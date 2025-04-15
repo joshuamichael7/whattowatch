@@ -27,18 +27,15 @@ interface OmdbMovie {
   imdbRating?: string;
 }
 
-// Use environment variable for API key with fallback for development
-const OMDB_API_KEY = import.meta.env.VITE_OMDB_API_KEY || "b80c6107";
-
-// Flag to determine whether to use direct API calls or Netlify function
-const USE_DIRECT_API =
-  import.meta.env.DEV && !import.meta.env.VITE_USE_NETLIFY_FUNCTIONS;
+// Always use Netlify functions in production
+const USE_DIRECT_API = false;
 
 const HomePage = () => {
   const [trendingMovies, setTrendingMovies] = useState<OmdbMovie[]>([]);
   const [popularTVShows, setPopularTVShows] = useState<OmdbMovie[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchValue, setSearchValue] = useState("");
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -61,8 +58,10 @@ const HomePage = () => {
           const randomMovieIndex = Math.floor(
             Math.random() * popularMovies.length,
           );
+
+          // Use Netlify function instead of direct API call
           const movieResponse = await fetch(
-            `https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&s=${popularMovies[randomMovieIndex]}&type=movie&page=1`,
+            `/.netlify/functions/omdb?s=${popularMovies[randomMovieIndex]}&type=movie&page=1`,
           );
           const movieData: OmdbSearchResponse = await movieResponse.json();
 
@@ -83,8 +82,10 @@ const HomePage = () => {
           const randomShowIndex = Math.floor(
             Math.random() * popularShows.length,
           );
+
+          // Use Netlify function instead of direct API call
           const tvResponse = await fetch(
-            `https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&s=${popularShows[randomShowIndex]}&type=series&page=1`,
+            `/.netlify/functions/omdb?s=${popularShows[randomShowIndex]}&type=series&page=1`,
           );
           const tvData: OmdbSearchResponse = await tvResponse.json();
 
@@ -95,17 +96,17 @@ const HomePage = () => {
           // Get detailed info including ratings for each movie
           const movieDetailsPromises = movieData.Search.slice(0, 4).map(
             (movie) =>
-              fetch(
-                `https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${movie.imdbID}`,
-              ).then((res) => res.json()),
+              fetch(`/.netlify/functions/omdb?i=${movie.imdbID}`).then((res) =>
+                res.json(),
+              ),
           );
           const movieDetails = await Promise.all(movieDetailsPromises);
 
           // Get detailed info including ratings for each TV show
           const tvDetailsPromises = tvData.Search.slice(0, 4).map((show) =>
-            fetch(
-              `https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${show.imdbID}`,
-            ).then((res) => res.json()),
+            fetch(`/.netlify/functions/omdb?i=${show.imdbID}`).then((res) =>
+              res.json(),
+            ),
           );
           const tvDetails = await Promise.all(tvDetailsPromises);
 
@@ -165,6 +166,35 @@ const HomePage = () => {
 
     fetchMovies();
   }, []);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchValue.trim()) return;
+
+    try {
+      setIsLoading(true);
+      // Use Netlify function to search
+      const response = await fetch(
+        `/.netlify/functions/omdb?s=${encodeURIComponent(searchValue)}&type=movie,series`,
+      );
+      const data = await response.json();
+
+      if (data.Response === "False") {
+        throw new Error(data.Error || "No results found");
+      }
+
+      // Process results here
+      console.log("Search results:", data);
+      // You could update state with search results here
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "An unknown error occurred",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -343,17 +373,22 @@ const HomePage = () => {
                 Enter a movie or TV show you love, and we'll find similar
                 content you might enjoy.
               </p>
-              <div className="flex w-full max-w-2xl gap-2">
+              <form
+                onSubmit={handleSearch}
+                className="flex w-full max-w-2xl gap-2"
+              >
                 <input
                   type="text"
                   placeholder="Search for a movie or TV show..."
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={searchValue}
+                  onChange={(e) => setSearchValue(e.target.value)}
                 />
                 <Button type="submit">
                   <Search className="h-4 w-4 mr-2" />
                   Search
                 </Button>
-              </div>
+              </form>
             </div>
 
             <div className="mt-12 text-center text-muted-foreground">

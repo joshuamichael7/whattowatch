@@ -2,8 +2,16 @@
 exports.handler = async function (event, context) {
   try {
     // Get the API key from environment variables
-    const API_KEY =
-      process.env.OMDB_API_KEY || process.env.VITE_OMDB_API_KEY || "b80c6107";
+    const API_KEY = process.env.OMDB_API_KEY;
+
+    if (!API_KEY) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({
+          error: "Missing OMDB API key in server environment variables.",
+        }),
+      };
+    }
 
     // Get query parameters from the request
     const params = event.queryStringParameters || {};

@@ -12,24 +12,18 @@ const getEnvVar = (key: string, defaultValue: string = ""): string => {
   return defaultValue;
 };
 
-// OMDB API endpoint - use Netlify function in production, direct API in development
-const API_ENDPOINT =
-  getEnvVar("NODE_ENV") === "production"
-    ? "/.netlify/functions/omdb"
-    : "https://www.omdbapi.com";
+// Always use Netlify function for OMDB API calls
+const API_ENDPOINT = "/.netlify/functions/omdb";
 
-// Get API key from environment variable only
-const API_KEY = getEnvVar("OMDB_API_KEY");
+// API key is handled server-side in the Netlify function
+const API_KEY = "";
 
-if (!API_KEY) {
-  console.error(
-    "Missing OMDB API key. Please check your environment variables.",
-  );
-}
-
-// Helper function to make API calls to OMDB
+// Helper function to make API calls to OMDB via Netlify function
 async function fetchFromOmdb(params: URLSearchParams) {
   try {
+    // Remove any API key from params as it's handled server-side
+    params.delete("apikey");
+
     const response = await fetch(`${API_ENDPOINT}?${params.toString()}`);
     const data = await response.json();
 
@@ -52,7 +46,6 @@ export async function searchContent(
 ): Promise<ContentItem[]> {
   try {
     const params = new URLSearchParams({
-      apikey: API_KEY,
       s: query,
     });
 
@@ -88,7 +81,6 @@ export async function searchContent(
 export async function getContentById(id: string): Promise<ContentItem | null> {
   try {
     const params = new URLSearchParams({
-      apikey: API_KEY,
       i: id,
       plot: "full",
     });
@@ -634,7 +626,6 @@ export async function getSimilarContent(
         // Use individual meaningful words from the title
         for (let i = 0; i < Math.min(3, titleWords.length); i++) {
           const titleParams = new URLSearchParams({
-            apikey: API_KEY,
             s: titleWords[i],
             type: contentType,
           });
@@ -643,7 +634,6 @@ export async function getSimilarContent(
 
         // Also try the full title for exact matches
         const fullTitleParams = new URLSearchParams({
-          apikey: API_KEY,
           s: content.title.substring(0, 30), // Limit length to avoid issues with very long titles
           type: contentType,
         });
@@ -721,7 +711,6 @@ export async function getSimilarContent(
           : primaryGenre;
 
       const genreParams = new URLSearchParams({
-        apikey: API_KEY,
         s: searchTerm,
         type: contentType,
       });
@@ -732,7 +721,6 @@ export async function getSimilarContent(
     if (actors.length > 0) {
       const mainActor = actors[0];
       const actorParams = new URLSearchParams({
-        apikey: API_KEY,
         s: mainActor,
         type: contentType,
       });
@@ -742,7 +730,6 @@ export async function getSimilarContent(
     // 3. Search by director if available (more relevant for movies)
     if (director && contentType === "movie") {
       const directorParams = new URLSearchParams({
-        apikey: API_KEY,
         s: director,
         type: contentType,
       });
@@ -753,7 +740,6 @@ export async function getSimilarContent(
     if (year > 0) {
       const decade = Math.floor(year / 10) * 10;
       const decadeParams = new URLSearchParams({
-        apikey: API_KEY,
         s: `${decade}s ${genres[0] || contentType}`,
         type: contentType,
       });
@@ -772,7 +758,6 @@ export async function getSimilarContent(
             genres.length > 0 ? `${genres[0]} ${plotKeyword}` : plotKeyword;
 
           const plotParams = new URLSearchParams({
-            apikey: API_KEY,
             s: searchTerm,
             type: contentType,
           });
@@ -1182,7 +1167,6 @@ export async function getTrendingContent(
     for (let i = 0; i < numSearches; i++) {
       const searchTerm = getSmartSearchTerm();
       const params = new URLSearchParams({
-        apikey: API_KEY,
         s: searchTerm,
       });
 
