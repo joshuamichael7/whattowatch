@@ -1,7 +1,6 @@
-// Edge function for calculating text similarity using TensorFlow.js
-const tf = require("@tensorflow/tfjs");
-require("@tensorflow/tfjs-node");
-const use = require("@tensorflow-models/universal-sentence-encoder");
+// Edge function for calculating text similarity
+// Using pure JS implementation instead of TensorFlow.js to avoid dependency issues
+const natural = require("natural");
 
 exports.handler = async function (event, context) {
   try {
@@ -23,46 +22,57 @@ exports.handler = async function (event, context) {
       `Processing similarity for ${candidatePlots.length} candidates`,
     );
 
-    // Load the Universal Sentence Encoder model
-    const model = await use.load();
-    console.log("Model loaded successfully");
+    // Calculate cosine similarity using natural's TfIdf
+    const tfidf = new natural.TfIdf();
 
-    // Get embeddings for all plots
-    const plots = [basePlot, ...candidatePlots];
-    const embeddings = await model.embed(plots);
-    console.log("Embeddings generated successfully");
+    // Add documents
+    tfidf.addDocument(basePlot);
+    candidatePlots.forEach((plot) => tfidf.addDocument(plot));
 
-    // Calculate cosine similarity for each candidate
-    const baseTensor = embeddings.slice([0, 0], [1]);
+    // Calculate similarities
     const similarities = [];
 
     for (let i = 0; i < candidatePlots.length; i++) {
-      const candidateTensor = embeddings.slice([i + 1, 0], [1]);
+      // Get terms from base plot
+      const baseTerms = {};
+      tfidf.listTerms(0).forEach((item) => {
+        baseTerms[item.term] = item.tfidf;
+      });
 
-      // Calculate dot product
-      const dot = tf.matMul(baseTensor, candidateTensor, false, true);
+      // Get terms from candidate plot
+      const candidateTerms = {};
+      tfidf.listTerms(i + 1).forEach((item) => {
+        candidateTerms[item.term] = item.tfidf;
+      });
 
-      // Calculate magnitudes
-      const baseMag = tf.norm(baseTensor);
-      const candidateMag = tf.norm(candidateTensor);
+      // Calculate cosine similarity
+      let dotProduct = 0;
+      let baseMagnitude = 0;
+      let candidateMagnitude = 0;
 
-      // Calculate similarity (cosine similarity)
-      const similarity = dot.div(baseMag.mul(candidateMag));
+      // Calculate dot product and magnitudes
+      const allTerms = new Set([
+        ...Object.keys(baseTerms),
+        ...Object.keys(candidateTerms),
+      ]);
 
-      // Get the similarity value
-      const similarityValue = await similarity.data();
-      similarities.push(similarityValue[0]);
+      allTerms.forEach((term) => {
+        const baseValue = baseTerms[term] || 0;
+        const candidateValue = candidateTerms[term] || 0;
 
-      // Clean up tensors
-      dot.dispose();
-      baseMag.dispose();
-      candidateMag.dispose();
-      similarity.dispose();
+        dotProduct += baseValue * candidateValue;
+        baseMagnitude += baseValue * baseValue;
+        candidateMagnitude += candidateValue * candidateValue;
+      });
+
+      // Calculate final similarity
+      const similarity =
+        dotProduct /
+          (Math.sqrt(baseMagnitude) * Math.sqrt(candidateMagnitude)) || 0;
+      similarities.push(similarity);
     }
 
-    // Clean up the main tensors
-    baseTensor.dispose();
-    embeddings.dispose();
+    console.log("Similarities calculated successfully");
 
     return {
       statusCode: 200,

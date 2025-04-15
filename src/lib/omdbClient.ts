@@ -15,9 +15,6 @@ const getEnvVar = (key: string, defaultValue: string = ""): string => {
 // Always use Netlify function for OMDB API calls
 const API_ENDPOINT = "/.netlify/functions/omdb";
 
-// API key is handled server-side in the Netlify function
-const API_KEY = "";
-
 // Helper function to make API calls to OMDB via Netlify function
 async function fetchFromOmdb(params: URLSearchParams) {
   try {
@@ -376,6 +373,8 @@ function extractKeyPlotElements(synopsis: string): string[] {
 async function calculatePlotSimilarities(
   basePlot: string,
   candidatePlots: string[],
+  baseContent?: ContentItem,
+  candidateContents?: (ContentItem | null)[],
 ): Promise<number[] | null> {
   try {
     console.log(
@@ -400,7 +399,17 @@ async function calculatePlotSimilarities(
       );
       const errorText = await response.text();
       console.error(`[calculatePlotSimilarities] Error details: ${errorText}`);
-      return null;
+
+      // Fallback to local calculation if edge function fails
+      console.log(
+        `[calculatePlotSimilarities] Falling back to local calculation`,
+      );
+      return calculateLocalSimilarities(
+        basePlot,
+        candidatePlots,
+        baseContent,
+        candidateContents,
+      );
     }
 
     const data = await response.json();
@@ -413,8 +422,116 @@ async function calculatePlotSimilarities(
       "[calculatePlotSimilarities] Error calling edge function:",
       error,
     );
-    return null;
+    // Fallback to local calculation if edge function fails
+    console.log(
+      `[calculatePlotSimilarities] Falling back to local calculation due to error`,
+    );
+    return calculateLocalSimilarities(
+      basePlot,
+      candidatePlots,
+      baseContent,
+      candidateContents,
+    );
   }
+}
+
+// Local fallback for calculating similarities when the edge function fails
+function calculateLocalSimilarities(
+  basePlot: string,
+  candidatePlots: string[],
+  baseContent?: ContentItem,
+  candidateContents?: (ContentItem | null)[],
+): number[] {
+  console.log(
+    `[calculateLocalSimilarities] Calculating similarities locally for ${candidatePlots.length} plots`,
+  );
+
+  // If we have genre information, filter by genre first
+  let similarityScores = new Array(candidatePlots.length).fill(0);
+
+  // If we have content items with genre information, prioritize same genre
+  if (baseContent && candidateContents && baseContent.genre_strings) {
+    console.log(
+      `[calculateLocalSimilarities] Filtering by genre: ${baseContent.genre_strings.join(", ")}`,
+    );
+
+    // Create a set of base content genres for faster lookup
+    const baseGenres = new Set(
+      baseContent.genre_strings.map((g) => g.toLowerCase()),
+    );
+
+    // Check each candidate content for genre match
+    candidateContents.forEach((candidate, index) => {
+      if (!candidate || !candidate.genre_strings) return;
+
+      // Check if any genres match
+      const hasMatchingGenre = candidate.genre_strings.some((genre) =>
+        baseGenres.has(genre.toLowerCase()),
+      );
+
+      // If genres match, calculate similarity, otherwise leave as 0
+      if (hasMatchingGenre) {
+        similarityScores[index] = calculateCosineSimilarity(
+          basePlot,
+          candidatePlots[index],
+        );
+      }
+    });
+
+    return similarityScores;
+  }
+
+  // Fallback to regular similarity if no genre information is available
+  return candidatePlots.map((plot) =>
+    calculateCosineSimilarity(basePlot, plot),
+  );
+}
+
+// Helper function to calculate cosine similarity between two text strings
+function calculateCosineSimilarity(text1: string, text2: string): number {
+  // Simple implementation of cosine similarity using bag of words
+  const getWordFrequency = (text: string): Record<string, number> => {
+    const words = text
+      .toLowerCase()
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
+      .split(/\s+/);
+
+    const frequency: Record<string, number> = {};
+    for (const word of words) {
+      if (word.length > 2) {
+        // Skip very short words
+        frequency[word] = (frequency[word] || 0) + 1;
+      }
+    }
+    return frequency;
+  };
+
+  const freq1 = getWordFrequency(text1);
+  const freq2 = getWordFrequency(text2);
+
+  // Calculate dot product
+  let dotProduct = 0;
+  let magnitude1 = 0;
+  let magnitude2 = 0;
+
+  // Get all unique words
+  const allWords = new Set([...Object.keys(freq1), ...Object.keys(freq2)]);
+
+  // Calculate similarity
+  for (const word of allWords) {
+    const value1 = freq1[word] || 0;
+    const value2 = freq2[word] || 0;
+
+    dotProduct += value1 * value2;
+    magnitude1 += value1 * value1;
+    magnitude2 += value2 * value2;
+  }
+
+  // Avoid division by zero
+  if (magnitude1 === 0 || magnitude2 === 0) return 0;
+
+  // Return cosine similarity
+  return dotProduct / (Math.sqrt(magnitude1) * Math.sqrt(magnitude2));
 }
 
 // Import AI and Vector services
@@ -491,7 +608,6 @@ export async function getSimilarContent(
           // Search for each title in OMDB
           const searchPromises = similarTitles.map((title) => {
             const params = new URLSearchParams({
-              apikey: API_KEY,
               s: title,
               type: content.media_type === "movie" ? "movie" : "series",
             });
@@ -860,6 +976,8 @@ export async function getSimilarContent(
         const similarities = await calculatePlotSimilarities(
           plotSynopsis,
           candidatePlots,
+          content,
+          validContents,
         );
 
         if (similarities) {
