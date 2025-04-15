@@ -1199,99 +1199,106 @@ function useTraditionalSimilarity(
   });
 }
 
-// Helper function to get top-rated content instead of trending
+// Helper function to get trending content from local storage or fallback to hardcoded content
 export async function getTrendingContent(
   type?: "movie" | "tv",
   limit = 8,
 ): Promise<ContentItem[]> {
   console.log(
-    `[getTopRatedContent] Fetching ${limit} top-rated ${type || "all"} content items`,
+    `[getTrendingContent] Attempting to load ${type || "all"} content from local storage`,
   );
 
-  // Use a list of top-rated titles by IMDb rating
-  const topRatedMovies = [
-    "tt0111161", // The Shawshank Redemption
-    "tt0068646", // The Godfather
-    "tt0071562", // The Godfather: Part II
-    "tt0468569", // The Dark Knight
-    "tt0050083", // 12 Angry Men
-    "tt0108052", // Schindler's List
-    "tt0167260", // The Lord of the Rings: The Return of the King
-    "tt0110912", // Pulp Fiction
-    "tt0060196", // The Good, the Bad and the Ugly
-    "tt0109830", // Forrest Gump
-    "tt0120737", // The Lord of the Rings: The Fellowship of the Ring
-    "tt0137523", // Fight Club
-    "tt0167261", // The Lord of the Rings: The Two Towers
-    "tt0080684", // Star Wars: Episode V - The Empire Strikes Back
-    "tt1375666", // Inception
-  ];
-
-  const topRatedTVShows = [
-    "tt0903747", // Breaking Bad
-    "tt0185906", // Band of Brothers
-    "tt7366338", // Chernobyl
-    "tt0795176", // Planet Earth
-    "tt0306414", // The Wire
-    "tt0417299", // Avatar: The Last Airbender
-    "tt0944947", // Game of Thrones
-    "tt0081846", // Das Boot
-    "tt8420184", // The Last Dance
-    "tt0071075", // The World at War
-    "tt1533395", // Life
-    "tt1355642", // Fullmetal Alchemist: Brotherhood
-    "tt2395695", // Cosmos
-    "tt0052520", // The Twilight Zone
-    "tt2861424", // Rick and Morty
-  ];
-
   try {
-    // Select IDs based on content type
-    const selectedIds =
-      type === "tv"
-        ? topRatedTVShows
-        : type === "movie"
-          ? topRatedMovies
-          : [
-              ...topRatedMovies.slice(0, Math.ceil(limit / 2)),
-              ...topRatedTVShows.slice(0, Math.floor(limit / 2)),
-            ];
+    // Try to get content from local storage first
+    const storageKey = `trending-${type || "all"}-content`;
+    const storedContentJson = localStorage.getItem(storageKey);
+    const storedTimestampJson = localStorage.getItem(`${storageKey}-timestamp`);
 
-    // Limit to requested number and shuffle slightly for variety
-    const shuffledIds = selectedIds
-      .slice(0, limit * 2)
-      .sort(() => 0.5 - Math.random())
-      .slice(0, limit);
+    // Check if we have stored content and it's not expired (less than 24 hours old)
+    if (storedContentJson && storedTimestampJson) {
+      const storedContent = JSON.parse(storedContentJson);
+      const storedTimestamp = JSON.parse(storedTimestampJson);
+      const currentTime = new Date().getTime();
+      const oneDay = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
-    // Fetch details for each ID in parallel
-    const detailPromises = shuffledIds.map((id) => {
-      const params = new URLSearchParams({
-        i: id,
-        plot: "short",
-      });
-      return fetchFromOmdb(params);
-    });
+      // If content is less than 24 hours old, use it
+      if (
+        currentTime - storedTimestamp < oneDay &&
+        Array.isArray(storedContent) &&
+        storedContent.length >= limit
+      ) {
+        console.log(
+          `[getTrendingContent] Using cached content from local storage for ${type || "all"}`,
+        );
 
-    const detailsResults = await Promise.all(detailPromises);
+        // Schedule a background refresh if content is older than 12 hours
+        if (currentTime - storedTimestamp > oneDay / 2) {
+          console.log(
+            `[getTrendingContent] Scheduling background refresh for ${type || "all"} content`,
+          );
+          setTimeout(() => refreshTrendingContent(type, limit), 100);
+        }
 
-    // Filter out any failed requests
-    const validResults = detailsResults.filter(
-      (data) => data && data.Response === "True" && data.imdbID,
-    );
-
-    if (validResults.length === 0) {
+        return storedContent.slice(0, limit);
+      } else {
+        console.log(
+          `[getTrendingContent] Cached content expired or insufficient for ${type || "all"}, refreshing...`,
+        );
+      }
+    } else {
       console.log(
-        "[getTopRatedContent] No results from OMDB API, using fallback data",
+        `[getTrendingContent] No cached content found for ${type || "all"}, using hardcoded content`,
       );
-      return getHardcodedContent(type, limit);
     }
 
+    // If we don't have valid stored content, use hardcoded content and refresh in background
+    const hardcodedContent = getHardcodedContent(type, limit);
+
+    // Schedule a background refresh
+    setTimeout(() => refreshTrendingContent(type, limit), 100);
+
+    return hardcodedContent;
+  } catch (error) {
+    console.error(`[getTrendingContent] Error accessing local storage:`, error);
+    // Fallback to hardcoded content if there's any error
+    return getHardcodedContent(type, limit);
+  }
+}
+
+// Helper function to refresh trending content in the background and store in local storage
+async function refreshTrendingContent(
+  type?: "movie" | "tv",
+  limit = 20,
+): Promise<void> {
+  try {
     console.log(
-      `[getTopRatedContent] Found ${validResults.length} top-rated items`,
+      `[refreshTrendingContent] Refreshing trending ${type || "all"} content in background`,
     );
 
-    // Transform OMDB data to match our application's expected format
-    return validResults.map((item: any) => ({
+    // Use the Netlify edge function to get fresh content
+    const params = new URLSearchParams({
+      trending: "true",
+    });
+
+    if (type) {
+      params.append("type", type);
+    }
+
+    // Fetch fresh content from the edge function
+    const response = await fetch(`${API_ENDPOINT}?${params.toString()}`);
+
+    if (!response.ok) {
+      throw new Error(`Edge function returned status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!data || !Array.isArray(data.results) || data.results.length === 0) {
+      throw new Error("No results returned from edge function");
+    }
+
+    // Format the results to match ContentItem format
+    const formattedResults = data.results.map((item: any) => ({
       id: item.imdbID,
       title: item.Title,
       poster_path:
@@ -1300,25 +1307,91 @@ export async function getTrendingContent(
           : "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80",
       media_type: item.Type === "movie" ? "movie" : "tv",
       release_date: item.Year,
-      vote_average: item.imdbRating !== "N/A" ? parseFloat(item.imdbRating) : 0,
-      vote_count:
-        item.imdbVotes !== "N/A"
-          ? parseInt(item.imdbVotes.replace(/,/g, ""))
-          : 0,
-      genre_ids: [], // We could parse genres here if needed
-      genre_strings: item.Genre ? item.Genre.split(", ") : [],
-      overview: item.Plot !== "N/A" ? item.Plot : "",
-      recommendationReason: `Top-rated ${item.Type === "movie" ? "movie" : "TV show"} (${item.imdbRating}/10)`,
+      vote_average: item.imdbRating ? parseFloat(item.imdbRating) : 0,
+      vote_count: item.imdbVotes
+        ? parseInt(item.imdbVotes.replace(/,/g, ""))
+        : 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: `Trending ${item.Type === "movie" ? "movie" : "TV show"}`,
     }));
+
+    // Store in local storage with timestamp
+    const storageKey = `trending-${type || "all"}-content`;
+    localStorage.setItem(storageKey, JSON.stringify(formattedResults));
+    localStorage.setItem(
+      `${storageKey}-timestamp`,
+      JSON.stringify(new Date().getTime()),
+    );
+
+    console.log(
+      `[refreshTrendingContent] Successfully refreshed and stored ${formattedResults.length} ${type || "all"} items`,
+    );
+
+    // Dispatch an event to notify components that fresh content is available
+    const event = new CustomEvent("freshContentAvailable", {
+      detail: {
+        type: type || "all",
+        content: formattedResults,
+      },
+    });
+    window.dispatchEvent(event);
   } catch (error) {
-    console.error("Error fetching top-rated content:", error);
-    return getHardcodedContent(type, limit);
+    console.error(
+      `[refreshTrendingContent] Error refreshing trending content:`,
+      error,
+    );
   }
 }
 
-// Helper function to get hardcoded content when API fails
+// Function to check and refresh content on page load
+export function initializeContentCache(): void {
+  try {
+    console.log("[initializeContentCache] Checking content cache on page load");
+
+    // Check if we need to refresh movie content
+    const movieStorageKey = "trending-movie-content";
+    const movieTimestampJson = localStorage.getItem(
+      `${movieStorageKey}-timestamp`,
+    );
+
+    // Check if we need to refresh TV content
+    const tvStorageKey = "trending-tv-content";
+    const tvTimestampJson = localStorage.getItem(`${tvStorageKey}-timestamp`);
+
+    const currentTime = new Date().getTime();
+    const oneDay = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+    // Schedule refresh for movie content if needed
+    if (
+      !movieTimestampJson ||
+      currentTime - JSON.parse(movieTimestampJson) > oneDay
+    ) {
+      console.log(
+        "[initializeContentCache] Scheduling refresh for movie content",
+      );
+      setTimeout(() => refreshTrendingContent("movie", 20), 2000);
+    }
+
+    // Schedule refresh for TV content if needed
+    if (
+      !tvTimestampJson ||
+      currentTime - JSON.parse(tvTimestampJson) > oneDay
+    ) {
+      console.log("[initializeContentCache] Scheduling refresh for TV content");
+      setTimeout(() => refreshTrendingContent("tv", 20), 4000);
+    }
+  } catch (error) {
+    console.error(
+      "[initializeContentCache] Error checking content cache:",
+      error,
+    );
+  }
+}
+
+// Helper function to get pre-defined content immediately
 function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
-  console.log("[getTrendingContent] Using hardcoded content");
+  console.log("[getHardcodedContent] Using pre-defined content");
 
   const movies = [
     {

@@ -44,133 +44,238 @@ const HomePage = () => {
   const [searchValue, setSearchValue] = useState("");
 
   useEffect(() => {
-    const fetchMovies = async () => {
+    const fetchContent = async () => {
+      setIsLoading(true);
+      setError(null);
+
       try {
-        setIsLoading(true);
-        setError(null);
-
-        if (USE_DIRECT_API) {
-          // Direct API calls for development
-          // Fetch trending movies using more specific search terms
-          const popularMovies = [
-            "Avengers",
-            "Star Wars",
-            "Jurassic",
-            "Batman",
-            "Spider",
-            "Harry Potter",
-            "Fast",
-          ];
-          const randomMovieIndex = Math.floor(
-            Math.random() * popularMovies.length,
-          );
-
-          // Use Netlify function instead of direct API call
-          const movieResponse = await fetch(
-            `/.netlify/functions/omdb?s=${popularMovies[randomMovieIndex]}&type=movie&page=1`,
-          );
-          const movieData: OmdbSearchResponse = await movieResponse.json();
-
-          if (movieData.Response === "False") {
-            throw new Error(movieData.Error || "Failed to fetch movies");
-          }
-
-          // Fetch popular TV shows using more specific search terms
-          const popularShows = [
-            "Breaking",
-            "Game of",
-            "Stranger",
-            "Friends",
-            "Office",
-            "Walking",
-            "Crown",
-          ];
-          const randomShowIndex = Math.floor(
-            Math.random() * popularShows.length,
-          );
-
-          // Use Netlify function instead of direct API call
-          const tvResponse = await fetch(
-            `/.netlify/functions/omdb?s=${popularShows[randomShowIndex]}&type=series&page=1`,
-          );
-          const tvData: OmdbSearchResponse = await tvResponse.json();
-
-          if (tvData.Response === "False") {
-            throw new Error(tvData.Error || "Failed to fetch TV shows");
-          }
-
-          // Get detailed info including ratings for each movie
-          const movieDetailsPromises = movieData.Search.slice(0, 4).map(
-            (movie) =>
-              fetch(`/.netlify/functions/omdb?i=${movie.imdbID}`).then((res) =>
-                res.json(),
-              ),
-          );
-          const movieDetails = await Promise.all(movieDetailsPromises);
-
-          // Get detailed info including ratings for each TV show
-          const tvDetailsPromises = tvData.Search.slice(0, 4).map((show) =>
-            fetch(`/.netlify/functions/omdb?i=${show.imdbID}`).then((res) =>
-              res.json(),
-            ),
-          );
-          const tvDetails = await Promise.all(tvDetailsPromises);
-
-          setTrendingMovies(movieDetails);
-          setPopularTVShows(tvDetails);
-        } else {
-          // Use omdbClient for production (Netlify functions)
-          // Fetch trending movies
-          const movieData = await getTrendingContent("movie", 4);
-
-          // Fetch trending TV shows
-          const tvData = await getTrendingContent("tv", 4);
-
-          // Get detailed info for each movie
-          const movieDetailsPromises = movieData.map((movie) =>
-            getContentById(movie.id),
-          );
-          const movieDetails = await Promise.all(movieDetailsPromises);
-
-          // Get detailed info for each TV show
-          const tvDetailsPromises = tvData.map((show) =>
-            getContentById(show.id),
-          );
-          const tvDetails = await Promise.all(tvDetailsPromises);
-
-          // Map the returned data to match the expected format
-          const formattedMovies = movieDetails.filter(Boolean).map((movie) => ({
-            Title: movie.title,
-            Year: movie.release_date,
-            imdbID: movie.id,
-            Type: "movie",
-            Poster: movie.poster_path,
-            imdbRating: movie.vote_average.toString(),
-          }));
-
-          const formattedShows = tvDetails.filter(Boolean).map((show) => ({
-            Title: show.title,
-            Year: show.release_date || show.first_air_date,
-            imdbID: show.id,
-            Type: "series",
-            Poster: show.poster_path,
-            imdbRating: show.vote_average.toString(),
-          }));
-
-          setTrendingMovies(formattedMovies);
-          setPopularTVShows(formattedShows);
+        // Initialize content cache on page load
+        // This will check if we need to refresh the cache in the background
+        try {
+          import("@/lib/omdbClient")
+            .then((module) => {
+              if (typeof module.initializeContentCache === "function") {
+                console.log("Initializing content cache on page load");
+                module.initializeContentCache();
+              }
+            })
+            .catch((err) => {
+              console.warn("Failed to initialize content cache:", err);
+              // Non-critical error, continue execution
+            });
+        } catch (initError) {
+          console.warn("Error during content cache initialization:", initError);
+          // Non-critical error, continue execution
         }
+
+        console.log("Fetching trending content from cache or fallback");
+
+        // Wrap each getTrendingContent call in try/catch to handle individual failures
+        let movieData = [];
+        let tvData = [];
+
+        try {
+          // Get initial movie content from local storage or fallback to hardcoded content
+          movieData = await getTrendingContent("movie", 4);
+          console.log(`Received ${movieData.length} movies`);
+        } catch (movieError) {
+          console.error("Error fetching movie data:", movieError);
+          setError(
+            (prev) =>
+              prev || "Error loading movie data. Using fallback content.",
+          );
+          // Use empty array, will show appropriate UI for no content
+        }
+
+        try {
+          // Get initial TV show content from local storage or fallback to hardcoded content
+          tvData = await getTrendingContent("tv", 4);
+          console.log(`Received ${tvData.length} TV shows`);
+        } catch (tvError) {
+          console.error("Error fetching TV data:", tvError);
+          setError(
+            (prev) =>
+              prev || "Error loading TV show data. Using fallback content.",
+          );
+          // Use empty array, will show appropriate UI for no content
+        }
+
+        // Format the data to match the expected format with additional validation
+        const formattedMovies = movieData
+          .map((movie) => {
+            // Validate required fields and provide fallbacks
+            if (!movie || typeof movie !== "object") {
+              console.warn("Invalid movie object:", movie);
+              return null;
+            }
+
+            return {
+              Title: movie.title || "Unknown Title",
+              Year: movie.release_date || "Unknown Year",
+              imdbID:
+                movie.id ||
+                `unknown-${Math.random().toString(36).substring(2, 9)}`,
+              Type: "movie",
+              Poster:
+                movie.poster_path ||
+                "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80",
+              imdbRating:
+                movie.vote_average !== undefined && movie.vote_average !== null
+                  ? movie.vote_average.toString()
+                  : "0",
+            };
+          })
+          .filter(Boolean); // Remove any null entries
+
+        const formattedShows = tvData
+          .map((show) => {
+            // Validate required fields and provide fallbacks
+            if (!show || typeof show !== "object") {
+              console.warn("Invalid TV show object:", show);
+              return null;
+            }
+
+            return {
+              Title: show.title || "Unknown Title",
+              Year: show.release_date || show.first_air_date || "Unknown Year",
+              imdbID:
+                show.id ||
+                `unknown-${Math.random().toString(36).substring(2, 9)}`,
+              Type: "series",
+              Poster:
+                show.poster_path ||
+                "https://images.unsplash.com/photo-1616530940355-351fabd9524b?w=400&q=80",
+              imdbRating:
+                show.vote_average !== undefined && show.vote_average !== null
+                  ? show.vote_average.toString()
+                  : "0",
+            };
+          })
+          .filter(Boolean); // Remove any null entries
+
+        // Set initial content
+        setTrendingMovies(formattedMovies);
+        setPopularTVShows(formattedShows);
+
+        // Listen for fresh content updates
+        const handleFreshContent = (event: CustomEvent) => {
+          try {
+            if (!event || !event.detail) {
+              console.warn("Received invalid fresh content event:", event);
+              return;
+            }
+
+            const { type, content } = event.detail;
+
+            if (!content || !Array.isArray(content)) {
+              console.warn(`Received invalid ${type} content:`, content);
+              return;
+            }
+
+            console.log(
+              `Received fresh ${type} content with ${content.length} items`,
+            );
+
+            if (type === "movie" && content.length > 0) {
+              // Format and update movie content
+              const freshMovies = content
+                .slice(0, 4)
+                .map((movie: any) => {
+                  if (!movie || typeof movie !== "object") return null;
+
+                  return {
+                    Title: movie.title || "Unknown Title",
+                    Year: movie.release_date || "Unknown Year",
+                    imdbID:
+                      movie.id ||
+                      `unknown-${Math.random().toString(36).substring(2, 9)}`,
+                    Type: "movie",
+                    Poster:
+                      movie.poster_path ||
+                      "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80",
+                    imdbRating:
+                      movie.vote_average !== undefined &&
+                      movie.vote_average !== null
+                        ? movie.vote_average.toString()
+                        : "0",
+                  };
+                })
+                .filter(Boolean);
+
+              if (freshMovies.length > 0) {
+                console.log(
+                  `Updating trending movies with ${freshMovies.length} items`,
+                );
+                setTrendingMovies(freshMovies);
+              }
+            } else if (type === "tv" && content.length > 0) {
+              // Format and update TV content
+              const freshShows = content
+                .slice(0, 4)
+                .map((show: any) => {
+                  if (!show || typeof show !== "object") return null;
+
+                  return {
+                    Title: show.title || "Unknown Title",
+                    Year:
+                      show.release_date ||
+                      show.first_air_date ||
+                      "Unknown Year",
+                    imdbID:
+                      show.id ||
+                      `unknown-${Math.random().toString(36).substring(2, 9)}`,
+                    Type: "series",
+                    Poster:
+                      show.poster_path ||
+                      "https://images.unsplash.com/photo-1616530940355-351fabd9524b?w=400&q=80",
+                    imdbRating:
+                      show.vote_average !== undefined &&
+                      show.vote_average !== null
+                        ? show.vote_average.toString()
+                        : "0",
+                  };
+                })
+                .filter(Boolean);
+
+              if (freshShows.length > 0) {
+                console.log(
+                  `Updating popular TV shows with ${freshShows.length} items`,
+                );
+                setPopularTVShows(freshShows);
+              }
+            }
+          } catch (eventError) {
+            console.error("Error processing fresh content event:", eventError);
+            // Non-critical error, don't update state or show error to user
+          }
+        };
+
+        // Add event listener for fresh content
+        window.addEventListener(
+          "freshContentAvailable",
+          handleFreshContent as EventListener,
+        );
+
+        // Clean up event listener on unmount
+        return () => {
+          window.removeEventListener(
+            "freshContentAvailable",
+            handleFreshContent as EventListener,
+          );
+        };
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "An unknown error occurred",
         );
         console.error("Error fetching data:", err);
+        // Ensure loading state is turned off even if there's an error
+        setIsLoading(false);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchMovies();
+    fetchContent();
   }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
