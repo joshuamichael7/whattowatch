@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { PlayCircle, Search, ListFilter } from "lucide-react";
-import PreferenceQuiz from "./PreferenceQuiz";
+import PreferenceFinder from "./PreferenceQuiz";
 import SimilarContentSearch from "./SimilarContentSearch";
 import RecommendationGrid from "./RecommendationGrid";
 import ContentFilters from "./ContentFilters";
@@ -25,13 +25,14 @@ interface ContentItem {
   contentRating?: string;
 }
 
-interface QuizResults {
+interface PreferenceResults {
   genres: string[];
   mood: string;
   viewingTime: number;
   favoriteContent: string[];
   contentToAvoid: string[];
   ageRating: string;
+  aiRecommendations?: Array<{ title: string; reason: string }>;
 }
 
 interface ContentFilterOptions {
@@ -59,19 +60,135 @@ const Dashboard = () => {
     setUseDirectApi(useDirectApiFlag);
   }, []);
 
+  // Function to search for content by title
+  const searchContent = async (title: string, type: string = "all") => {
+    try {
+      console.log(`Searching for content with title: ${title}, type: ${type}`);
+      const response = await omdbClient.search(title, type);
+      return response.results || [];
+    } catch (error) {
+      console.error(`Error searching for content with title: ${title}`, error);
+      return [];
+    }
+  };
+
+  // Function to get content details by ID
+  const getContentById = async (id: string) => {
+    try {
+      console.log(`Getting content details for ID: ${id}`);
+      const response = await omdbClient.getById(id);
+      return response;
+    } catch (error) {
+      console.error(`Error getting content details for ID: ${id}`, error);
+      return null;
+    }
+  };
+
   // Handle quiz completion
-  const handleQuizComplete = (preferences: QuizResults) => {
+  const handleQuizComplete = async (preferences: PreferenceResults) => {
     setIsLoading(true);
     setActiveTab("recommendations");
 
-    // Simulate API call to get recommendations based on preferences
-    setTimeout(() => {
-      // In a real app, this would be an API call that uses the preferences
-      // to generate personalized recommendations
+    try {
+      // Check if we have AI recommendations from the quiz
+      if (
+        preferences.aiRecommendations &&
+        preferences.aiRecommendations.length > 0
+      ) {
+        console.log(
+          "Using AI recommendations from quiz",
+          preferences.aiRecommendations,
+        );
+
+        // Convert AI recommendations to ContentItem format
+        const aiBasedRecommendations = await Promise.all(
+          preferences.aiRecommendations.map(async (rec) => {
+            try {
+              console.log(`Processing AI recommendation: ${rec.title}`);
+              // Search for the title
+              const searchResults = await searchContent(rec.title, "all");
+
+              if (searchResults && searchResults.length > 0) {
+                console.log(
+                  `Found ${searchResults.length} search results for "${rec.title}"`,
+                );
+                // Get the first result (most relevant)
+                const firstResult = searchResults[0];
+
+                // Get detailed content
+                const detailedContent = await getContentById(firstResult.id);
+
+                if (detailedContent) {
+                  console.log(`Got detailed content for "${rec.title}":`, {
+                    id: detailedContent.id,
+                    title: detailedContent.title,
+                    type: detailedContent.media_type,
+                  });
+
+                  return {
+                    id: detailedContent.id,
+                    title: detailedContent.title,
+                    type: detailedContent.media_type as "movie" | "tv",
+                    year:
+                      detailedContent.release_date ||
+                      detailedContent.first_air_date ||
+                      "",
+                    poster: detailedContent.poster_path,
+                    rating: detailedContent.vote_average || 0,
+                    genres: detailedContent.genre_strings || [],
+                    synopsis: detailedContent.overview || "",
+                    streamingOn: [],
+                    recommendationReason:
+                      rec.reason || "AI recommended based on your preferences",
+                    runtime: detailedContent.runtime
+                      ? `${Math.floor(detailedContent.runtime / 60)}h ${detailedContent.runtime % 60}m`
+                      : undefined,
+                    contentRating: detailedContent.content_rating,
+                  };
+                }
+              }
+              return null;
+            } catch (err) {
+              console.error(
+                `Error processing AI recommendation "${rec.title}":`,
+                err,
+              );
+              return null;
+            }
+          }),
+        );
+
+        // Filter out null results and limit to reasonable number
+        const validRecommendations = aiBasedRecommendations.filter(
+          Boolean,
+        ) as ContentItem[];
+
+        console.log(
+          `Found ${validRecommendations.length} valid recommendations from AI`,
+        );
+
+        if (validRecommendations.length > 0) {
+          setRecommendations(validRecommendations);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      console.log(
+        "No valid AI recommendations found, falling back to mock data",
+      );
+      // Fallback to mock recommendations if AI recommendations failed or weren't available
       const mockRecommendations = generateMockRecommendations(preferences);
       setRecommendations(mockRecommendations);
+    } catch (error) {
+      console.error("Error processing recommendations:", error);
+      // Fallback to mock recommendations
+      console.log("Error occurred, falling back to mock data");
+      const mockRecommendations = generateMockRecommendations(preferences);
+      setRecommendations(mockRecommendations);
+    } finally {
       setIsLoading(false);
-    }, 2000);
+    }
   };
 
   // Handle similar content selection
@@ -146,7 +263,7 @@ const Dashboard = () => {
 
   // Mock function to generate recommendations based on preferences
   const generateMockRecommendations = (
-    preferences: Partial<QuizResults>,
+    preferences: Partial<PreferenceResults>,
   ): ContentItem[] => {
     // This would be replaced with actual recommendation logic or API call
     const baseRecommendations = [
@@ -296,7 +413,7 @@ const Dashboard = () => {
               variant={activeTab === "quiz" ? "default" : "ghost"}
               onClick={() => setActiveTab("quiz")}
             >
-              Preference Quiz
+              Find Preferences
             </Button>
             <Button
               variant={activeTab === "similar" ? "default" : "ghost"}
@@ -342,7 +459,9 @@ const Dashboard = () => {
                 <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                   <ListFilter className="h-8 w-8" />
                 </div>
-                <h2 className="text-2xl font-semibold">Take Preference Quiz</h2>
+                <h2 className="text-2xl font-semibold">
+                  Find Your Preferences
+                </h2>
                 <p className="text-muted-foreground">
                   Answer a few questions about your taste to get personalized
                   recommendations.
@@ -352,7 +471,7 @@ const Dashboard = () => {
                   onClick={() => setActiveTab("quiz")}
                   className="mt-4"
                 >
-                  Start Quiz
+                  Get Started
                 </Button>
               </div>
 
@@ -383,7 +502,7 @@ const Dashboard = () => {
             animate={{ opacity: 1 }}
             className="max-w-4xl mx-auto"
           >
-            <PreferenceQuiz onComplete={handleQuizComplete} />
+            <PreferenceFinder onComplete={handleQuizComplete} />
           </motion.div>
         )}
 

@@ -239,7 +239,7 @@ const MovieDetailPage = () => {
         <SimilarContentCarousel
           contentId={id || ""}
           mediaType={movie.media_type || "movie"}
-          limit={6}
+          limit={8}
         />
       </div>
 

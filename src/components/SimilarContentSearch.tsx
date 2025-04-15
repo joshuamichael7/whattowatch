@@ -104,7 +104,13 @@ const SimilarContentSearch = ({
 
     try {
       // Get similar content based on the selected item, using the appropriate API method
+      console.log(
+        `[SimilarContentSearch] Getting similar content for: ${item.title} (${item.media_type}), ID: ${item.id}`,
+      );
       const similarItems = await getSimilarContent(item.id, useDirectApi);
+      console.log(
+        `[SimilarContentSearch] Found ${similarItems.length} similar items`,
+      );
       setSimilarContent(similarItems);
 
       if (similarItems.length === 0) {

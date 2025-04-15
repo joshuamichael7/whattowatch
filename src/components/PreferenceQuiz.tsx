@@ -15,24 +15,25 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 
-interface PreferenceQuizProps {
-  onComplete?: (preferences: QuizResults) => void;
+interface PreferenceFinderProps {
+  onComplete?: (preferences: PreferenceResults) => void;
 }
 
-interface QuizResults {
+interface PreferenceResults {
   genres: string[];
   mood: string;
   viewingTime: number;
   favoriteContent: string[];
   contentToAvoid: string[];
   ageRating: string;
+  aiRecommendations?: Array<{ title: string; reason: string }>;
 }
 
-const PreferenceQuiz: React.FC<PreferenceQuizProps> = ({
+const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
   onComplete = () => {},
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [preferences, setPreferences] = useState<QuizResults>({
+  const [preferences, setPreferences] = useState<PreferenceResults>({
     genres: [],
     mood: "thoughtful",
     viewingTime: 90,
@@ -87,7 +88,7 @@ const PreferenceQuiz: React.FC<PreferenceQuizProps> = ({
     if (currentStep < totalSteps - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      onComplete(preferences);
+      handlePreferenceComplete();
     }
   };
 
@@ -95,6 +96,35 @@ const PreferenceQuiz: React.FC<PreferenceQuizProps> = ({
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
     }
+  };
+
+  const handlePreferenceComplete = async () => {
+    // Try to use enhanced recommendation engine if available
+    try {
+      const { getPersonalizedRecommendations } = await import(
+        "@/services/aiService"
+      );
+      const aiRecommendations = await getPersonalizedRecommendations(
+        preferences,
+        10,
+      );
+
+      // If we got AI recommendations, add them to the preferences object
+      if (aiRecommendations && aiRecommendations.length > 0) {
+        const enhancedPreferences = {
+          ...preferences,
+          aiRecommendations: aiRecommendations,
+        };
+        onComplete(enhancedPreferences);
+        return;
+      }
+    } catch (error) {
+      console.error("Error getting AI recommendations:", error);
+      // Fall back to regular preferences if AI fails
+    }
+
+    // Default behavior if AI recommendations fail or aren't available
+    onComplete(preferences);
   };
 
   const genres = [
@@ -363,4 +393,4 @@ const PreferenceQuiz: React.FC<PreferenceQuizProps> = ({
   );
 };
 
-export default PreferenceQuiz;
+export default PreferenceFinder;

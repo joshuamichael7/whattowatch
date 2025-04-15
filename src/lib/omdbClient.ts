@@ -1,10 +1,25 @@
+// Helper function to safely access environment variables
+const getEnvVar = (key: string, defaultValue: string = ""): string => {
+  if (typeof process !== "undefined" && process.env && process.env[key]) {
+    return process.env[key] || defaultValue;
+  } else if (
+    typeof import.meta !== "undefined" &&
+    import.meta.env &&
+    import.meta.env[key]
+  ) {
+    return import.meta.env[key] || defaultValue;
+  }
+  return defaultValue;
+};
+
 // OMDB API endpoint - use Netlify function in production, direct API in development
-const API_ENDPOINT = import.meta.env.PROD
-  ? "/.netlify/functions/omdb"
-  : "https://www.omdbapi.com";
+const API_ENDPOINT =
+  getEnvVar("NODE_ENV") === "production"
+    ? "/.netlify/functions/omdb"
+    : "https://www.omdbapi.com";
 
 // Get API key from environment variable only
-const API_KEY = import.meta.env.VITE_OMDB_API_KEY || "";
+const API_KEY = getEnvVar("OMDB_API_KEY");
 
 if (!API_KEY) {
   console.error(
@@ -410,11 +425,24 @@ async function calculatePlotSimilarities(
   }
 }
 
+// Import AI and Vector services
+import {
+  getSimilarContentTitles,
+  storeContentInVectorDB,
+} from "../services/aiService";
+import {
+  querySimilarContent,
+  storeContentVector,
+} from "../services/vectorService";
+
 // Helper function to get similar content using multiple similarity metrics
 export async function getSimilarContent(
   contentId: string,
   useDirectApi = false,
-  limit = 8,
+  limit = 12, // Increased from 8 to 12 to get more diverse recommendations
+  useAI = getEnvVar("USE_AI_RECOMMENDATIONS") === "true",
+  useVectorDB = getEnvVar("USE_VECTOR_DB") === "true",
+  fallbackToTrending = true,
 ) {
   try {
     // First get the content details to find genres, actors, directors
@@ -425,6 +453,158 @@ export async function getSimilarContent(
         `[getSimilarContent] Content with ID ${contentId} not found, falling back to trending content`,
       );
       return await getTrendingContent("movie", limit);
+    }
+
+    // Store the content in the vector database for future queries
+    if (useVectorDB) {
+      storeContentVector(content).catch((error) => {
+        console.error(
+          "[getSimilarContent] Error storing content vector:",
+          error,
+        );
+      });
+    }
+
+    // If AI is enabled, try to get similar content titles from the AI service
+    if (useAI && content.title && content.overview) {
+      console.log(
+        `[getSimilarContent] Using AI to find similar content for "${content.title}"`,
+      );
+
+      // Check if Gemini API key is available
+      const geminiApiKey = getEnvVar("GEMINI_API_KEY");
+      if (!geminiApiKey) {
+        console.warn(
+          "[getSimilarContent] Gemini API key not found, skipping AI recommendations",
+        );
+      } else {
+        // Get similar content titles from the AI service
+        const similarTitles = await getSimilarContentTitles(
+          content.title,
+          content.overview,
+          content.media_type,
+          Math.min(20, limit * 2), // Request more titles than needed to account for not finding some
+          { apiKey: geminiApiKey },
+        );
+
+        console.log(
+          `[getSimilarContent] AI returned titles: ${JSON.stringify(similarTitles)}`,
+        ); // Add logging
+
+        if (similarTitles.length > 0) {
+          console.log(
+            `[getSimilarContent] AI returned ${similarTitles.length} similar titles`,
+          );
+
+          // Search for each title in OMDB
+          const searchPromises = similarTitles.map((title) => {
+            const params = new URLSearchParams({
+              apikey: API_KEY,
+              s: title,
+              type: content.media_type === "movie" ? "movie" : "series",
+            });
+            return fetchFromOmdb(params);
+          });
+
+          // Wait for all search results
+          const searchResults = await Promise.all(searchPromises);
+
+          // Process the results
+          const aiRecommendations = [];
+
+          searchResults.forEach((result, index) => {
+            if (result && result.Response === "True" && result.Search) {
+              // Take the first result for each title (most relevant match)
+              const item = result.Search[0];
+              if (item && item.imdbID !== contentId) {
+                aiRecommendations.push({
+                  id: item.imdbID,
+                  title: item.Title,
+                  poster_path:
+                    item.Poster !== "N/A"
+                      ? item.Poster
+                      : "https://via.placeholder.com/300x450?text=No+Poster",
+                  media_type: item.Type === "movie" ? "movie" : "tv",
+                  release_date: item.Year,
+                  vote_average: 0,
+                  vote_count: 0,
+                  genre_ids: content.genre_ids || [],
+                  genre_strings: content.genre_strings || [],
+                  overview: "",
+                  recommendationReason: `AI recommended based on ${content.title}`,
+                  aiRecommended: true,
+                  aiSimilarityScore: 1 - index / similarTitles.length, // Higher score for earlier results
+                });
+
+                // Store this content in the vector database for future queries
+                if (useVectorDB) {
+                  getContentById(item.imdbID)
+                    .then((detailedContent) => {
+                      if (detailedContent) {
+                        storeContentVector(detailedContent).catch((error) => {
+                          console.error(
+                            "[getSimilarContent] Error storing AI recommendation vector:",
+                            error,
+                          );
+                        });
+                      }
+                    })
+                    .catch((error) => {
+                      console.error(
+                        "[getSimilarContent] Error getting AI recommendation details:",
+                        error,
+                      );
+                    });
+                }
+              }
+            }
+          });
+
+          if (aiRecommendations.length >= limit) {
+            console.log(
+              `[getSimilarContent] Returning ${limit} AI recommendations`,
+            );
+            return aiRecommendations.slice(0, limit);
+          }
+
+          console.log(
+            `[getSimilarContent] AI returned only ${aiRecommendations.length} valid recommendations, supplementing with traditional search`,
+          );
+          // If we don't have enough AI recommendations, continue with traditional search
+          // and combine the results later
+        }
+      }
+    }
+
+    // If vector DB is enabled, try to get similar content from the vector database
+    let vectorResults = [];
+    if (useVectorDB) {
+      // Check if Pinecone API key is available
+      const pineconeApiKey = getEnvVar("PINECONE_API_KEY");
+
+      if (!pineconeApiKey) {
+        console.warn(
+          "[getSimilarContent] Pinecone API key not found, skipping vector DB recommendations",
+        );
+      } else {
+        const similarIds = await querySimilarContent(
+          contentId,
+          undefined,
+          limit,
+        );
+        if (similarIds.length > 0) {
+          const detailsPromises = similarIds.map((id) => getContentById(id));
+          const detailedContents = await Promise.all(detailsPromises);
+          vectorResults = detailedContents.filter((item) => item !== null);
+
+          if (vectorResults.length >= limit) {
+            console.log(
+              `[getSimilarContent] Returning ${limit} vector DB recommendations`,
+            );
+            return vectorResults.slice(0, limit);
+          }
+        }
+      }
     }
 
     // Collect all available metadata for similarity matching
@@ -448,36 +628,77 @@ export async function getSimilarContent(
         .filter((word) => word.length > 3);
 
       if (titleWords.length > 0) {
-        const titleParams = new URLSearchParams({
+        // Try multiple title words for better coverage
+        const titleSearchPromises = [];
+
+        // Use individual meaningful words from the title
+        for (let i = 0; i < Math.min(3, titleWords.length); i++) {
+          const titleParams = new URLSearchParams({
+            apikey: API_KEY,
+            s: titleWords[i],
+            type: contentType,
+          });
+          titleSearchPromises.push(fetchFromOmdb(titleParams));
+        }
+
+        // Also try the full title for exact matches
+        const fullTitleParams = new URLSearchParams({
           apikey: API_KEY,
-          s: titleWords[0], // Use the first meaningful word from the title
+          s: content.title.substring(0, 30), // Limit length to avoid issues with very long titles
           type: contentType,
         });
-        const titleResults = await fetchFromOmdb(titleParams);
-        if (
-          titleResults &&
-          titleResults.Response === "True" &&
-          titleResults.Search
-        ) {
-          const mappedResults = titleResults.Search.map((item: any) => ({
-            id: item.imdbID,
-            title: item.Title,
-            poster_path:
-              item.Poster !== "N/A"
-                ? item.Poster
-                : "https://via.placeholder.com/300x450?text=No+Poster",
-            media_type: item.Type === "movie" ? "movie" : "tv",
-            release_date: item.Year,
-            vote_average: 0,
-            vote_count: 0,
-            genre_ids: [],
-            overview: "",
-            combinedSimilarity: 0.5, // Default similarity score
-          }));
+        titleSearchPromises.push(fetchFromOmdb(fullTitleParams));
+
+        // Wait for all title searches to complete
+        const titleSearchResults = await Promise.all(titleSearchPromises);
+
+        // Combine and deduplicate results
+        const uniqueResults = new Map();
+
+        titleSearchResults.forEach((result) => {
+          if (result && result.Response === "True" && result.Search) {
+            result.Search.forEach((item: any) => {
+              if (
+                item.imdbID !== contentId &&
+                !uniqueResults.has(item.imdbID)
+              ) {
+                uniqueResults.set(item.imdbID, item);
+              }
+            });
+          }
+        });
+
+        if (uniqueResults.size > 0) {
+          const mappedResults = Array.from(uniqueResults.values()).map(
+            (item: any) => ({
+              id: item.imdbID,
+              title: item.Title,
+              poster_path:
+                item.Poster !== "N/A"
+                  ? item.Poster
+                  : "https://via.placeholder.com/300x450?text=No+Poster",
+              media_type: item.Type === "movie" ? "movie" : "tv",
+              release_date: item.Year,
+              vote_average: 0,
+              vote_count: 0,
+              genre_ids: [],
+              overview: "",
+              combinedSimilarity: 0.5, // Default similarity score
+              recommendationReason: `Similar to "${content.title}"`,
+            }),
+          );
           return mappedResults.slice(0, limit);
         }
       }
-      return await getTrendingContent(contentType, limit);
+
+      if (fallbackToTrending) {
+        console.log(
+          `[getSimilarContent] No results found for title search, falling back to trending content`,
+        );
+        return await getTrendingContent(contentType, limit);
+      } else {
+        return [];
+      }
     }
 
     // Create multiple search promises based on different criteria
@@ -750,7 +971,7 @@ export async function getSimilarContent(
       );
 
     // If we didn't find enough results, supplement with trending content
-    if (sortedResults.length < limit / 2) {
+    if (sortedResults.length < limit / 2 && fallbackToTrending) {
       console.log(
         `[getSimilarContent] Found only ${sortedResults.length} results, supplementing with trending content`,
       );
@@ -758,7 +979,16 @@ export async function getSimilarContent(
         contentType,
         limit - sortedResults.length,
       );
-      return [...sortedResults, ...trendingItems];
+
+      // Mark trending items as supplementary
+      const markedTrendingItems = trendingItems.map((item) => ({
+        ...item,
+        isTrendingFallback: true,
+        recommendationReason:
+          item.recommendationReason || `Trending ${contentType}`,
+      }));
+
+      return [...sortedResults, ...markedTrendingItems];
     }
 
     console.log(
@@ -767,16 +997,30 @@ export async function getSimilarContent(
     return sortedResults;
   } catch (error) {
     console.error("Error getting similar content:", error);
-    // Fallback to trending content in case of any error
-    console.log(
-      "[getSimilarContent] Error occurred, falling back to trending content",
-    );
-    try {
-      return await getTrendingContent("movie", limit);
-    } catch (fallbackError) {
-      console.error(
-        "Error getting trending content as fallback:",
-        fallbackError,
+
+    // Fallback to trending content in case of any error, if enabled
+    if (fallbackToTrending) {
+      console.log(
+        "[getSimilarContent] Error occurred, falling back to trending content",
+      );
+      try {
+        const trendingItems = await getTrendingContent("movie", limit);
+        return trendingItems.map((item) => ({
+          ...item,
+          isErrorFallback: true,
+          recommendationReason:
+            item.recommendationReason || "Recommended while we fix an issue",
+        }));
+      } catch (fallbackError) {
+        console.error(
+          "Error getting trending content as fallback:",
+          fallbackError,
+        );
+        return [];
+      }
+    } else {
+      console.log(
+        "[getSimilarContent] Error occurred, returning empty array as fallback is disabled",
       );
       return [];
     }
