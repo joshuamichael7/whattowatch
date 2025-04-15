@@ -1199,70 +1199,99 @@ function useTraditionalSimilarity(
   });
 }
 
-// Helper function to get trending content (simplified with reliable popular movies)
+// Helper function to get top-rated content instead of trending
 export async function getTrendingContent(
   type?: "movie" | "tv",
   limit = 8,
 ): Promise<ContentItem[]> {
   console.log(
-    `[getTrendingContent] Fetching ${limit} trending ${type || "all"} content items`,
+    `[getTopRatedContent] Fetching ${limit} top-rated ${type || "all"} content items`,
   );
 
-  // Use a small set of reliable popular search terms
-  const popularSearchTerms = [
-    "star wars",
-    "marvel",
-    "harry potter",
-    "lord of the rings",
-    "jurassic",
-    "batman",
-    "mission impossible",
-    "james bond",
+  // Use a list of top-rated titles by IMDb rating
+  const topRatedMovies = [
+    "tt0111161", // The Shawshank Redemption
+    "tt0068646", // The Godfather
+    "tt0071562", // The Godfather: Part II
+    "tt0468569", // The Dark Knight
+    "tt0050083", // 12 Angry Men
+    "tt0108052", // Schindler's List
+    "tt0167260", // The Lord of the Rings: The Return of the King
+    "tt0110912", // Pulp Fiction
+    "tt0060196", // The Good, the Bad and the Ugly
+    "tt0109830", // Forrest Gump
+    "tt0120737", // The Lord of the Rings: The Fellowship of the Ring
+    "tt0137523", // Fight Club
+    "tt0167261", // The Lord of the Rings: The Two Towers
+    "tt0080684", // Star Wars: Episode V - The Empire Strikes Back
+    "tt1375666", // Inception
   ];
 
-  if (type === "tv") {
-    // TV show specific search terms
-    popularSearchTerms.push(
-      "breaking bad",
-      "game of thrones",
-      "stranger things",
-      "friends",
-      "the office",
-    );
-  }
+  const topRatedTVShows = [
+    "tt0903747", // Breaking Bad
+    "tt0185906", // Band of Brothers
+    "tt7366338", // Chernobyl
+    "tt0795176", // Planet Earth
+    "tt0306414", // The Wire
+    "tt0417299", // Avatar: The Last Airbender
+    "tt0944947", // Game of Thrones
+    "tt0081846", // Das Boot
+    "tt8420184", // The Last Dance
+    "tt0071075", // The World at War
+    "tt1533395", // Life
+    "tt1355642", // Fullmetal Alchemist: Brotherhood
+    "tt2395695", // Cosmos
+    "tt0052520", // The Twilight Zone
+    "tt2861424", // Rick and Morty
+  ];
 
   try {
-    // Use a single reliable search term instead of random ones
-    const searchTerm =
-      popularSearchTerms[Math.floor(Math.random() * popularSearchTerms.length)];
-    const params = new URLSearchParams({
-      s: searchTerm,
+    // Select IDs based on content type
+    const selectedIds =
+      type === "tv"
+        ? topRatedTVShows
+        : type === "movie"
+          ? topRatedMovies
+          : [
+              ...topRatedMovies.slice(0, Math.ceil(limit / 2)),
+              ...topRatedTVShows.slice(0, Math.floor(limit / 2)),
+            ];
+
+    // Limit to requested number and shuffle slightly for variety
+    const shuffledIds = selectedIds
+      .slice(0, limit * 2)
+      .sort(() => 0.5 - Math.random())
+      .slice(0, limit);
+
+    // Fetch details for each ID in parallel
+    const detailPromises = shuffledIds.map((id) => {
+      const params = new URLSearchParams({
+        i: id,
+        plot: "short",
+      });
+      return fetchFromOmdb(params);
     });
 
-    if (type) {
-      params.append("type", type === "movie" ? "movie" : "series");
-    }
+    const detailsResults = await Promise.all(detailPromises);
 
-    const data = await fetchFromOmdb(params);
+    // Filter out any failed requests
+    const validResults = detailsResults.filter(
+      (data) => data && data.Response === "True" && data.imdbID,
+    );
 
-    if (
-      !data ||
-      data.Response !== "True" ||
-      !data.Search ||
-      data.Search.length === 0
-    ) {
+    if (validResults.length === 0) {
       console.log(
-        "[getTrendingContent] No results from OMDB API, using fallback data",
+        "[getTopRatedContent] No results from OMDB API, using fallback data",
       );
       return getHardcodedContent(type, limit);
     }
 
     console.log(
-      `[getTrendingContent] Found ${data.Search.length} trending items`,
+      `[getTopRatedContent] Found ${validResults.length} top-rated items`,
     );
 
     // Transform OMDB data to match our application's expected format
-    return data.Search.slice(0, limit).map((item: any) => ({
+    return validResults.map((item: any) => ({
       id: item.imdbID,
       title: item.Title,
       poster_path:
@@ -1271,14 +1300,18 @@ export async function getTrendingContent(
           : "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80",
       media_type: item.Type === "movie" ? "movie" : "tv",
       release_date: item.Year,
-      vote_average: 0, // OMDB search doesn't provide ratings
-      vote_count: 0,
-      genre_ids: [], // OMDB search doesn't provide genres
-      overview: "", // OMDB search doesn't provide overview
-      recommendationReason: `Trending ${item.Type === "movie" ? "movie" : "TV show"} you might enjoy`,
+      vote_average: item.imdbRating !== "N/A" ? parseFloat(item.imdbRating) : 0,
+      vote_count:
+        item.imdbVotes !== "N/A"
+          ? parseInt(item.imdbVotes.replace(/,/g, ""))
+          : 0,
+      genre_ids: [], // We could parse genres here if needed
+      genre_strings: item.Genre ? item.Genre.split(", ") : [],
+      overview: item.Plot !== "N/A" ? item.Plot : "",
+      recommendationReason: `Top-rated ${item.Type === "movie" ? "movie" : "TV show"} (${item.imdbRating}/10)`,
     }));
   } catch (error) {
-    console.error("Error fetching trending content:", error);
+    console.error("Error fetching top-rated content:", error);
     return getHardcodedContent(type, limit);
   }
 }
