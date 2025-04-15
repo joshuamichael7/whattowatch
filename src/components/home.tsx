@@ -109,6 +109,9 @@ const HomePage = () => {
               return null;
             }
 
+            console.log("Raw movie data:", movie);
+            console.log("Movie poster path:", movie.poster_path);
+
             return {
               Title: movie.title || "Unknown Title",
               Year: movie.release_date || "Unknown Year",
@@ -125,6 +128,8 @@ const HomePage = () => {
           })
           .filter(Boolean); // Remove any null entries
 
+        console.log("Formatted movies:", formattedMovies);
+
         const formattedShows = tvData
           .map((show) => {
             // Validate required fields and provide fallbacks
@@ -132,6 +137,9 @@ const HomePage = () => {
               console.warn("Invalid TV show object:", show);
               return null;
             }
+
+            console.log("Raw TV show data:", show);
+            console.log("TV show poster path:", show.poster_path);
 
             return {
               Title: show.title || "Unknown Title",
@@ -148,6 +156,8 @@ const HomePage = () => {
             };
           })
           .filter(Boolean); // Remove any null entries
+
+        console.log("Formatted TV shows:", formattedShows);
 
         // Set initial content
         setTrendingMovies(formattedMovies);
@@ -658,6 +668,7 @@ const MovieCard = ({
   image = "",
   id,
 }: MediaCardProps) => {
+  console.log(`MovieCard: title=${title}, image=${image}`);
   return (
     <Link to={id ? `/movie/${id}` : "#"} className="block">
       <Card className="overflow-hidden group cursor-pointer hover:shadow-md transition-shadow">
@@ -687,6 +698,7 @@ const TVShowCard = ({
   image = "",
   id,
 }: MediaCardProps) => {
+  console.log(`TVShowCard: title=${title}, image=${image}`);
   return (
     <Link to={id ? `/tv/${id}` : "#"} className="block">
       <Card className="overflow-hidden group cursor-pointer hover:shadow-md transition-shadow">

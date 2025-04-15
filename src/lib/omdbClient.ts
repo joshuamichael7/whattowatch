@@ -1371,12 +1371,14 @@ export function initializeContentCache(): void {
 // Helper function to get pre-defined content immediately
 function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
   console.log("[getHardcodedContent] Using pre-defined content");
+  console.log("[getHardcodedContent] Type:", type, "Limit:", limit);
 
   const movies = [
     {
       id: "tt0111161",
       title: "The Shawshank Redemption",
-      poster_path: "",
+      poster_path:
+        "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500&q=80",
       media_type: "movie",
       release_date: "1994",
       vote_average: 9.3,
@@ -1571,15 +1573,20 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
   ];
 
   if (type === "tv") {
-    return tvShows.slice(0, limit);
+    const result = tvShows.slice(0, limit);
+    console.log("[getHardcodedContent] Returning TV shows:", result);
+    return result;
   } else if (type === "movie") {
-    return movies.slice(0, limit);
+    const result = movies.slice(0, limit);
+    console.log("[getHardcodedContent] Returning movies:", result);
+    return result;
   } else {
     // Mix movies and TV shows
     const combined = [
       ...movies.slice(0, Math.ceil(limit / 2)),
       ...tvShows.slice(0, Math.floor(limit / 2)),
     ];
+    console.log("[getHardcodedContent] Returning combined content:", combined);
     return combined.slice(0, limit);
   }
 }
