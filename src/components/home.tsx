@@ -666,12 +666,6 @@ const MovieCard = ({
             src={image}
             alt={title}
             className="object-cover w-full h-full transition-transform group-hover:scale-105"
-            onError={(e) => {
-              // Only hide the image if it fails to load
-              if (!image || image === "N/A") {
-                e.currentTarget.style.display = "none";
-              }
-            }}
           />
           <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm text-xs font-medium py-1 px-2 rounded-md">
             {rating}
@@ -701,12 +695,6 @@ const TVShowCard = ({
             src={image}
             alt={title}
             className="object-cover w-full h-full transition-transform group-hover:scale-105"
-            onError={(e) => {
-              // Only hide the image if it fails to load
-              if (!image || image === "N/A") {
-                e.currentTarget.style.display = "none";
-              }
-            }}
           />
           <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm text-xs font-medium py-1 px-2 rounded-md">
             {rating}
