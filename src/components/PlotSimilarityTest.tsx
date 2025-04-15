@@ -95,6 +95,11 @@ const PlotSimilarityTest: React.FC = () => {
                     src={content.poster_path}
                     alt={content.title}
                     className="w-full rounded-md"
+                    onError={(e) => {
+                      // Fallback to Unsplash image if poster fails to load
+                      e.currentTarget.src =
+                        "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80";
+                    }}
                   />
                 </div>
                 <div className="md:w-3/4">
@@ -133,6 +138,11 @@ const PlotSimilarityTest: React.FC = () => {
                           src={item.poster_path}
                           alt={item.title}
                           className="w-full rounded-md"
+                          onError={(e) => {
+                            // Fallback to Unsplash image if poster fails to load
+                            e.currentTarget.src =
+                              "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80";
+                          }}
                         />
                       </div>
                       <div className="md:w-3/4">

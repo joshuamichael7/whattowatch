@@ -151,6 +151,11 @@ const SimilarContentCarousel: React.FC<SimilarContentCarouselProps> = ({
                   src={item.poster_path}
                   alt={item.title}
                   className="object-cover w-full h-full transition-transform group-hover:scale-105"
+                  onError={(e) => {
+                    // Fallback to Unsplash image if poster fails to load
+                    e.currentTarget.src =
+                      "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80";
+                  }}
                 />
                 {item.vote_average > 0 && (
                   <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm text-xs font-medium py-1 px-2 rounded-md">

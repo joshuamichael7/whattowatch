@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Search, Film, ListFilter, PlayCircle, Loader2 } from "lucide-react";
+import {
+  Search as SearchIcon,
+  Film,
+  ListFilter,
+  PlayCircle,
+  Loader2,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -240,7 +246,7 @@ const HomePage = () => {
                 className="gap-2"
                 onClick={() => (window.location.href = "/dashboard")}
               >
-                <Search className="h-5 w-5" />
+                <SearchIcon className="h-5 w-5" />
                 Find Similar Content
               </Button>
               <Button
@@ -385,7 +391,7 @@ const HomePage = () => {
                   onChange={(e) => setSearchValue(e.target.value)}
                 />
                 <Button type="submit">
-                  <Search className="h-4 w-4 mr-2" />
+                  <SearchIcon className="h-4 w-4 mr-2" />
                   Search
                 </Button>
               </form>
@@ -424,7 +430,7 @@ const HomePage = () => {
                 description="Get tailored suggestions based on your unique preferences."
               />
               <FeatureCard
-                icon={<Search className="h-8 w-8" />}
+                icon={<SearchIcon className="h-8 w-8" />}
                 title="Discover New Content"
                 description="Find hidden gems and new releases that match your taste."
               />
@@ -571,6 +577,11 @@ const MovieCard = ({
             src={image}
             alt={title}
             className="object-cover w-full h-full transition-transform group-hover:scale-105"
+            onError={(e) => {
+              // Fallback to Unsplash image if poster fails to load
+              e.currentTarget.src =
+                "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80";
+            }}
           />
           <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm text-xs font-medium py-1 px-2 rounded-md">
             {rating}
@@ -600,6 +611,11 @@ const TVShowCard = ({
             src={image}
             alt={title}
             className="object-cover w-full h-full transition-transform group-hover:scale-105"
+            onError={(e) => {
+              // Fallback to Unsplash image if poster fails to load
+              e.currentTarget.src =
+                "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80";
+            }}
           />
           <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm text-xs font-medium py-1 px-2 rounded-md">
             {rating}

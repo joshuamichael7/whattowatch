@@ -212,6 +212,11 @@ const SimilarContentSearch = ({
                       src={item.poster_path}
                       alt={item.title}
                       className="object-cover w-full h-full"
+                      onError={(e) => {
+                        // Fallback to Unsplash image if poster fails to load
+                        e.currentTarget.src =
+                          "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80";
+                      }}
                     />
                     <div className="absolute top-2 right-2">
                       <Badge variant="secondary">
@@ -270,6 +275,11 @@ const SimilarContentSearch = ({
                     src={selectedItem.poster_path}
                     alt={selectedItem.title}
                     className="object-cover w-full h-full"
+                    onError={(e) => {
+                      // Fallback to Unsplash image if poster fails to load
+                      e.currentTarget.src =
+                        "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80";
+                    }}
                   />
                 </div>
               </div>
@@ -352,6 +362,11 @@ const SimilarContentSearch = ({
                           src={item.poster_path}
                           alt={item.title}
                           className="object-cover w-full h-full"
+                          onError={(e) => {
+                            // Fallback to Unsplash image if poster fails to load
+                            e.currentTarget.src =
+                              "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80";
+                          }}
                         />
                         <div className="absolute top-2 right-2">
                           <Badge variant="secondary">

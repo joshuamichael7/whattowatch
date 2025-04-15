@@ -60,7 +60,7 @@ export async function searchContent(
       poster_path:
         item.Poster !== "N/A"
           ? item.Poster
-          : "https://via.placeholder.com/300x450?text=No+Poster",
+          : "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80",
       media_type: item.Type === "movie" ? "movie" : "tv",
       release_date: item.Year,
       vote_average: 0, // OMDB search doesn't provide ratings in search results
@@ -104,11 +104,11 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
       poster_path:
         data.Poster !== "N/A"
           ? data.Poster
-          : "https://via.placeholder.com/300x450?text=No+Poster",
+          : "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80",
       backdrop_path:
         data.Poster !== "N/A"
           ? data.Poster
-          : "https://via.placeholder.com/1280x720?text=No+Backdrop", // OMDB doesn't provide backdrop
+          : "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=1280&q=80", // OMDB doesn't provide backdrop
       media_type: data.Type === "movie" ? "movie" : "tv",
       release_date: data.Released !== "N/A" ? data.Released : data.Year,
       first_air_date:
@@ -1199,7 +1199,7 @@ function useTraditionalSimilarity(
   });
 }
 
-// Helper function to get trending content (enhanced with popular genres and better cold-start recommendations)
+// Helper function to get trending content (simplified with reliable popular movies)
 export async function getTrendingContent(
   type?: "movie" | "tv",
   limit = 8,
@@ -1207,125 +1207,68 @@ export async function getTrendingContent(
   console.log(
     `[getTrendingContent] Fetching ${limit} trending ${type || "all"} content items`,
   );
-  // Popular search terms organized by category for better cold-start recommendations
-  const popularCategories = {
-    genres: [
-      "action",
-      "comedy",
-      "drama",
-      "thriller",
-      "sci-fi",
-      "adventure",
-      "romance",
-      "horror",
-      "mystery",
-      "fantasy",
-      "animation",
-    ],
-    decades: ["1980s", "1990s", "2000s", "2010s", "2020s"],
-    qualifiers: ["best", "top", "popular", "acclaimed", "award winning"],
-    specific: [
-      "superhero",
-      "space",
-      "time travel",
-      "dystopian",
-      "zombie",
-      "spy",
-      "musical",
-    ],
-  };
 
-  // Create a more specific search term for better results
-  // e.g. "best 1990s action" or "popular sci-fi"
-  const getSmartSearchTerm = () => {
-    const useQualifier = Math.random() > 0.5;
-    const useDecade = Math.random() > 0.7;
-    const useSpecific = Math.random() > 0.8;
+  // Use a small set of reliable popular search terms
+  const popularSearchTerms = [
+    "star wars",
+    "marvel",
+    "harry potter",
+    "lord of the rings",
+    "jurassic",
+    "batman",
+    "mission impossible",
+    "james bond",
+  ];
 
-    let searchTerms = [];
-
-    if (useQualifier) {
-      const qualifier =
-        popularCategories.qualifiers[
-          Math.floor(Math.random() * popularCategories.qualifiers.length)
-        ];
-      searchTerms.push(qualifier);
-    }
-
-    if (useDecade) {
-      const decade =
-        popularCategories.decades[
-          Math.floor(Math.random() * popularCategories.decades.length)
-        ];
-      searchTerms.push(decade);
-    }
-
-    if (useSpecific && Math.random() > 0.5) {
-      const specific =
-        popularCategories.specific[
-          Math.floor(Math.random() * popularCategories.specific.length)
-        ];
-      searchTerms.push(specific);
-    } else {
-      const genre =
-        popularCategories.genres[
-          Math.floor(Math.random() * popularCategories.genres.length)
-        ];
-      searchTerms.push(genre);
-    }
-
-    return searchTerms.join(" ");
-  };
+  if (type === "tv") {
+    // TV show specific search terms
+    popularSearchTerms.push(
+      "breaking bad",
+      "game of thrones",
+      "stranger things",
+      "friends",
+      "the office",
+    );
+  }
 
   try {
-    // Make multiple searches to get a diverse set of trending content
-    const searchPromises = [];
-    const numSearches = Math.min(3, Math.ceil(limit / 3)); // Up to 3 searches based on limit
-
-    for (let i = 0; i < numSearches; i++) {
-      const searchTerm = getSmartSearchTerm();
-      const params = new URLSearchParams({
-        s: searchTerm,
-      });
-
-      if (type) {
-        params.append("type", type === "movie" ? "movie" : "series");
-      }
-
-      searchPromises.push(fetchFromOmdb(params));
-    }
-
-    const searchResults = await Promise.all(searchPromises);
-
-    // Combine results and remove duplicates
-    const uniqueResults = new Map();
-
-    searchResults.forEach((data) => {
-      if (data && data.Response === "True" && data.Search) {
-        data.Search.forEach((item: any) => {
-          if (!uniqueResults.has(item.imdbID)) {
-            uniqueResults.set(item.imdbID, item);
-          }
-        });
-      }
+    // Use a single reliable search term instead of random ones
+    const searchTerm =
+      popularSearchTerms[Math.floor(Math.random() * popularSearchTerms.length)];
+    const params = new URLSearchParams({
+      s: searchTerm,
     });
 
-    // Convert to array, shuffle for variety, and limit
-    const combinedResults = Array.from(uniqueResults.values());
-    const shuffledResults = combinedResults.sort(() => Math.random() - 0.5);
+    if (type) {
+      params.append("type", type === "movie" ? "movie" : "series");
+    }
+
+    const data = await fetchFromOmdb(params);
+
+    if (
+      !data ||
+      data.Response !== "True" ||
+      !data.Search ||
+      data.Search.length === 0
+    ) {
+      console.log(
+        "[getTrendingContent] No results from OMDB API, using fallback data",
+      );
+      return getHardcodedContent(type, limit);
+    }
 
     console.log(
-      `[getTrendingContent] Found ${shuffledResults.length} trending items`,
+      `[getTrendingContent] Found ${data.Search.length} trending items`,
     );
 
     // Transform OMDB data to match our application's expected format
-    return shuffledResults.slice(0, limit).map((item: any) => ({
+    return data.Search.slice(0, limit).map((item: any) => ({
       id: item.imdbID,
       title: item.Title,
       poster_path:
         item.Poster !== "N/A"
           ? item.Poster
-          : "https://via.placeholder.com/300x450?text=No+Poster",
+          : "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80",
       media_type: item.Type === "movie" ? "movie" : "tv",
       release_date: item.Year,
       vote_average: 0, // OMDB search doesn't provide ratings
@@ -1336,63 +1279,238 @@ export async function getTrendingContent(
     }));
   } catch (error) {
     console.error("Error fetching trending content:", error);
-    // Return some hardcoded popular movies as a last resort
-    console.log(
-      "[getTrendingContent] Error occurred, returning hardcoded popular movies",
-    );
-    return [
-      {
-        id: "tt0111161",
-        title: "The Shawshank Redemption",
-        poster_path:
-          "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&q=80",
-        media_type: "movie",
-        release_date: "1994",
-        vote_average: 9.3,
-        vote_count: 0,
-        genre_ids: [],
-        overview: "",
-        recommendationReason: "Classic highly-rated movie",
-      },
-      {
-        id: "tt0068646",
-        title: "The Godfather",
-        poster_path:
-          "https://images.unsplash.com/photo-1481277542470-605612bd2d61?w=800&q=80",
-        media_type: "movie",
-        release_date: "1972",
-        vote_average: 9.2,
-        vote_count: 0,
-        genre_ids: [],
-        overview: "",
-        recommendationReason: "Classic crime drama",
-      },
-      {
-        id: "tt0468569",
-        title: "The Dark Knight",
-        poster_path:
-          "https://images.unsplash.com/photo-1509347528160-9a9e33742cdb?w=800&q=80",
-        media_type: "movie",
-        release_date: "2008",
-        vote_average: 9.0,
-        vote_count: 0,
-        genre_ids: [],
-        overview: "",
-        recommendationReason: "Popular superhero movie",
-      },
-      {
-        id: "tt0816692",
-        title: "Interstellar",
-        poster_path:
-          "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80",
-        media_type: "movie",
-        release_date: "2014",
-        vote_average: 8.6,
-        vote_count: 0,
-        genre_ids: [],
-        overview: "",
-        recommendationReason: "Popular sci-fi movie",
-      },
-    ].slice(0, limit);
+    return getHardcodedContent(type, limit);
+  }
+}
+
+// Helper function to get hardcoded content when API fails
+function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
+  console.log("[getTrendingContent] Using hardcoded content");
+
+  const movies = [
+    {
+      id: "tt0111161",
+      title: "The Shawshank Redemption",
+      poster_path:
+        "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&q=80",
+      media_type: "movie",
+      release_date: "1994",
+      vote_average: 9.3,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Classic highly-rated movie",
+    },
+    {
+      id: "tt0068646",
+      title: "The Godfather",
+      poster_path:
+        "https://images.unsplash.com/photo-1481277542470-605612bd2d61?w=800&q=80",
+      media_type: "movie",
+      release_date: "1972",
+      vote_average: 9.2,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Classic crime drama",
+    },
+    {
+      id: "tt0468569",
+      title: "The Dark Knight",
+      poster_path:
+        "https://images.unsplash.com/photo-1509347528160-9a9e33742cdb?w=800&q=80",
+      media_type: "movie",
+      release_date: "2008",
+      vote_average: 9.0,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Popular superhero movie",
+    },
+    {
+      id: "tt0816692",
+      title: "Interstellar",
+      poster_path:
+        "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80",
+      media_type: "movie",
+      release_date: "2014",
+      vote_average: 8.6,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Popular sci-fi movie",
+    },
+    {
+      id: "tt0133093",
+      title: "The Matrix",
+      poster_path:
+        "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&q=80",
+      media_type: "movie",
+      release_date: "1999",
+      vote_average: 8.7,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Groundbreaking sci-fi action",
+    },
+    {
+      id: "tt0110912",
+      title: "Pulp Fiction",
+      poster_path:
+        "https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?w=800&q=80",
+      media_type: "movie",
+      release_date: "1994",
+      vote_average: 8.9,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Iconic crime film",
+    },
+    {
+      id: "tt0109830",
+      title: "Forrest Gump",
+      poster_path:
+        "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=800&q=80",
+      media_type: "movie",
+      release_date: "1994",
+      vote_average: 8.8,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Beloved drama",
+    },
+    {
+      id: "tt0167260",
+      title: "The Lord of the Rings: The Return of the King",
+      poster_path:
+        "https://images.unsplash.com/photo-1500964757637-c85e8a162699?w=800&q=80",
+      media_type: "movie",
+      release_date: "2003",
+      vote_average: 8.9,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Epic fantasy adventure",
+    },
+  ];
+
+  const tvShows = [
+    {
+      id: "tt0944947",
+      title: "Game of Thrones",
+      poster_path:
+        "https://images.unsplash.com/photo-1559583109-3e7968136c99?w=800&q=80",
+      media_type: "tv",
+      release_date: "2011",
+      vote_average: 9.3,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Epic fantasy series",
+    },
+    {
+      id: "tt0903747",
+      title: "Breaking Bad",
+      poster_path:
+        "https://images.unsplash.com/photo-1504593811423-6dd665756598?w=800&q=80",
+      media_type: "tv",
+      release_date: "2008",
+      vote_average: 9.5,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Critically acclaimed drama",
+    },
+    {
+      id: "tt1520211",
+      title: "The Walking Dead",
+      poster_path:
+        "https://images.unsplash.com/photo-1601513445506-2ab0d4fb4229?w=800&q=80",
+      media_type: "tv",
+      release_date: "2010",
+      vote_average: 8.2,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Popular zombie drama",
+    },
+    {
+      id: "tt4574334",
+      title: "Stranger Things",
+      poster_path:
+        "https://images.unsplash.com/photo-1560759226-14da22a643ef?w=800&q=80",
+      media_type: "tv",
+      release_date: "2016",
+      vote_average: 8.7,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Nostalgic sci-fi thriller",
+    },
+    {
+      id: "tt0108778",
+      title: "Friends",
+      poster_path:
+        "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&q=80",
+      media_type: "tv",
+      release_date: "1994",
+      vote_average: 8.9,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Beloved sitcom",
+    },
+    {
+      id: "tt0386676",
+      title: "The Office",
+      poster_path:
+        "https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=800&q=80",
+      media_type: "tv",
+      release_date: "2005",
+      vote_average: 8.9,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Popular workplace comedy",
+    },
+    {
+      id: "tt2442560",
+      title: "Peaky Blinders",
+      poster_path:
+        "https://images.unsplash.com/photo-1534809027769-b00d750a6bac?w=800&q=80",
+      media_type: "tv",
+      release_date: "2013",
+      vote_average: 8.8,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Gritty period crime drama",
+    },
+    {
+      id: "tt1475582",
+      title: "Sherlock",
+      poster_path:
+        "https://images.unsplash.com/photo-1581985673473-0784a7a44e39?w=800&q=80",
+      media_type: "tv",
+      release_date: "2010",
+      vote_average: 9.1,
+      vote_count: 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: "Modern detective series",
+    },
+  ];
+
+  if (type === "tv") {
+    return tvShows.slice(0, limit);
+  } else if (type === "movie") {
+    return movies.slice(0, limit);
+  } else {
+    // Mix movies and TV shows
+    const combined = [
+      ...movies.slice(0, Math.ceil(limit / 2)),
+      ...tvShows.slice(0, Math.floor(limit / 2)),
+    ];
+    return combined.slice(0, limit);
   }
 }
