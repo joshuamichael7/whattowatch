@@ -69,10 +69,10 @@ const VectorDatabaseDemo: React.FC = () => {
         return;
       }
 
-      setContentDetails(content);
+      setContentDetails(content as ContentItem);
 
       // Store in vector database
-      const success = await storeContentVector(content);
+      const success = await storeContentVector(content as ContentItem);
       setStoreSuccess(success);
       if (!success) {
         setError("Failed to store content in vector database");

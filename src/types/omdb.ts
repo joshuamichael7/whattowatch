@@ -2,6 +2,7 @@
 
 // Basic content item structure used throughout the application
 export interface ContentItem {
+  // Core fields
   id: string;
   title: string;
   poster_path: string;
@@ -18,6 +19,20 @@ export interface ContentItem {
   content_rating?: string;
   streaming_providers?: Record<string, any> | null;
   popularity?: number;
+
+  // Similarity features
+  plotSimilarity?: number;
+  keywordSimilarity?: number;
+  titleSimilarity?: number;
+  combinedSimilarity?: number;
+  keywords?: string[];
+  recommendationSource?: string;
+  recommendationReason?: string;
+  isTrendingFallback?: boolean;
+  isErrorFallback?: boolean;
+  aiRecommended?: boolean;
+  aiSimilarityScore?: number;
+
   // Additional fields for recommendation display
   year?: string;
   poster?: string;
@@ -25,8 +40,8 @@ export interface ContentItem {
   genres?: string[];
   synopsis?: string;
   streamingOn?: string[];
-  recommendationReason?: string;
   contentRating?: string;
+
   // Fields from OMDB API
   imdbID?: string;
   Type?: string;

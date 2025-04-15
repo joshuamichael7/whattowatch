@@ -115,12 +115,12 @@ const EnhancedRecommendationEngine: React.FC<
               try {
                 const content = await getContentById(id);
                 return content
-                  ? {
+                  ? ({
                       ...content,
                       recommendationReason:
                         "Similar content based on vector similarity",
                       recommendationSource: "vector",
-                    }
+                    } as ContentItem)
                   : null;
               } catch (err) {
                 console.error(`Error fetching content for ID ${id}:`, err);
@@ -140,7 +140,7 @@ const EnhancedRecommendationEngine: React.FC<
 
             for (const vectorItem of validVectorItems) {
               if (!combinedRecs.some((item) => item.id === vectorItem.id)) {
-                combinedRecs.push(vectorItem);
+                combinedRecs.push(vectorItem as ContentItem);
               }
             }
 

@@ -23,7 +23,7 @@ const PlotSimilarityTest: React.FC = () => {
 
     try {
       const contentData = await getContentById(contentId);
-      setContent(contentData);
+      setContent(contentData as ContentItem);
 
       if (contentData) {
         const similar = await getSimilarContent(contentId, false, 10);

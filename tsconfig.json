@@ -15,6 +15,7 @@
     "jsx": "react-jsx",
 
     "strict": false,
+    "noEmitOnError": false,
     "paths": {
       "@/*": ["./src/*"]
     }

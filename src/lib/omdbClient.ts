@@ -49,7 +49,7 @@ async function fetchFromOmdb(params: URLSearchParams) {
 export async function searchContent(
   query: string,
   type?: "movie" | "series" | "all",
-) {
+): Promise<ContentItem[]> {
   try {
     const params = new URLSearchParams({
       apikey: API_KEY,
@@ -85,7 +85,7 @@ export async function searchContent(
 }
 
 // Helper function to get content details by ID
-export async function getContentById(id: string) {
+export async function getContentById(id: string): Promise<ContentItem | null> {
   try {
     const params = new URLSearchParams({
       apikey: API_KEY,
@@ -384,7 +384,7 @@ function extractKeyPlotElements(synopsis: string): string[] {
 async function calculatePlotSimilarities(
   basePlot: string,
   candidatePlots: string[],
-) {
+): Promise<number[] | null> {
   try {
     console.log(
       `[calculatePlotSimilarities] Calling edge function with ${candidatePlots.length} plots`,
@@ -443,7 +443,7 @@ export async function getSimilarContent(
   useAI = getEnvVar("USE_AI_RECOMMENDATIONS") === "true",
   useVectorDB = getEnvVar("USE_VECTOR_DB") === "true",
   fallbackToTrending = true,
-) {
+): Promise<ContentItem[]> {
   try {
     // First get the content details to find genres, actors, directors
     const content = await getContentById(contentId);
@@ -1029,11 +1029,23 @@ export async function getSimilarContent(
 
 // Helper function to use traditional similarity methods
 function useTraditionalSimilarity(
-  validContents,
-  plotSynopsis,
-  originalContent,
-  scoredResults,
-) {
+  validContents: (ContentItem | null)[],
+  plotSynopsis: string,
+  originalContent: ContentItem,
+  scoredResults: Map<
+    string,
+    {
+      item: any;
+      score: number;
+      plotSimilarity?: number;
+      keywordSimilarity?: number;
+      textSimilarity?: number;
+      titleSimilarity?: number;
+      combinedSimilarity?: number;
+      keywords?: string[];
+    }
+  >,
+): void {
   validContents.forEach((detailedContent) => {
     if (!detailedContent) return;
 
@@ -1085,7 +1097,10 @@ function useTraditionalSimilarity(
 }
 
 // Helper function to get trending content (enhanced with popular genres and better cold-start recommendations)
-export async function getTrendingContent(type?: "movie" | "tv", limit = 8) {
+export async function getTrendingContent(
+  type?: "movie" | "tv",
+  limit = 8,
+): Promise<ContentItem[]> {
   console.log(
     `[getTrendingContent] Fetching ${limit} trending ${type || "all"} content items`,
   );

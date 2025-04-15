@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { omdbClient } from "@/lib/omdbClient";
+import * as omdbClient from "@/lib/omdbClient";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -10,20 +10,7 @@ import RecommendationGrid from "./RecommendationGrid";
 import ContentFilters from "./ContentFilters";
 import { Link } from "react-router-dom";
 
-interface ContentItem {
-  id: string;
-  title: string;
-  type: "movie" | "tv";
-  year: string;
-  poster: string;
-  rating: number;
-  genres: string[];
-  synopsis: string;
-  streamingOn: string[];
-  recommendationReason: string;
-  runtime?: string;
-  contentRating?: string;
-}
+import { ContentItem } from "@/types/omdb";
 
 interface PreferenceResults {
   genres: string[];
@@ -64,8 +51,8 @@ const Dashboard = () => {
   const searchContent = async (title: string, type: string = "all") => {
     try {
       console.log(`Searching for content with title: ${title}, type: ${type}`);
-      const response = await omdbClient.search(title, type);
-      return response.results || [];
+      const results = await omdbClient.searchContent(title, type);
+      return results || [];
     } catch (error) {
       console.error(`Error searching for content with title: ${title}`, error);
       return [];
@@ -76,7 +63,7 @@ const Dashboard = () => {
   const getContentById = async (id: string) => {
     try {
       console.log(`Getting content details for ID: ${id}`);
-      const response = await omdbClient.getById(id);
+      const response = await omdbClient.getContentById(id);
       return response;
     } catch (error) {
       console.error(`Error getting content details for ID: ${id}`, error);
@@ -125,26 +112,12 @@ const Dashboard = () => {
                     type: detailedContent.media_type,
                   });
 
-                  return {
-                    id: detailedContent.id,
-                    title: detailedContent.title,
-                    type: detailedContent.media_type as "movie" | "tv",
-                    year:
-                      detailedContent.release_date ||
-                      detailedContent.first_air_date ||
-                      "",
-                    poster: detailedContent.poster_path,
-                    rating: detailedContent.vote_average || 0,
-                    genres: detailedContent.genre_strings || [],
-                    synopsis: detailedContent.overview || "",
-                    streamingOn: [],
+                  const contentItem: ContentItem = {
+                    ...detailedContent,
                     recommendationReason:
                       rec.reason || "AI recommended based on your preferences",
-                    runtime: detailedContent.runtime
-                      ? `${Math.floor(detailedContent.runtime / 60)}h ${detailedContent.runtime % 60}m`
-                      : undefined,
-                    contentRating: detailedContent.content_rating,
                   };
+                  return contentItem;
                 }
               }
               return null;

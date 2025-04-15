@@ -66,7 +66,7 @@ const MovieDetailPage = () => {
         // Remove the media type check to allow both movies and TV shows
         // since we're using the same component for both
 
-        setMovie(movieData);
+        setMovie(movieData as ContentItem);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load movie details",

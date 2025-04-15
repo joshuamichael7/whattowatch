@@ -75,7 +75,7 @@ const SimilarContentSearch = ({
 
     try {
       // Use the appropriate API method based on the useDirectApi flag
-      const results = await searchContent(searchQuery, "all", useDirectApi);
+      const results = await searchContent(searchQuery, "all");
       setSearchResults(results);
       if (results.length === 0) {
         setError("No results found. Try a different search term.");
