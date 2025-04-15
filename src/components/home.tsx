@@ -116,9 +116,7 @@ const HomePage = () => {
                 movie.id ||
                 `unknown-${Math.random().toString(36).substring(2, 9)}`,
               Type: "movie",
-              Poster:
-                movie.poster_path ||
-                "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80",
+              Poster: movie.poster_path,
               imdbRating:
                 movie.vote_average !== undefined && movie.vote_average !== null
                   ? movie.vote_average.toString()
@@ -142,9 +140,7 @@ const HomePage = () => {
                 show.id ||
                 `unknown-${Math.random().toString(36).substring(2, 9)}`,
               Type: "series",
-              Poster:
-                show.poster_path ||
-                "https://images.unsplash.com/photo-1616530940355-351fabd9524b?w=400&q=80",
+              Poster: show.poster_path,
               imdbRating:
                 show.vote_average !== undefined && show.vote_average !== null
                   ? show.vote_average.toString()
@@ -190,9 +186,7 @@ const HomePage = () => {
                       movie.id ||
                       `unknown-${Math.random().toString(36).substring(2, 9)}`,
                     Type: "movie",
-                    Poster:
-                      movie.poster_path ||
-                      "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80",
+                    Poster: movie.poster_path,
                     imdbRating:
                       movie.vote_average !== undefined &&
                       movie.vote_average !== null
@@ -225,9 +219,7 @@ const HomePage = () => {
                       show.id ||
                       `unknown-${Math.random().toString(36).substring(2, 9)}`,
                     Type: "series",
-                    Poster:
-                      show.poster_path ||
-                      "https://images.unsplash.com/photo-1616530940355-351fabd9524b?w=400&q=80",
+                    Poster: show.poster_path,
                     imdbRating:
                       show.vote_average !== undefined &&
                       show.vote_average !== null
@@ -414,11 +406,7 @@ const HomePage = () => {
                     title={movie.Title}
                     year={movie.Year}
                     rating={movie.imdbRating || "N/A"}
-                    image={
-                      movie.Poster !== "N/A"
-                        ? movie.Poster
-                        : "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=400&q=80"
-                    }
+                    image={movie.Poster}
                     id={movie.imdbID}
                   />
                 ))
@@ -463,11 +451,7 @@ const HomePage = () => {
                     title={show.Title}
                     year={show.Year}
                     rating={show.imdbRating || "N/A"}
-                    image={
-                      show.Poster !== "N/A"
-                        ? show.Poster
-                        : "https://images.unsplash.com/photo-1616530940355-351fabd9524b?w=400&q=80"
-                    }
+                    image={show.Poster}
                     id={show.imdbID}
                   />
                 ))
@@ -671,23 +655,23 @@ const MovieCard = ({
   title = "Interstellar",
   year = "2014",
   rating = "8.6",
-  image = "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=400&q=80",
+  image = "",
   id,
 }: MediaCardProps) => {
   return (
     <Link to={id ? `/movie/${id}` : "#"} className="block">
       <Card className="overflow-hidden group cursor-pointer hover:shadow-md transition-shadow">
         <div className="aspect-[2/3] relative overflow-hidden bg-muted">
-          <img
-            src={image}
-            alt={title}
-            className="object-cover w-full h-full transition-transform group-hover:scale-105"
-            onError={(e) => {
-              // Fallback to Unsplash image if poster fails to load
-              e.currentTarget.src =
-                "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80";
-            }}
-          />
+          {image && (
+            <img
+              src={image}
+              alt={title}
+              className="object-cover w-full h-full transition-transform group-hover:scale-105"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          )}
           <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm text-xs font-medium py-1 px-2 rounded-md">
             {rating}
           </div>
@@ -705,23 +689,23 @@ const TVShowCard = ({
   title = "Stranger Things",
   year = "2016",
   rating = "8.7",
-  image = "https://images.unsplash.com/photo-1616530940355-351fabd9524b?w=400&q=80",
+  image = "",
   id,
 }: MediaCardProps) => {
   return (
     <Link to={id ? `/tv/${id}` : "#"} className="block">
       <Card className="overflow-hidden group cursor-pointer hover:shadow-md transition-shadow">
         <div className="aspect-[2/3] relative overflow-hidden bg-muted">
-          <img
-            src={image}
-            alt={title}
-            className="object-cover w-full h-full transition-transform group-hover:scale-105"
-            onError={(e) => {
-              // Fallback to Unsplash image if poster fails to load
-              e.currentTarget.src =
-                "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80";
-            }}
-          />
+          {image && (
+            <img
+              src={image}
+              alt={title}
+              className="object-cover w-full h-full transition-transform group-hover:scale-105"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          )}
           <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm text-xs font-medium py-1 px-2 rounded-md">
             {rating}
           </div>

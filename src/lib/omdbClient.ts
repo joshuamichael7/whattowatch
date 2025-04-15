@@ -57,10 +57,7 @@ export async function searchContent(
     return data.Search.map((item: any) => ({
       id: item.imdbID,
       title: item.Title,
-      poster_path:
-        item.Poster !== "N/A"
-          ? item.Poster
-          : "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80",
+      poster_path: item.Poster !== "N/A" ? item.Poster : "",
       media_type: item.Type === "movie" ? "movie" : "tv",
       release_date: item.Year,
       vote_average: 0, // OMDB search doesn't provide ratings in search results
@@ -101,14 +98,8 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     return {
       id: data.imdbID,
       title: data.Title,
-      poster_path:
-        data.Poster !== "N/A"
-          ? data.Poster
-          : "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80",
-      backdrop_path:
-        data.Poster !== "N/A"
-          ? data.Poster
-          : "https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=1280&q=80", // OMDB doesn't provide backdrop
+      poster_path: data.Poster !== "N/A" ? data.Poster : "",
+      backdrop_path: data.Poster !== "N/A" ? data.Poster : "", // OMDB doesn't provide backdrop
       media_type: data.Type === "movie" ? "movie" : "tv",
       release_date: data.Released !== "N/A" ? data.Released : data.Year,
       first_air_date:
@@ -628,10 +619,7 @@ export async function getSimilarContent(
                 aiRecommendations.push({
                   id: item.imdbID,
                   title: item.Title,
-                  poster_path:
-                    item.Poster !== "N/A"
-                      ? item.Poster
-                      : "https://via.placeholder.com/300x450?text=No+Poster",
+                  poster_path: item.Poster !== "N/A" ? item.Poster : "",
                   media_type: item.Type === "movie" ? "movie" : "tv",
                   release_date: item.Year,
                   vote_average: 0,
@@ -779,10 +767,7 @@ export async function getSimilarContent(
             (item: any) => ({
               id: item.imdbID,
               title: item.Title,
-              poster_path:
-                item.Poster !== "N/A"
-                  ? item.Poster
-                  : "https://via.placeholder.com/300x450?text=No+Poster",
+              poster_path: item.Poster !== "N/A" ? item.Poster : "",
               media_type: item.Type === "movie" ? "movie" : "tv",
               release_date: item.Year,
               vote_average: 0,
@@ -1055,10 +1040,7 @@ export async function getSimilarContent(
         }) => ({
           id: item.imdbID,
           title: item.Title,
-          poster_path:
-            item.Poster !== "N/A"
-              ? item.Poster
-              : "https://via.placeholder.com/300x450?text=No+Poster",
+          poster_path: item.Poster !== "N/A" ? item.Poster : "",
           media_type: item.Type === "movie" ? "movie" : "tv",
           release_date: item.Year,
           vote_average: 0, // OMDB search doesn't provide ratings
@@ -1301,10 +1283,7 @@ async function refreshTrendingContent(
     const formattedResults = data.results.map((item: any) => ({
       id: item.imdbID,
       title: item.Title,
-      poster_path:
-        item.Poster !== "N/A"
-          ? item.Poster
-          : "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80",
+      poster_path: item.Poster !== "N/A" ? item.Poster : "",
       media_type: item.Type === "movie" ? "movie" : "tv",
       release_date: item.Year,
       vote_average: item.imdbRating ? parseFloat(item.imdbRating) : 0,
@@ -1397,8 +1376,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt0111161",
       title: "The Shawshank Redemption",
-      poster_path:
-        "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&q=80",
+      poster_path: "",
       media_type: "movie",
       release_date: "1994",
       vote_average: 9.3,
@@ -1410,8 +1388,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt0068646",
       title: "The Godfather",
-      poster_path:
-        "https://images.unsplash.com/photo-1481277542470-605612bd2d61?w=800&q=80",
+      poster_path: "",
       media_type: "movie",
       release_date: "1972",
       vote_average: 9.2,
@@ -1423,8 +1400,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt0468569",
       title: "The Dark Knight",
-      poster_path:
-        "https://images.unsplash.com/photo-1509347528160-9a9e33742cdb?w=800&q=80",
+      poster_path: "",
       media_type: "movie",
       release_date: "2008",
       vote_average: 9.0,
@@ -1436,8 +1412,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt0816692",
       title: "Interstellar",
-      poster_path:
-        "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80",
+      poster_path: "",
       media_type: "movie",
       release_date: "2014",
       vote_average: 8.6,
@@ -1449,8 +1424,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt0133093",
       title: "The Matrix",
-      poster_path:
-        "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&q=80",
+      poster_path: "",
       media_type: "movie",
       release_date: "1999",
       vote_average: 8.7,
@@ -1462,8 +1436,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt0110912",
       title: "Pulp Fiction",
-      poster_path:
-        "https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?w=800&q=80",
+      poster_path: "",
       media_type: "movie",
       release_date: "1994",
       vote_average: 8.9,
@@ -1475,8 +1448,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt0109830",
       title: "Forrest Gump",
-      poster_path:
-        "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=800&q=80",
+      poster_path: "",
       media_type: "movie",
       release_date: "1994",
       vote_average: 8.8,
@@ -1488,8 +1460,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt0167260",
       title: "The Lord of the Rings: The Return of the King",
-      poster_path:
-        "https://images.unsplash.com/photo-1500964757637-c85e8a162699?w=800&q=80",
+      poster_path: "",
       media_type: "movie",
       release_date: "2003",
       vote_average: 8.9,
@@ -1504,8 +1475,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt0944947",
       title: "Game of Thrones",
-      poster_path:
-        "https://images.unsplash.com/photo-1559583109-3e7968136c99?w=800&q=80",
+      poster_path: "",
       media_type: "tv",
       release_date: "2011",
       vote_average: 9.3,
@@ -1517,8 +1487,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt0903747",
       title: "Breaking Bad",
-      poster_path:
-        "https://images.unsplash.com/photo-1504593811423-6dd665756598?w=800&q=80",
+      poster_path: "",
       media_type: "tv",
       release_date: "2008",
       vote_average: 9.5,
@@ -1530,8 +1499,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt1520211",
       title: "The Walking Dead",
-      poster_path:
-        "https://images.unsplash.com/photo-1601513445506-2ab0d4fb4229?w=800&q=80",
+      poster_path: "",
       media_type: "tv",
       release_date: "2010",
       vote_average: 8.2,
@@ -1543,8 +1511,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt4574334",
       title: "Stranger Things",
-      poster_path:
-        "https://images.unsplash.com/photo-1560759226-14da22a643ef?w=800&q=80",
+      poster_path: "",
       media_type: "tv",
       release_date: "2016",
       vote_average: 8.7,
@@ -1556,8 +1523,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt0108778",
       title: "Friends",
-      poster_path:
-        "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=800&q=80",
+      poster_path: "",
       media_type: "tv",
       release_date: "1994",
       vote_average: 8.9,
@@ -1569,8 +1535,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt0386676",
       title: "The Office",
-      poster_path:
-        "https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=800&q=80",
+      poster_path: "",
       media_type: "tv",
       release_date: "2005",
       vote_average: 8.9,
@@ -1582,8 +1547,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt2442560",
       title: "Peaky Blinders",
-      poster_path:
-        "https://images.unsplash.com/photo-1534809027769-b00d750a6bac?w=800&q=80",
+      poster_path: "",
       media_type: "tv",
       release_date: "2013",
       vote_average: 8.8,
@@ -1595,8 +1559,7 @@ function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
     {
       id: "tt1475582",
       title: "Sherlock",
-      poster_path:
-        "https://images.unsplash.com/photo-1581985673473-0784a7a44e39?w=800&q=80",
+      poster_path: "",
       media_type: "tv",
       release_date: "2010",
       vote_average: 9.1,

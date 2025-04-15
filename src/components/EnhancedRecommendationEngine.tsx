@@ -358,9 +358,8 @@ const RecommendationList: React.FC<RecommendationListProps> = ({
                   alt={item.title}
                   className="w-full rounded-md object-cover aspect-[2/3]"
                   onError={(e) => {
-                    // Fallback to Unsplash image if poster fails to load
-                    e.currentTarget.src =
-                      "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&q=80";
+                    // Hide the image if it fails to load
+                    e.currentTarget.style.display = "none";
                   }}
                 />
               </div>
