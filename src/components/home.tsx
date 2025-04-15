@@ -116,7 +116,7 @@ const HomePage = () => {
                 movie.id ||
                 `unknown-${Math.random().toString(36).substring(2, 9)}`,
               Type: "movie",
-              Poster: movie.poster_path,
+              Poster: movie.poster_path || "",
               imdbRating:
                 movie.vote_average !== undefined && movie.vote_average !== null
                   ? movie.vote_average.toString()
@@ -140,7 +140,7 @@ const HomePage = () => {
                 show.id ||
                 `unknown-${Math.random().toString(36).substring(2, 9)}`,
               Type: "series",
-              Poster: show.poster_path,
+              Poster: show.poster_path || "",
               imdbRating:
                 show.vote_average !== undefined && show.vote_average !== null
                   ? show.vote_average.toString()
@@ -186,7 +186,7 @@ const HomePage = () => {
                       movie.id ||
                       `unknown-${Math.random().toString(36).substring(2, 9)}`,
                     Type: "movie",
-                    Poster: movie.poster_path,
+                    Poster: movie.poster_path || "",
                     imdbRating:
                       movie.vote_average !== undefined &&
                       movie.vote_average !== null
@@ -219,7 +219,7 @@ const HomePage = () => {
                       show.id ||
                       `unknown-${Math.random().toString(36).substring(2, 9)}`,
                     Type: "series",
-                    Poster: show.poster_path,
+                    Poster: show.poster_path || "",
                     imdbRating:
                       show.vote_average !== undefined &&
                       show.vote_average !== null
@@ -662,16 +662,17 @@ const MovieCard = ({
     <Link to={id ? `/movie/${id}` : "#"} className="block">
       <Card className="overflow-hidden group cursor-pointer hover:shadow-md transition-shadow">
         <div className="aspect-[2/3] relative overflow-hidden bg-muted">
-          {image && (
-            <img
-              src={image}
-              alt={title}
-              className="object-cover w-full h-full transition-transform group-hover:scale-105"
-              onError={(e) => {
+          <img
+            src={image}
+            alt={title}
+            className="object-cover w-full h-full transition-transform group-hover:scale-105"
+            onError={(e) => {
+              // Only hide the image if it fails to load
+              if (!image || image === "N/A") {
                 e.currentTarget.style.display = "none";
-              }}
-            />
-          )}
+              }
+            }}
+          />
           <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm text-xs font-medium py-1 px-2 rounded-md">
             {rating}
           </div>
@@ -696,16 +697,17 @@ const TVShowCard = ({
     <Link to={id ? `/tv/${id}` : "#"} className="block">
       <Card className="overflow-hidden group cursor-pointer hover:shadow-md transition-shadow">
         <div className="aspect-[2/3] relative overflow-hidden bg-muted">
-          {image && (
-            <img
-              src={image}
-              alt={title}
-              className="object-cover w-full h-full transition-transform group-hover:scale-105"
-              onError={(e) => {
+          <img
+            src={image}
+            alt={title}
+            className="object-cover w-full h-full transition-transform group-hover:scale-105"
+            onError={(e) => {
+              // Only hide the image if it fails to load
+              if (!image || image === "N/A") {
                 e.currentTarget.style.display = "none";
-              }}
-            />
-          )}
+              }
+            }}
+          />
           <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm text-xs font-medium py-1 px-2 rounded-md">
             {rating}
           </div>
