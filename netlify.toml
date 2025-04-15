@@ -11,8 +11,8 @@
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["@tensorflow/tfjs-node"]
+  # Schedule the trending content refresh function to run daily at 00:00 UTC
+  included_files = []
 
-# Schedule the trending content refresh function to run daily at 00:00 UTC
-[[functions]]
-  name = "refresh-trending"
+[functions.refresh-trending]
   schedule = "0 0 * * *"
