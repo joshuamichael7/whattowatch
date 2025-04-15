@@ -1,0 +1,573 @@
+import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
+import {
+  Film,
+  Tv,
+  Star,
+  Info,
+  ExternalLink,
+  Heart,
+  Clock,
+  Filter,
+} from "lucide-react";
+import { getContentById } from "@/lib/omdbClient";
+import { ContentItem, genreMap } from "@/types/omdb";
+
+interface RecommendationItem {
+  id: string;
+  title: string;
+  type: "movie" | "tv";
+  year: string;
+  poster: string;
+  rating: number;
+  genres: string[];
+  synopsis: string;
+  streamingOn: string[];
+  recommendationReason: string;
+  runtime?: string;
+  contentRating?: string;
+}
+
+interface RecommendationGridProps {
+  recommendations?: RecommendationItem[];
+  isLoading?: boolean;
+  onFilterChange?: (filters: any) => void;
+  useDirectApi?: boolean;
+}
+
+const RecommendationGrid = ({
+  recommendations = defaultRecommendations,
+  isLoading = false,
+  onFilterChange = () => {},
+  useDirectApi = false,
+}: RecommendationGridProps) => {
+  const [selectedItem, setSelectedItem] = useState<RecommendationItem | null>(
+    null,
+  );
+  const [loadedItems, setLoadedItems] =
+    useState<RecommendationItem[]>(recommendations);
+  const [sortBy, setSortBy] = useState("relevance");
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [ratingFilter, setRatingFilter] = useState([0, 10]);
+  const [yearFilter, setYearFilter] = useState([1950, 2023]);
+  const [typeFilter, setTypeFilter] = useState("all");
+
+  // Example of using omdbClient with useDirectApi flag
+  useEffect(() => {
+    // This is just an example of how you might use the omdbClient with the useDirectApi flag
+    // Actual implementation would depend on specific requirements
+    const fetchAdditionalDetails = async (itemId: string) => {
+      try {
+        const details = await getContentById(itemId);
+        // Process details as needed
+        console.log(
+          "Fetched details using useDirectApi:",
+          useDirectApi,
+          details,
+        );
+      } catch (error) {
+        console.error("Error fetching details:", error);
+      }
+    };
+
+    // Example: fetch details for the first item if available
+    if (recommendations.length > 0 && selectedItem) {
+      fetchAdditionalDetails(selectedItem.id);
+    }
+  }, [selectedItem, useDirectApi]);
+
+  const handleFilterApply = () => {
+    onFilterChange({
+      rating: ratingFilter,
+      year: yearFilter,
+      type: typeFilter,
+    });
+    setFilterVisible(false);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="w-full h-96 flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">
+            Finding the perfect recommendations for you...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full bg-background p-4 md:p-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <h2 className="text-2xl font-bold">Recommended for You</h2>
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <Button
+            variant="outline"
+            className="flex items-center gap-2"
+            onClick={() => setFilterVisible(!filterVisible)}
+          >
+            <Filter size={16} />
+            Filters
+          </Button>
+
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="relevance">Relevance</SelectItem>
+              <SelectItem value="rating">Rating (High to Low)</SelectItem>
+              <SelectItem value="year">Year (Newest)</SelectItem>
+              <SelectItem value="title">Title (A-Z)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {filterVisible && (
+        <div className="mb-6 p-4 border rounded-lg">
+          <h3 className="text-lg font-medium mb-4">Refine Results</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium">Content Type</h4>
+              <Tabs
+                defaultValue={typeFilter}
+                onValueChange={setTypeFilter}
+                className="w-full"
+              >
+                <TabsList className="grid grid-cols-3 w-full">
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="movie">Movies</TabsTrigger>
+                  <TabsTrigger value="tv">TV Shows</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <h4 className="text-sm font-medium">Rating</h4>
+                <span className="text-sm text-muted-foreground">
+                  {ratingFilter[0]} - {ratingFilter[1]}
+                </span>
+              </div>
+              <Slider
+                defaultValue={ratingFilter}
+                min={0}
+                max={10}
+                step={0.5}
+                onValueChange={setRatingFilter}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <h4 className="text-sm font-medium">Year</h4>
+                <span className="text-sm text-muted-foreground">
+                  {yearFilter[0]} - {yearFilter[1]}
+                </span>
+              </div>
+              <Slider
+                defaultValue={yearFilter}
+                min={1950}
+                max={2023}
+                step={1}
+                onValueChange={setYearFilter}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end mt-4 gap-2">
+            <Button variant="outline" onClick={() => setFilterVisible(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleFilterApply}>Apply Filters</Button>
+          </div>
+        </div>
+      )}
+
+      {recommendations.length === 0 ? (
+        <div className="text-center py-12">
+          <h3 className="text-xl font-medium mb-2">No recommendations found</h3>
+          <p className="text-muted-foreground">
+            Try adjusting your preferences or filters
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {recommendations.map((item) => (
+            <Card
+              key={item.id}
+              className="overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow"
+            >
+              <Link
+                to={`/${item.type}/${item.id}`}
+                className="flex flex-col h-full"
+              >
+                <div className="relative aspect-[2/3] overflow-hidden bg-muted">
+                  <img
+                    src={item.poster}
+                    alt={`${item.title} poster`}
+                    className="object-cover w-full h-full"
+                  />
+                  <div className="absolute top-2 right-2">
+                    <Badge
+                      variant={item.type === "movie" ? "default" : "secondary"}
+                      className="flex items-center gap-1"
+                    >
+                      {item.type === "movie" ? (
+                        <Film size={12} />
+                      ) : (
+                        <Tv size={12} />
+                      )}
+                      {item.type === "movie" ? "Movie" : "TV"}
+                    </Badge>
+                  </div>
+                </div>
+
+                <CardHeader className="p-3 pb-0">
+                  <CardTitle className="text-base line-clamp-1">
+                    {item.title}
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-2">
+                    <span>{item.year}</span>
+                    {item.rating > 0 && (
+                      <span className="flex items-center">
+                        <Star
+                          size={14}
+                          className="fill-yellow-400 text-yellow-400 mr-1"
+                        />
+                        {item.rating.toFixed(1)}
+                      </span>
+                    )}
+                  </CardDescription>
+                </CardHeader>
+
+                <CardContent className="p-3 pt-2 flex-grow">
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {item.genres.slice(0, 2).map((genre) => (
+                      <Badge key={genre} variant="outline" className="text-xs">
+                        {genre}
+                      </Badge>
+                    ))}
+                    {item.genres.length > 2 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{item.genres.length - 2}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">
+                    {item.synopsis}
+                  </p>
+                </CardContent>
+              </Link>
+
+              <CardFooter className="p-3 pt-0">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setSelectedItem(item)}
+                    >
+                      <Info size={16} className="mr-2" />
+                      Details
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                    {selectedItem && (
+                      <>
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            {selectedItem.title}
+                            <Badge
+                              variant={
+                                selectedItem.type === "movie"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                              className="ml-2"
+                            >
+                              {selectedItem.type === "movie"
+                                ? "Movie"
+                                : "TV Show"}
+                            </Badge>
+                          </DialogTitle>
+                          <DialogDescription className="flex items-center gap-3">
+                            <span>{selectedItem.year}</span>
+                            {selectedItem.contentRating && (
+                              <Badge variant="outline">
+                                {selectedItem.contentRating}
+                              </Badge>
+                            )}
+                            {selectedItem.runtime && (
+                              <span className="flex items-center gap-1">
+                                <Clock size={14} />
+                                {selectedItem.runtime}
+                              </span>
+                            )}
+                            {selectedItem.rating > 0 && (
+                              <span className="flex items-center gap-1">
+                                <Star
+                                  size={14}
+                                  className="fill-yellow-400 text-yellow-400"
+                                />
+                                {selectedItem.rating.toFixed(1)}/10
+                              </span>
+                            )}
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 mt-4">
+                          <div className="aspect-[2/3] overflow-hidden rounded-md bg-muted">
+                            <img
+                              src={selectedItem.poster}
+                              alt={`${selectedItem.title} poster`}
+                              className="object-cover w-full h-full"
+                            />
+                          </div>
+
+                          <div className="space-y-4">
+                            <div>
+                              <h4 className="font-medium mb-1">Synopsis</h4>
+                              <p className="text-sm text-muted-foreground">
+                                {selectedItem.synopsis}
+                              </p>
+                            </div>
+
+                            <div>
+                              <h4 className="font-medium mb-1">Genres</h4>
+                              <div className="flex flex-wrap gap-1">
+                                {selectedItem.genres.map((genre) => (
+                                  <Badge key={genre} variant="outline">
+                                    {genre}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+
+                            {selectedItem.streamingOn.length > 0 && (
+                              <div>
+                                <h4 className="font-medium mb-1">
+                                  Available on
+                                </h4>
+                                <div className="flex flex-wrap gap-1">
+                                  {selectedItem.streamingOn.map((service) => (
+                                    <Badge key={service}>{service}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            <div>
+                              <h4 className="font-medium mb-1">
+                                Why we recommend this
+                              </h4>
+                              <p className="text-sm text-muted-foreground">
+                                {selectedItem.recommendationReason}
+                              </p>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                              <Button
+                                variant="outline"
+                                className="flex items-center gap-2"
+                              >
+                                <Heart size={16} />
+                                Save
+                              </Button>
+                              <Button
+                                className="flex items-center gap-2"
+                                asChild
+                              >
+                                <Link
+                                  to={`/${selectedItem.type}/${selectedItem.id}`}
+                                >
+                                  <ExternalLink size={16} />
+                                  View Details
+                                </Link>
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </DialogContent>
+                </Dialog>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Sample data for demonstration
+const defaultRecommendations: RecommendationItem[] = [
+  {
+    id: "1",
+    title: "Inception",
+    type: "movie",
+    year: "2010",
+    poster:
+      "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80",
+    rating: 8.8,
+    genres: ["Sci-Fi", "Action", "Thriller"],
+    synopsis:
+      "A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.",
+    streamingOn: ["Netflix", "HBO Max"],
+    recommendationReason:
+      "Because you enjoyed mind-bending sci-fi movies with complex plots",
+    runtime: "2h 28m",
+    contentRating: "PG-13",
+  },
+  {
+    id: "2",
+    title: "Stranger Things",
+    type: "tv",
+    year: "2016",
+    poster:
+      "https://images.unsplash.com/photo-1560759226-14da22a643ef?w=800&q=80",
+    rating: 8.7,
+    genres: ["Drama", "Fantasy", "Horror"],
+    synopsis:
+      "When a young boy disappears, his mother, a police chief, and his friends must confront terrifying supernatural forces in order to get him back.",
+    streamingOn: ["Netflix"],
+    recommendationReason:
+      "Based on your interest in supernatural themes and 80s nostalgia",
+    contentRating: "TV-14",
+  },
+  {
+    id: "3",
+    title: "The Shawshank Redemption",
+    type: "movie",
+    year: "1994",
+    poster:
+      "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&q=80",
+    rating: 9.3,
+    genres: ["Drama"],
+    synopsis:
+      "Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.",
+    streamingOn: ["Amazon Prime", "HBO Max"],
+    recommendationReason:
+      "Matches your preference for powerful character-driven dramas",
+    runtime: "2h 22m",
+    contentRating: "R",
+  },
+  {
+    id: "4",
+    title: "Breaking Bad",
+    type: "tv",
+    year: "2008",
+    poster:
+      "https://images.unsplash.com/photo-1504593811423-6dd665756598?w=800&q=80",
+    rating: 9.5,
+    genres: ["Crime", "Drama", "Thriller"],
+    synopsis:
+      "A high school chemistry teacher diagnosed with inoperable lung cancer turns to manufacturing and selling methamphetamine in order to secure his family's future.",
+    streamingOn: ["Netflix", "AMC+"],
+    recommendationReason:
+      "Based on your interest in complex characters and crime dramas",
+    contentRating: "TV-MA",
+  },
+  {
+    id: "5",
+    title: "Parasite",
+    type: "movie",
+    year: "2019",
+    poster:
+      "https://images.unsplash.com/photo-1611523658822-385aa008324c?w=800&q=80",
+    rating: 8.6,
+    genres: ["Drama", "Thriller", "Comedy"],
+    synopsis:
+      "Greed and class discrimination threaten the newly formed symbiotic relationship between the wealthy Park family and the destitute Kim clan.",
+    streamingOn: ["Hulu"],
+    recommendationReason:
+      "Matches your interest in thought-provoking international films",
+    runtime: "2h 12m",
+    contentRating: "R",
+  },
+  {
+    id: "6",
+    title: "The Mandalorian",
+    type: "tv",
+    year: "2019",
+    poster:
+      "https://images.unsplash.com/photo-1518744386442-2d48ac47a7eb?w=800&q=80",
+    rating: 8.7,
+    genres: ["Action", "Adventure", "Sci-Fi"],
+    synopsis:
+      "The travels of a lone bounty hunter in the outer reaches of the galaxy, far from the authority of the New Republic.",
+    streamingOn: ["Disney+"],
+    recommendationReason:
+      "Based on your interest in space adventures and Star Wars content",
+    contentRating: "TV-14",
+  },
+  {
+    id: "7",
+    title: "Knives Out",
+    type: "movie",
+    year: "2019",
+    poster:
+      "https://images.unsplash.com/photo-1542204165-65bf26472b9b?w=800&q=80",
+    rating: 7.9,
+    genres: ["Comedy", "Crime", "Drama"],
+    synopsis:
+      "A detective investigates the death of a patriarch of an eccentric, combative family.",
+    streamingOn: ["Amazon Prime"],
+    recommendationReason:
+      "Matches your preference for clever mysteries with humor",
+    runtime: "2h 10m",
+    contentRating: "PG-13",
+  },
+  {
+    id: "8",
+    title: "The Queen's Gambit",
+    type: "tv",
+    year: "2020",
+    poster:
+      "https://images.unsplash.com/photo-1580541631950-7282082b03fe?w=800&q=80",
+    rating: 8.6,
+    genres: ["Drama"],
+    synopsis:
+      "Orphaned at the tender age of nine, prodigious introvert Beth Harmon discovers and masters the game of chess in 1960s USA. But child stardom comes at a price.",
+    streamingOn: ["Netflix"],
+    recommendationReason:
+      "Based on your interest in character-driven period dramas",
+    contentRating: "TV-MA",
+  },
+];
+
+export default RecommendationGrid;
