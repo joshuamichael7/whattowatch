@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, lazy } from "react";
 import { useRoutes, Routes, Route } from "react-router-dom";
 import Home from "./components/home";
 import Dashboard from "./components/Dashboard";
@@ -8,33 +8,43 @@ import { ThemeProvider } from "./components/theme-provider";
 import { ThemeToggle } from "./components/ui/theme-toggle";
 import PlotSimilarityTest from "./components/PlotSimilarityTest";
 import EdgeFunctionTester from "./components/EdgeFunctionTester";
+import { AuthProvider } from "./contexts/AuthContext";
+
+// Lazy load authentication components
+const Auth = lazy(() => import("./components/Auth"));
+const UserProfile = lazy(() => import("./components/UserProfile"));
 
 function App() {
   return (
-    <ThemeProvider defaultTheme="system">
-      <Suspense fallback={<p>Loading...</p>}>
-        <>
-          <div className="fixed top-4 right-4 z-50">
-            <ThemeToggle />
-          </div>
-          {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/movie/:id" element={<MovieDetailPage />} />
-            <Route path="/tv/:id" element={<MovieDetailPage />} />
-            <Route
-              path="/plot-similarity-test"
-              element={<PlotSimilarityTest />}
-            />
-            <Route
-              path="/edge-function-test"
-              element={<EdgeFunctionTester />}
-            />
-          </Routes>
-        </>
-      </Suspense>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider defaultTheme="system">
+        <Suspense fallback={<p>Loading...</p>}>
+          <>
+            <div className="fixed top-4 right-4 z-50">
+              <ThemeToggle />
+            </div>
+            {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/movie/:id" element={<MovieDetailPage />} />
+              <Route path="/tv/:id" element={<MovieDetailPage />} />
+              <Route path="/login" element={<Auth />} />
+              <Route path="/register" element={<Auth />} />
+              <Route path="/profile" element={<UserProfile />} />
+              <Route
+                path="/plot-similarity-test"
+                element={<PlotSimilarityTest />}
+              />
+              <Route
+                path="/edge-function-test"
+                element={<EdgeFunctionTester />}
+              />
+            </Routes>
+          </>
+        </Suspense>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
 

@@ -1,16 +1,8 @@
-// Helper function to safely access environment variables
-const getEnvVar = (key: string, defaultValue: string = ""): string => {
-  if (typeof process !== "undefined" && process.env && process.env[key]) {
-    return process.env[key] || defaultValue;
-  } else if (
-    typeof import.meta !== "undefined" &&
-    import.meta.env &&
-    import.meta.env[key]
-  ) {
-    return import.meta.env[key] || defaultValue;
-  }
-  return defaultValue;
-};
+import { getEnvVar } from "../lib/utils";
+import {
+  getContentByIdFromSupabase,
+  searchContentInSupabase,
+} from "../lib/supabaseClient";
 
 // Use only regular Netlify functions for all OMDB API calls
 const API_ENDPOINT = "/.netlify/functions/omdb";
@@ -42,6 +34,25 @@ export async function searchContent(
   type?: "movie" | "series" | "all",
 ): Promise<ContentItem[]> {
   try {
+    console.log(
+      `[omdbClient] Searching for content with query: ${query}, type: ${type || "all"}`,
+    );
+
+    // First, try to search in Supabase
+    const supabaseResults = await searchContentInSupabase(query, type);
+
+    // If we have results from Supabase, return them
+    if (supabaseResults && supabaseResults.length > 0) {
+      console.log(
+        `[omdbClient] Found ${supabaseResults.length} results in Supabase`,
+      );
+      return supabaseResults;
+    }
+
+    // If no results from Supabase, fall back to OMDB API
+    console.log(
+      `[omdbClient] No results found in Supabase, falling back to OMDB API`,
+    );
     const params = new URLSearchParams({
       s: query,
     });
@@ -74,6 +85,23 @@ export async function searchContent(
 // Helper function to get content details by ID
 export async function getContentById(id: string): Promise<ContentItem | null> {
   try {
+    console.log(`[omdbClient] Getting content details for ID: ${id}`);
+
+    // First, try to get content from Supabase
+    const supabaseContent = await getContentByIdFromSupabase(id);
+
+    // If we have content from Supabase, return it
+    if (supabaseContent) {
+      console.log(
+        `[omdbClient] Found content in Supabase: ${supabaseContent.title}`,
+      );
+      return supabaseContent;
+    }
+
+    // If no content from Supabase, fall back to OMDB API
+    console.log(
+      `[omdbClient] Content not found in Supabase, falling back to OMDB API`,
+    );
     const params = new URLSearchParams({
       i: id,
       plot: "full",
@@ -95,7 +123,7 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     });
 
     // Transform OMDB data to match our application's expected format
-    return {
+    const contentItem = {
       id: data.imdbID,
       title: data.Title,
       poster_path: data.Poster !== "N/A" ? data.Poster : "",
@@ -121,6 +149,20 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
       streaming_providers: null, // OMDB doesn't provide streaming info
       popularity: 0, // OMDB doesn't provide popularity metrics
     };
+
+    // Try to add this content to Supabase for future use
+    try {
+      const { addContentToSupabase } = await import("../lib/supabaseClient");
+      await addContentToSupabase(contentItem);
+      console.log(
+        `[omdbClient] Added content to Supabase: ${contentItem.title}`,
+      );
+    } catch (supabaseError) {
+      console.error("Error adding content to Supabase:", supabaseError);
+      // Continue even if adding to Supabase fails
+    }
+
+    return contentItem;
   } catch (error) {
     console.error("Error fetching content by ID:", error);
     return null;

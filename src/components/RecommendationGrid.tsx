@@ -34,12 +34,15 @@ import {
   Star,
   Info,
   ExternalLink,
-  Heart,
   Clock,
   Filter,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import { getContentById } from "@/lib/omdbClient";
 import { ContentItem, genreMap } from "@/types/omdb";
+import UserFeedbackButton from "./UserFeedbackButton";
+import WatchlistButton from "./WatchlistButton";
 
 interface RecommendationItem {
   id: string;
@@ -61,6 +64,9 @@ interface RecommendationGridProps {
   isLoading?: boolean;
   onFilterChange?: (filters: any) => void;
   useDirectApi?: boolean;
+  onFeedbackSubmit?: (itemId: string, isPositive: boolean) => void;
+  userId?: string;
+  userPreferences?: any;
 }
 
 const RecommendationGrid = ({
@@ -68,6 +74,9 @@ const RecommendationGrid = ({
   isLoading = false,
   onFilterChange = () => {},
   useDirectApi = false,
+  onFeedbackSubmit = () => {},
+  userId,
+  userPreferences,
 }: RecommendationGridProps) => {
   const [selectedItem, setSelectedItem] = useState<RecommendationItem | null>(
     null,
@@ -80,7 +89,7 @@ const RecommendationGrid = ({
   const [yearFilter, setYearFilter] = useState([1950, 2023]);
   const [typeFilter, setTypeFilter] = useState("all");
 
-  // Example of using omdbClient with useDirectApi flag
+  // Example of using omdbClient with useDirectApi flag and user preferences
   useEffect(() => {
     // This is just an example of how you might use the omdbClient with the useDirectApi flag
     // Actual implementation would depend on specific requirements
@@ -103,6 +112,17 @@ const RecommendationGrid = ({
       fetchAdditionalDetails(selectedItem.id);
     }
   }, [selectedItem, useDirectApi]);
+
+  // Log user preferences when they change
+  useEffect(() => {
+    if (userId && userPreferences) {
+      console.log(`Loading recommendations for user ${userId}`);
+      console.log("User preferences:", userPreferences);
+
+      // Here you would typically fetch personalized recommendations
+      // based on the user's preferences
+    }
+  }, [userId, userPreferences]);
 
   const handleFilterApply = () => {
     onFilterChange({
@@ -129,7 +149,11 @@ const RecommendationGrid = ({
   return (
     <div className="w-full bg-background p-4 md:p-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <h2 className="text-2xl font-bold">Recommended for You</h2>
+        <h2 className="text-2xl font-bold">
+          {userId
+            ? `Recommended for ${userPreferences?.display_name || "You"}`
+            : "Recommended for You"}
+        </h2>
 
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
           <Button
@@ -294,6 +318,30 @@ const RecommendationGrid = ({
               </Link>
 
               <CardFooter className="p-3 pt-0">
+                <div className="flex gap-2 w-full mb-2">
+                  <UserFeedbackButton
+                    contentId={item.id}
+                    isPositive={true}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    showText={false}
+                    onFeedbackSubmitted={(success) => {
+                      if (success) onFeedbackSubmit(item.id, true);
+                    }}
+                  />
+                  <UserFeedbackButton
+                    contentId={item.id}
+                    isPositive={false}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    showText={false}
+                    onFeedbackSubmitted={(success) => {
+                      if (success) onFeedbackSubmit(item.id, false);
+                    }}
+                  />
+                </div>
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button
@@ -400,13 +448,11 @@ const RecommendationGrid = ({
                             </div>
 
                             <div className="flex gap-2 pt-2">
-                              <Button
+                              <WatchlistButton
+                                contentId={selectedItem.id}
                                 variant="outline"
                                 className="flex items-center gap-2"
-                              >
-                                <Heart size={16} />
-                                Save
-                              </Button>
+                              />
                               <Button
                                 className="flex items-center gap-2"
                                 asChild
@@ -418,6 +464,28 @@ const RecommendationGrid = ({
                                   View Details
                                 </Link>
                               </Button>
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                              <UserFeedbackButton
+                                contentId={selectedItem.id}
+                                isPositive={true}
+                                variant="outline"
+                                className="flex items-center gap-2"
+                                onFeedbackSubmitted={(success) => {
+                                  if (success)
+                                    onFeedbackSubmit(selectedItem.id, true);
+                                }}
+                              />
+                              <UserFeedbackButton
+                                contentId={selectedItem.id}
+                                isPositive={false}
+                                variant="outline"
+                                className="flex items-center gap-2"
+                                onFeedbackSubmitted={(success) => {
+                                  if (success)
+                                    onFeedbackSubmit(selectedItem.id, false);
+                                }}
+                              />
                             </div>
                           </div>
                         </div>

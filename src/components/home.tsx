@@ -8,6 +8,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import UserProfileButton from "./UserProfileButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -161,7 +162,7 @@ const HomePage = () => {
             <Button variant="ghost" asChild>
               <Link to="/edge-function-test">Edge Function Test</Link>
             </Button>
-            <Button variant="outline">Sign In</Button>
+            <UserProfileButton />
           </nav>
         </div>
       </header>
@@ -186,20 +187,16 @@ const HomePage = () => {
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <Button
                 size="lg"
-                className="gap-2"
                 onClick={() => (window.location.href = "/dashboard")}
               >
-                <SearchIcon className="h-5 w-5" />
-                Find Similar Content
+                What to Watch
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                className="gap-2"
                 onClick={() => (window.location.href = "/dashboard")}
               >
-                <ListFilter className="h-5 w-5" />
-                Take Preference Quiz
+                Find Similar Content
               </Button>
             </div>
           </motion.div>
@@ -212,7 +209,7 @@ const HomePage = () => {
           <TabsList className="grid w-full grid-cols-3 mb-8">
             <TabsTrigger value="discover">Discover</TabsTrigger>
             <TabsTrigger value="similar">Find Similar</TabsTrigger>
-            <TabsTrigger value="quiz">Preference Quiz</TabsTrigger>
+            <TabsTrigger value="quiz">What to Watch</TabsTrigger>
           </TabsList>
 
           <TabsContent value="discover" className="space-y-8">
@@ -343,7 +340,7 @@ const HomePage = () => {
           <TabsContent value="quiz" className="space-y-6">
             <div className="max-w-3xl mx-auto">
               <h2 className="text-2xl font-bold tracking-tight mb-4">
-                Preference Quiz
+                What to Watch
               </h2>
               <p className="text-muted-foreground mb-6">
                 Answer a few questions to help us understand your taste and
@@ -354,7 +351,7 @@ const HomePage = () => {
                 className="w-full sm:w-auto"
                 onClick={() => (window.location.href = "/dashboard")}
               >
-                Start Quiz
+                What to Watch
               </Button>
             </div>
 
@@ -427,7 +424,7 @@ const HomePage = () => {
                     href="#"
                     className="text-muted-foreground hover:text-foreground"
                   >
-                    Preference Quiz
+                    What to Watch
                   </a>
                 </li>
                 <li>

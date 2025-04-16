@@ -59,8 +59,37 @@ const EnhancedRecommendationEngine: React.FC<
     setStatusMessage("Initializing recommendation engine...");
 
     try {
-      // Step 1: Generate AI recommendations if preferences are provided
+      // Step 1: Check Supabase for cached recommendations if preferences are provided
       if (preferences) {
+        setStatusMessage("Checking for cached recommendations...");
+        setProgress(5);
+
+        // Generate a cache key based on preferences
+        const cacheKey = generateCacheKey(preferences);
+
+        try {
+          // Import dynamically to avoid circular dependencies
+          const { getCachedRecommendations } = await import(
+            "../lib/supabaseClient"
+          );
+          const cachedRecs = await getCachedRecommendations(cacheKey);
+
+          if (cachedRecs && cachedRecs.length > 0) {
+            setStatusMessage("Found cached recommendations");
+            setProgress(50);
+            setRecommendations(cachedRecs);
+            setProgress(100);
+            setStatusMessage("Cached recommendations loaded successfully");
+            onRecommendationsGenerated(cachedRecs);
+            setIsLoading(false);
+            return;
+          }
+        } catch (cacheError) {
+          console.error("Error checking recommendation cache:", cacheError);
+          // Continue with normal recommendation flow if cache check fails
+        }
+
+        // If no cached recommendations, proceed with AI recommendations
         setStatusMessage(
           "Generating AI recommendations based on preferences...",
         );
@@ -91,13 +120,79 @@ const EnhancedRecommendationEngine: React.FC<
 
           setProgress(60);
           setRecommendations(aiContentWithReasons);
+
+          // Cache the AI recommendations for future use
+          try {
+            const { cacheRecommendations } = await import(
+              "../lib/supabaseClient"
+            );
+            await cacheRecommendations(cacheKey, aiContentWithReasons);
+            console.log("Successfully cached AI recommendations");
+          } catch (cacheError) {
+            console.error("Error caching AI recommendations:", cacheError);
+            // Continue even if caching fails
+          }
         }
       }
 
-      // Step 2: Generate vector-based recommendations if content ID is provided
+      // Step 2: Check Supabase for similar content if content ID is provided
       if (contentId) {
-        setStatusMessage("Querying vector database for similar content...");
+        setStatusMessage("Checking database for similar content...");
         setProgress(70);
+
+        try {
+          // First try to get similar content from Supabase
+          const { getSimilarContentFromSupabase } = await import(
+            "../lib/supabaseClient"
+          );
+          const supabaseResults = await getSimilarContentFromSupabase(
+            contentId,
+            limit,
+          );
+
+          if (supabaseResults && supabaseResults.length > 0) {
+            setStatusMessage("Found similar content in database");
+            const supabaseItems = supabaseResults.map((item) => ({
+              ...item,
+              recommendationReason: "Similar content from our database",
+              recommendationSource: "database",
+            }));
+
+            setVectorRecommendations(supabaseItems);
+            setProgress(90);
+
+            // If we already have AI recommendations, combine them
+            if (recommendations.length > 0) {
+              // Combine and deduplicate
+              const combinedRecs = [...recommendations];
+
+              for (const dbItem of supabaseItems) {
+                if (!combinedRecs.some((item) => item.id === dbItem.id)) {
+                  combinedRecs.push(dbItem);
+                }
+              }
+
+              setRecommendations(combinedRecs.slice(0, limit));
+            } else {
+              setRecommendations(supabaseItems);
+            }
+
+            setProgress(100);
+            setStatusMessage("Recommendations generated successfully");
+            onRecommendationsGenerated(recommendations);
+            setIsLoading(false);
+            return;
+          }
+        } catch (dbError) {
+          console.error(
+            "Error fetching similar content from database:",
+            dbError,
+          );
+          // Fall back to vector database if Supabase query fails
+        }
+
+        // If no results from Supabase, fall back to vector database
+        setStatusMessage("Querying vector database for similar content...");
 
         // Get similar content IDs from vector database
         const similarIds = await querySimilarContent(
@@ -114,6 +209,23 @@ const EnhancedRecommendationEngine: React.FC<
             similarIds.map(async (id) => {
               try {
                 const content = await getContentById(id);
+
+                // If content is found, store it in Supabase for future queries
+                if (content) {
+                  try {
+                    const { addContentToSupabase, addContentSimilarity } =
+                      await import("../lib/supabaseClient");
+                    await addContentToSupabase(content);
+                    await addContentSimilarity(contentId, id, 0.8); // Default similarity score
+                  } catch (storeError) {
+                    console.error(
+                      `Error storing content in database:`,
+                      storeError,
+                    );
+                    // Continue even if storing fails
+                  }
+                }
+
                 return content
                   ? ({
                       ...content,
@@ -172,6 +284,13 @@ const EnhancedRecommendationEngine: React.FC<
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Helper function to generate a cache key from preferences
+  const generateCacheKey = (prefs: any): string => {
+    const { genres, mood, viewingTime, ageRating } = prefs;
+    const genresStr = genres.sort().join(",");
+    return `${genresStr}|${mood}|${viewingTime}|${ageRating}`;
   };
 
   // Helper function to fetch content details for a list of titles

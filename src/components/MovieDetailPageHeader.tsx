@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import UserProfileButton from "./UserProfileButton";
 
 interface MovieDetailPageHeaderProps {
   title?: string;
@@ -25,7 +26,7 @@ const MovieDetailPageHeader: React.FC<MovieDetailPageHeaderProps> = ({
             <Link to="/dashboard">Discover</Link>
           </Button>
           <Button variant="ghost">About</Button>
-          <Button variant="outline">Sign In</Button>
+          <UserProfileButton />
         </nav>
       </div>
     </header>
