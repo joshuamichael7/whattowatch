@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -13,17 +13,15 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Database, Upload, Users } from "lucide-react";
 import CsvManagement from "./admin/CsvManagement";
+import AdminPasswordForm from "./AdminPasswordForm";
 
 const AdminDashboard: React.FC = () => {
-  const { user, profile, isLoading } = useAuth();
+  const { user, profile, isLoading, isAdmin, isAdminVerified } = useAuth();
   const navigate = useNavigate();
-
-  // Check if user is admin
-  const isAdmin = profile?.role === "admin";
 
   // Redirect non-admin users
   React.useEffect(() => {
-    if (!isLoading && (!user || !isAdmin)) {
+    if (!isLoading && user && !isAdmin) {
       navigate("/");
     }
   }, [user, isAdmin, isLoading, navigate]);
@@ -47,6 +45,11 @@ const AdminDashboard: React.FC = () => {
         </Alert>
       </div>
     );
+  }
+
+  // If user is admin but hasn't verified with password yet
+  if (!isAdminVerified) {
+    return <AdminPasswordForm />;
   }
 
   return (

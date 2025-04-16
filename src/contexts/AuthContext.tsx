@@ -16,9 +16,11 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isAdminVerified: boolean;
   refreshUser: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   refreshPreferences: () => Promise<void>;
+  verifyAdminPassword: (password: string) => Promise<boolean>;
 }
 
 // Create the context with default values
@@ -30,9 +32,11 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   isAuthenticated: false,
   isAdmin: false,
+  isAdminVerified: false,
   refreshUser: async () => {},
   refreshProfile: async () => {},
   refreshPreferences: async () => {},
+  verifyAdminPassword: async () => false,
 });
 
 // Create the provider component
@@ -42,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<any | null>(null);
   const [preferences, setPreferences] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdminVerified, setIsAdminVerified] = useState(false);
 
   // Function to refresh user data
   const refreshUser = async () => {
@@ -130,6 +135,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Function to verify admin password
+  const verifyAdminPassword = async (password: string): Promise<boolean> => {
+    // In a real application, you would verify this against a secure source
+    // For demo purposes, we're using a hardcoded password
+    // IMPORTANT: In production, use environment variables and proper security measures
+    const correctPassword = "admin123"; // This should be an environment variable in production
+
+    const isCorrect = password === correctPassword;
+    if (isCorrect) {
+      setIsAdminVerified(true);
+    }
+    return isCorrect;
+  };
+
   const value = {
     user,
     session,
@@ -138,22 +157,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     isAuthenticated: !!user,
     isAdmin: !!profile?.role && profile.role === "admin",
+    isAdminVerified,
     refreshUser,
     refreshProfile,
     refreshPreferences,
+    verifyAdminPassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// Create a named function and then export it as a constant
-function useAuthContext() {
+// Export the hook directly as a named function
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }
-
-// Export the hook as a constant
-export const useAuth = useAuthContext;
