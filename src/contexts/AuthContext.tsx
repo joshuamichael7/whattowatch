@@ -127,14 +127,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     refreshProfile,
   };
 
+  // Log the auth context state to the browser console
+  console.log("[AUTH_CONTEXT] Current state:", {
+    user: user ? { id: user.id, email: user.email } : null,
+    profile,
+    isAuthenticated: !!user,
+    isAdmin,
+    isLoading,
+  });
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Export the hook
-export function useAuth() {
+// Export the hook as a named export, not a function declaration
+// This fixes the HMR issue with "useAuth export is incompatible"
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
-}
+};

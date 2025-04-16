@@ -20,6 +20,17 @@ const AdminDashboard: React.FC = () => {
     useAuth();
   const navigate = useNavigate();
 
+  // Log detailed auth information when accessing admin dashboard
+  React.useEffect(() => {
+    console.log("[ADMIN_DASHBOARD] Auth details:", {
+      user,
+      profile,
+      isAdmin,
+      isAdminVerified,
+      isLoading,
+    });
+  }, [user, profile, isAdmin, isAdminVerified, isLoading]);
+
   // Redirect non-admin users
   React.useEffect(() => {
     if (isLoading) {
