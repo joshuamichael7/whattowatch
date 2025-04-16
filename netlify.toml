@@ -9,16 +9,10 @@
 [[edge_functions]]
   path = "/api/omdb-edge"
   function = "omdb-edge"
-  # Include environment variables for this edge function
-  [edge_functions.environment]
-    OMDB_API_KEY = "${OMDB_API_KEY}"
 
 [[edge_functions]]
   path = "/api/test-edge"
   function = "test-edge"
-  # Include environment variables for this edge function
-  [edge_functions.environment]
-    OMDB_API_KEY = "${OMDB_API_KEY}"
 
 # Redirects and rewrites
 [[redirects]]
