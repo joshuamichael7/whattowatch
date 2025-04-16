@@ -146,11 +146,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// Export the hook directly as a named function
-export function useAuth() {
+// Create a named function and then export it as a constant
+function useAuthContext() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }
+
+// Export the hook as a constant
+export const useAuth = useAuthContext;

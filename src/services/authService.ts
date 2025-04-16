@@ -19,10 +19,7 @@ export async function signIn(email: string, password: string) {
 // Sign up with email and password
 export async function signUp(email: string, password: string) {
   try {
-    console.log(
-      "Signing up with Supabase URL:",
-      import.meta.env.VITE_SUPABASE_URL,
-    );
+    console.log("Signing up with Supabase URL:", supabase.supabaseUrl);
     const { data, error } = await supabase.auth.signUp({
       email,
       password,

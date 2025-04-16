@@ -3,13 +3,16 @@ import { getEnvVar } from "./utils";
 import { ContentItem } from "../types/omdb";
 
 // Get Supabase URL and key from environment variables
-// Using non-VITE prefixed variables to keep them server-side only
-const supabaseUrl = import.meta.env.SUPABASE_URL || "";
-const supabaseKey = import.meta.env.SUPABASE_ANON_KEY || "";
+// Use VITE_ prefixed variables for client-side access
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 
 // Log environment variables for debugging (will be removed in production)
-console.log("SUPABASE_URL exists:", !!import.meta.env.SUPABASE_URL);
-console.log("SUPABASE_ANON_KEY exists:", !!import.meta.env.SUPABASE_ANON_KEY);
+console.log("VITE_SUPABASE_URL exists:", !!import.meta.env.VITE_SUPABASE_URL);
+console.log(
+  "VITE_SUPABASE_ANON_KEY exists:",
+  !!import.meta.env.VITE_SUPABASE_ANON_KEY,
+);
 
 // Create Supabase client with fallback URL and key if environment variables are not available
 export const supabase = createClient(
