@@ -23,62 +23,28 @@ export default async (request, context) => {
     const url = new URL(request.url);
     const params = url.searchParams;
 
-    // Check if this is a trending request
-    if (params.has("trending") && params.get("trending") === "true") {
-      // Handle trending content request
-      const type = params.get("type") || "movie";
-      const limit = parseInt(params.get("limit") || "10");
+    // Simplified approach: always return some videos regardless of parameters
+    // Create a simple search params object for the OMDB API
+    const omdbParams = new URLSearchParams();
+    omdbParams.set("apikey", API_KEY);
+    omdbParams.set("s", "movie"); // Simple search term that will return results
 
-      // Create a search for recent popular content
-      const year = new Date().getFullYear();
-
-      // Use better search terms for trending content
-      const popularTerms =
-        type === "movie"
-          ? ["action", "adventure", "sci-fi", "thriller", "drama"]
-          : ["show", "series", "drama", "comedy", "thriller"];
-
-      // Pick a random popular term
-      const randomTerm =
-        popularTerms[Math.floor(Math.random() * popularTerms.length)];
-
-      // Create a new search params object for the OMDB API
-      const omdbParams = new URLSearchParams();
-      omdbParams.set("apikey", API_KEY);
-      omdbParams.set("s", randomTerm); // Use a better search term
-      omdbParams.set("type", type === "movie" ? "movie" : "series");
-      omdbParams.set("y", year.toString());
-
-      // Make the request to OMDB API
-      const response = await fetch(
-        `https://www.omdbapi.com/?${omdbParams.toString()}`,
-      );
-      const data = await response.json();
-
-      return new Response(JSON.stringify(data), {
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-          "Cache-Control": "public, max-age=3600",
-        },
-      });
+    // If type is specified, use it
+    if (params.has("type")) {
+      omdbParams.set("type", params.get("type"));
     }
-
-    // For regular requests, just pass through the parameters
-    const searchParams = new URLSearchParams(params);
-    searchParams.set("apikey", API_KEY);
 
     // Make the request to OMDB API
     const response = await fetch(
-      `https://www.omdbapi.com/?${searchParams.toString()}`,
+      `https://www.omdbapi.com/?${omdbParams.toString()}`,
     );
     const data = await response.json();
 
     return new Response(JSON.stringify(data), {
       headers: {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*", // For CORS support
-        "Cache-Control": "public, max-age=3600", // Cache for 1 hour
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=3600",
       },
     });
   } catch (error) {
