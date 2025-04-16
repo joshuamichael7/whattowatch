@@ -16,13 +16,15 @@ import CsvManagement from "./admin/CsvManagement";
 import AdminPasswordForm from "./AdminPasswordForm";
 
 const AdminDashboard: React.FC = () => {
-  const { user, profile, isLoading, isAdmin, isAdminVerified } = useAuth();
+  const { user, profile, isLoading, isAdmin, isAdminVerified, refreshProfile } =
+    useAuth();
   const navigate = useNavigate();
 
   // Redirect non-admin users
   React.useEffect(() => {
     if (isLoading) {
       // Wait for loading to complete
+      console.log("AdminDashboard: Still loading, waiting...");
       return;
     }
 
@@ -32,18 +34,25 @@ const AdminDashboard: React.FC = () => {
       profile,
       profileRole: profile?.role,
       isAdmin,
+      isAdminVerified,
     });
 
-    if (!user) {
+    // Only redirect if user is definitely not logged in or definitely not an admin
+    // Don't redirect during loading or if profile isn't loaded yet
+    if (!user && !isLoading) {
       // Redirect if not logged in
       console.log("Redirecting: No user logged in");
       navigate("/");
-    } else if (!isAdmin) {
-      // Redirect if logged in but not admin
+    }
+    // Don't redirect if we're still waiting for profile data
+    else if (!isAdmin && profile !== null && !isLoading) {
+      // Only redirect if we've confirmed user is not admin (profile loaded and checked)
       console.log("Redirecting: User is not admin", { role: profile?.role });
       navigate("/");
     } else {
-      console.log("User is admin, allowing access");
+      console.log(
+        "User might be admin or still loading, allowing access for now",
+      );
     }
   }, [user, profile, isAdmin, isLoading, navigate]);
 
@@ -69,8 +78,8 @@ const AdminDashboard: React.FC = () => {
   }
 
   // If user is admin but hasn't verified with password yet
-  if (!isAdminVerified) {
-    return <AdminPasswordForm />;
+  if (isAdmin && !isAdminVerified) {
+    return <AdminPasswordForm onSuccess={() => refreshProfile()} />;
   }
 
   return (

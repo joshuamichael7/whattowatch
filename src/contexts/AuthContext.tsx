@@ -179,7 +179,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const isCorrect = password === correctPassword;
     if (isCorrect) {
+      console.log("Admin password verified, setting isAdminVerified to true");
       setIsAdminVerified(true);
+    } else {
+      console.log("Incorrect admin password provided");
     }
     return isCorrect;
   };

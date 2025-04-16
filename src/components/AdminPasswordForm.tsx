@@ -35,6 +35,7 @@ const AdminPasswordForm: React.FC<AdminPasswordFormProps> = ({
     try {
       const success = await verifyAdminPassword(password);
       if (success) {
+        console.log("Admin password verified successfully");
         onSuccess();
       } else {
         setError("Incorrect admin password");
