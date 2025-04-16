@@ -33,6 +33,7 @@ function App() {
               <Route path="/tv/:id" element={<MovieDetailPage />} />
               <Route path="/login" element={<Auth />} />
               <Route path="/register" element={<Auth />} />
+              <Route path="/auth" element={<Auth />} />
               <Route path="/profile" element={<UserProfile />} />
               <Route
                 path="/plot-similarity-test"

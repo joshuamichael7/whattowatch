@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User, LogOut, Settings, History, Heart } from "lucide-react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 
 interface UserProfileButtonProps {
@@ -79,8 +80,8 @@ const UserProfileButton: React.FC<UserProfileButtonProps> = ({
 
   if (!isLoggedIn) {
     return (
-      <Button variant="outline" onClick={handleLogin} className={className}>
-        Sign In
+      <Button variant="outline" asChild className={className}>
+        <Link to="/auth">Sign In</Link>
       </Button>
     );
   }
