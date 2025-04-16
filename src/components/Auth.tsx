@@ -13,9 +13,15 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Info } from "lucide-react";
 import { signIn, signUp, resetPassword } from "@/services/authService";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface AuthProps {
   redirectTo?: string;
@@ -39,6 +45,13 @@ const Auth: React.FC<AuthProps> = ({
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // Basic email format check
+    if (!validateBasicEmailFormat(email)) {
+      setError("Please enter a valid email address");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -57,9 +70,21 @@ const Auth: React.FC<AuthProps> = ({
     }
   };
 
+  // Basic email validation function
+  const validateBasicEmailFormat = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // Basic email format check
+    if (!validateBasicEmailFormat(email)) {
+      setError("Please enter a valid email address");
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError("Passwords do not match");
@@ -89,6 +114,13 @@ const Auth: React.FC<AuthProps> = ({
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // Basic email format check
+    if (!validateBasicEmailFormat(email)) {
+      setError("Please enter a valid email address");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
