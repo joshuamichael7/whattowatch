@@ -16,13 +16,8 @@
 
 # Redirects and rewrites
 [[redirects]]
-  from = "/api/omdb-edge"
-  to = "/.netlify/edge-functions/omdb-edge"
-  status = 200
-
-[[redirects]]
-  from = "/api/test-edge"
-  to = "/.netlify/edge-functions/test-edge"
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
   status = 200
 
 [[redirects]]

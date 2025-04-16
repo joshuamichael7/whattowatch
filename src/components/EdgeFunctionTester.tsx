@@ -84,12 +84,8 @@ const EdgeFunctionTester: React.FC = () => {
                   <code>/api/omdb-edge</code> - OMDB edge function
                 </li>
                 <li>
-                  <code>/.netlify/edge-functions/test-edge</code> - Direct edge
-                  function path
-                </li>
-                <li>
-                  <code>/.netlify/functions/check-edge</code> - Regular function
-                  to check edge status
+                  <code>/api/check-edge</code> - Regular function to check edge
+                  status
                 </li>
               </ul>
             </div>

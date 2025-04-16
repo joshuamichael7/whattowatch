@@ -14,7 +14,7 @@ const getEnvVar = (key: string, defaultValue: string = ""): string => {
 
 // Use Netlify edge function for trending content and regular function for other OMDB API calls
 const API_ENDPOINT = "/.netlify/functions/omdb";
-const EDGE_API_ENDPOINT = "/.netlify/edge-functions/omdb-edge";
+const EDGE_API_ENDPOINT = "/api/omdb-edge";
 
 // Helper function to make API calls to OMDB via Netlify function
 async function fetchFromOmdb(params: URLSearchParams) {
