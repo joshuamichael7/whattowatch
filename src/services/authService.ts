@@ -118,6 +118,7 @@ async function createUserProfile(
   role: string = "user",
 ) {
   try {
+    console.log(`Creating user profile for ${userId} with role ${role}`);
     const { error } = await supabase.from("users").insert({
       id: userId,
       email,
@@ -128,6 +129,8 @@ async function createUserProfile(
 
     if (error) {
       console.error("Error creating user profile:", error.message);
+    } else {
+      console.log(`Successfully created user profile with role ${role}`);
     }
 
     return { error };
@@ -135,6 +138,11 @@ async function createUserProfile(
     console.error("Error creating user profile:", error.message);
     return { error };
   }
+}
+
+// Create admin profile in the public.users table
+export async function createAdminProfile(userId: string, email: string) {
+  return createUserProfile(userId, email, "admin");
 }
 
 // Get user profile from the public.users table

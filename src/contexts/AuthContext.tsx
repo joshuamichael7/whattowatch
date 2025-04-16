@@ -73,10 +73,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
 
     try {
+      console.log(`Refreshing profile for user ID: ${user.id}`);
       const { data, error } = await getUserProfile(user.id);
       if (error) {
         console.error("Error fetching user profile:", error);
       } else {
+        console.log(`Setting profile with role: ${data?.role}`);
         setProfile(data);
       }
     } catch (error) {
@@ -186,7 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// Export the hook directly as a named function
+// Export the hook directly
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
