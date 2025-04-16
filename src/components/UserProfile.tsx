@@ -19,7 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Loader2, LogOut, Save, User, Shield } from "lucide-react";
+import { AlertCircle, Loader2, LogOut, Save, User } from "lucide-react";
 
 interface UserProfileProps {
   onClose?: () => void;
@@ -134,10 +134,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
 
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="preferences">Preferences</TabsTrigger>
-            <TabsTrigger value="account">Account</TabsTrigger>
           </TabsList>
 
           {error && (
@@ -276,67 +275,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
               )}
             </Button>
           </TabsContent>
-
-          <TabsContent value="account" className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <h3 className="text-lg font-medium">Account Information</h3>
-              <p className="text-sm text-muted-foreground">
-                Manage your account settings and linked services
-              </p>
-            </div>
-
-            <div className="p-4 border rounded-md bg-muted/40">
-              <div className="flex items-center gap-4">
-                <div className="bg-primary/10 p-3 rounded-full">
-                  <User className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <h4 className="font-medium">{displayName || user.email}</h4>
-                  <p className="text-sm text-muted-foreground">{user.email}</p>
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-2">
-              <h3 className="text-lg font-medium">Account Actions</h3>
-              <p className="text-sm text-muted-foreground">
-                Manage your account access and data
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {profile.role === "admin" && (
-                <Button
-                  variant="outline"
-                  onClick={() => navigate("/admin")}
-                  className="w-full"
-                >
-                  <Shield className="mr-2 h-4 w-4" />
-                  Admin Dashboard
-                </Button>
-              )}
-              <Button
-                variant="destructive"
-                onClick={handleSignOut}
-                disabled={isLoading}
-                className="w-full"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing out...
-                  </>
-                ) : (
-                  <>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sign Out
-                  </>
-                )}
-              </Button>
-            </div>
-          </TabsContent>
         </Tabs>
       </CardContent>
 
@@ -344,6 +282,23 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
         <p className="text-sm text-muted-foreground">
           Member since {new Date(profile.created_at).toLocaleDateString()}
         </p>
+        <Button
+          variant="destructive"
+          onClick={handleSignOut}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Signing out...
+            </>
+          ) : (
+            <>
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign Out
+            </>
+          )}
+        </Button>
       </CardFooter>
     </Card>
   );

@@ -1,5 +1,4 @@
 import { supabase } from "@/lib/supabaseClient";
-import { User, Session } from "@supabase/supabase-js";
 
 // Sign in with email and password
 export async function signIn(email: string, password: string) {
@@ -19,7 +18,7 @@ export async function signIn(email: string, password: string) {
 // Sign up with email and password
 export async function signUp(email: string, password: string) {
   try {
-    console.log("Signing up with Supabase URL:", supabase.supabaseUrl);
+    // First, create the auth user
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -28,14 +27,19 @@ export async function signUp(email: string, password: string) {
       },
     });
 
-    // If sign up is successful, create a user profile in the public.users table
+    // If auth user creation is successful, create a public user profile
     if (data.user && !error) {
-      try {
-        await createUserProfile(data.user.id, email, "user");
-        console.log("User profile created successfully");
-      } catch (profileError) {
+      const { error: profileError } = await supabase.from("users").insert({
+        id: data.user.id,
+        email: email,
+        role: "user", // Always set regular users by default
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+      if (profileError) {
         console.error("Error creating user profile:", profileError);
-        // Continue even if profile creation fails
+        return { data, error: profileError };
       }
     }
 
@@ -85,111 +89,14 @@ export async function updatePassword(password: string) {
   }
 }
 
-// Get current user
-export async function getCurrentUser(): Promise<User | null> {
-  try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    return user;
-  } catch (error: any) {
-    console.error("Error getting current user:", error.message);
-    return null;
-  }
-}
-
-// Get current session
-export async function getCurrentSession(): Promise<Session | null> {
-  try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    return session;
-  } catch (error: any) {
-    console.error("Error getting current session:", error.message);
-    return null;
-  }
-}
-
-// Create user profile in the public.users table
-async function createUserProfile(
-  userId: string,
-  email: string,
-  role: string = "user",
-) {
-  try {
-    console.log(`Creating user profile for ${userId} with role ${role}`);
-    const { error } = await supabase.from("users").insert({
-      id: userId,
-      email,
-      role,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-
-    if (error) {
-      console.error("Error creating user profile:", error.message);
-    } else {
-      console.log(`Successfully created user profile with role ${role}`);
-    }
-
-    return { error };
-  } catch (error: any) {
-    console.error("Error creating user profile:", error.message);
-    return { error };
-  }
-}
-
-// Create admin profile in the public.users table
-export async function createAdminProfile(userId: string, email: string) {
-  return createUserProfile(userId, email, "admin");
-}
-
 // Get user profile from the public.users table
 export async function getUserProfile(userId: string) {
   try {
-    console.log(`Fetching profile for user ID: ${userId}`);
     const { data, error } = await supabase
       .from("users")
       .select("*")
       .eq("id", userId)
       .single();
-
-    console.log(`Profile fetch result:`, { data, error });
-
-    if (error) {
-      console.error(`Error fetching profile: ${error.message}`);
-
-      // If no rows found and this is a new user, create an admin profile
-      if (error.code === "PGRST116") {
-        // No rows found
-        console.log(
-          `No profile found for user ID: ${userId}, creating admin profile`,
-        );
-        const { error: createError } = await createAdminProfile(
-          userId,
-          "user@example.com",
-        );
-        if (createError) {
-          console.error(`Error creating admin profile: ${createError.message}`);
-          return { data: null, error: createError };
-        }
-
-        // Try fetching again after creating
-        const retryResult = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", userId)
-          .single();
-
-        console.log(`Retry profile fetch result:`, retryResult);
-        return retryResult;
-      }
-    } else if (!data) {
-      console.warn(`No profile found for user ID: ${userId}`);
-    } else {
-      console.log(`Successfully fetched profile with role: ${data.role}`);
-    }
 
     return { data, error };
   } catch (error: any) {
