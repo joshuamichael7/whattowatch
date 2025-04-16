@@ -4,7 +4,6 @@ import { supabase } from "@/lib/supabaseClient";
 import {
   getCurrentUser,
   getCurrentSession,
-  getUserProfile,
   getUserPreferences,
 } from "@/services/authService";
 
@@ -74,11 +73,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       console.log(`Refreshing profile for user ID: ${user.id}`);
-      const { data, error } = await getUserProfile(user.id);
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
       if (error) {
         console.error("Error fetching user profile:", error);
       } else {
-        console.log(`Setting profile with role: ${data?.role}`);
+        console.log(`Profile fetch result:`, data);
         setProfile(data);
       }
     } catch (error) {
@@ -154,15 +158,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Determine if user is admin
   const isAdmin = React.useMemo(() => {
     console.log("Checking admin status:", { profile, userId: user?.id });
-    // Add more detailed logging to diagnose the issue
     if (!profile) {
-      console.warn("Profile is null or undefined when checking admin status");
+      console.log("No profile found, user is not admin");
       return false;
     }
     if (!profile.role) {
-      console.warn(
-        `Profile exists but role is missing: ${JSON.stringify(profile)}`,
-      );
+      console.log("Profile has no role field, user is not admin");
       return false;
     }
     const result = profile.role === "admin";

@@ -26,7 +26,13 @@ const AdminDashboard: React.FC = () => {
       return;
     }
 
-    console.log("AdminDashboard auth check:", { user, profile, isAdmin });
+    console.log("AdminDashboard auth check:", {
+      user: user?.id,
+      email: user?.email,
+      profile,
+      profileRole: profile?.role,
+      isAdmin,
+    });
 
     if (!user) {
       // Redirect if not logged in

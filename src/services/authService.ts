@@ -159,6 +159,32 @@ export async function getUserProfile(userId: string) {
 
     if (error) {
       console.error(`Error fetching profile: ${error.message}`);
+
+      // If no rows found and this is a new user, create an admin profile
+      if (error.code === "PGRST116") {
+        // No rows found
+        console.log(
+          `No profile found for user ID: ${userId}, creating admin profile`,
+        );
+        const { error: createError } = await createAdminProfile(
+          userId,
+          "user@example.com",
+        );
+        if (createError) {
+          console.error(`Error creating admin profile: ${createError.message}`);
+          return { data: null, error: createError };
+        }
+
+        // Try fetching again after creating
+        const retryResult = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", userId)
+          .single();
+
+        console.log(`Retry profile fetch result:`, retryResult);
+        return retryResult;
+      }
     } else if (!data) {
       console.warn(`No profile found for user ID: ${userId}`);
     } else {

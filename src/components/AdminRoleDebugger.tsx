@@ -1,6 +1,8 @@
 import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabaseClient";
 
 const AdminRoleDebugger: React.FC = () => {
   const { user, profile, isLoading, isAdmin, isAdminVerified } = useAuth();
@@ -22,6 +24,27 @@ const AdminRoleDebugger: React.FC = () => {
             <pre className="bg-muted p-2 rounded text-xs overflow-auto">
               {user ? JSON.stringify(user, null, 2) : "No user"}
             </pre>
+          </div>
+
+          <div>
+            <h3 className="font-bold">Direct Database Check:</h3>
+            <Button
+              onClick={async () => {
+                if (user) {
+                  const { data, error } = await supabase
+                    .from("users")
+                    .select("*")
+                    .eq("id", user.id)
+                    .single();
+
+                  console.log("Direct DB check result:", { data, error });
+                  alert(JSON.stringify({ data, error }, null, 2));
+                }
+              }}
+              className="mb-2"
+            >
+              Check Database Directly
+            </Button>
           </div>
 
           <div>
