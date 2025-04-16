@@ -16,3 +16,12 @@
 
 [functions.refresh-trending]
   schedule = "0 0 * * *"
+
+[[edge_functions]]
+  path = "/api/omdb-edge/*"
+  function = "omdb-edge"
+
+[[redirects]]
+  from = "/api/omdb-edge/*"
+  to = "/.netlify/edge-functions/omdb-edge"
+  status = 200

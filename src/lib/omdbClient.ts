@@ -1181,92 +1181,28 @@ function useTraditionalSimilarity(
   });
 }
 
-// Helper function to get trending content from local storage or fallback to hardcoded content
+// Simplified function to get trending content directly from the OMDB API via edge function
 export async function getTrendingContent(
   type?: "movie" | "tv",
   limit = 8,
 ): Promise<ContentItem[]> {
   console.log(
-    `[getTrendingContent] Attempting to load ${type || "all"} content from local storage`,
+    `[getTrendingContent] Fetching ${type || "all"} content directly from API`,
   );
+  const startTime = performance.now();
 
   try {
-    // Try to get content from local storage first
-    const storageKey = `trending-${type || "all"}-content`;
-    const storedContentJson = localStorage.getItem(storageKey);
-    const storedTimestampJson = localStorage.getItem(`${storageKey}-timestamp`);
-
-    // Check if we have stored content and it's not expired (less than 24 hours old)
-    if (storedContentJson && storedTimestampJson) {
-      const storedContent = JSON.parse(storedContentJson);
-      const storedTimestamp = JSON.parse(storedTimestampJson);
-      const currentTime = new Date().getTime();
-      const oneDay = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-
-      // If content is less than 24 hours old, use it
-      if (
-        currentTime - storedTimestamp < oneDay &&
-        Array.isArray(storedContent) &&
-        storedContent.length >= limit
-      ) {
-        console.log(
-          `[getTrendingContent] Using cached content from local storage for ${type || "all"}`,
-        );
-
-        // Schedule a background refresh if content is older than 12 hours
-        if (currentTime - storedTimestamp > oneDay / 2) {
-          console.log(
-            `[getTrendingContent] Scheduling background refresh for ${type || "all"} content`,
-          );
-          setTimeout(() => refreshTrendingContent(type, limit), 100);
-        }
-
-        return storedContent.slice(0, limit);
-      } else {
-        console.log(
-          `[getTrendingContent] Cached content expired or insufficient for ${type || "all"}, refreshing...`,
-        );
-      }
-    } else {
-      console.log(
-        `[getTrendingContent] No cached content found for ${type || "all"}, using hardcoded content`,
-      );
-    }
-
-    // If we don't have valid stored content, use hardcoded content and refresh in background
-    const hardcodedContent = getHardcodedContent(type, limit);
-
-    // Schedule a background refresh
-    setTimeout(() => refreshTrendingContent(type, limit), 100);
-
-    return hardcodedContent;
-  } catch (error) {
-    console.error(`[getTrendingContent] Error accessing local storage:`, error);
-    // Fallback to hardcoded content if there's any error
-    return getHardcodedContent(type, limit);
-  }
-}
-
-// Helper function to refresh trending content in the background and store in local storage
-async function refreshTrendingContent(
-  type?: "movie" | "tv",
-  limit = 20,
-): Promise<void> {
-  try {
-    console.log(
-      `[refreshTrendingContent] Refreshing trending ${type || "all"} content in background`,
-    );
-
     // Use the Netlify edge function to get fresh content
     const params = new URLSearchParams({
       trending: "true",
+      limit: limit.toString(),
     });
 
     if (type) {
       params.append("type", type);
     }
 
-    // Fetch fresh content from the edge function
+    // Fetch content directly from the edge function
     const response = await fetch(`${API_ENDPOINT}?${params.toString()}`);
 
     if (!response.ok) {
@@ -1274,6 +1210,10 @@ async function refreshTrendingContent(
     }
 
     const data = await response.json();
+    const endTime = performance.now();
+    console.log(
+      `[getTrendingContent] API fetch completed in ${endTime - startTime}ms`,
+    );
 
     if (!data || !Array.isArray(data.results) || data.results.length === 0) {
       throw new Error("No results returned from edge function");
@@ -1295,298 +1235,21 @@ async function refreshTrendingContent(
       recommendationReason: `Trending ${item.Type === "movie" ? "movie" : "TV show"}`,
     }));
 
-    // Store in local storage with timestamp
-    const storageKey = `trending-${type || "all"}-content`;
-    localStorage.setItem(storageKey, JSON.stringify(formattedResults));
-    localStorage.setItem(
-      `${storageKey}-timestamp`,
-      JSON.stringify(new Date().getTime()),
-    );
-
-    console.log(
-      `[refreshTrendingContent] Successfully refreshed and stored ${formattedResults.length} ${type || "all"} items`,
-    );
-
-    // Dispatch an event to notify components that fresh content is available
-    const event = new CustomEvent("freshContentAvailable", {
-      detail: {
-        type: type || "all",
-        content: formattedResults,
-      },
-    });
-    window.dispatchEvent(event);
+    return formattedResults.slice(0, limit);
   } catch (error) {
-    console.error(
-      `[refreshTrendingContent] Error refreshing trending content:`,
-      error,
-    );
+    console.error(`[getTrendingContent] Error fetching content:`, error);
+    return [];
   }
 }
 
-// Function to check and refresh content on page load
+// This function is no longer needed in the simplified implementation
+
+// This function is no longer needed in the simplified implementation
 export function initializeContentCache(): void {
-  try {
-    console.log("[initializeContentCache] Checking content cache on page load");
-
-    // Check if we need to refresh movie content
-    const movieStorageKey = "trending-movie-content";
-    const movieTimestampJson = localStorage.getItem(
-      `${movieStorageKey}-timestamp`,
-    );
-
-    // Check if we need to refresh TV content
-    const tvStorageKey = "trending-tv-content";
-    const tvTimestampJson = localStorage.getItem(`${tvStorageKey}-timestamp`);
-
-    const currentTime = new Date().getTime();
-    const oneDay = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-
-    // Schedule refresh for movie content if needed
-    if (
-      !movieTimestampJson ||
-      currentTime - JSON.parse(movieTimestampJson) > oneDay
-    ) {
-      console.log(
-        "[initializeContentCache] Scheduling refresh for movie content",
-      );
-      setTimeout(() => refreshTrendingContent("movie", 20), 2000);
-    }
-
-    // Schedule refresh for TV content if needed
-    if (
-      !tvTimestampJson ||
-      currentTime - JSON.parse(tvTimestampJson) > oneDay
-    ) {
-      console.log("[initializeContentCache] Scheduling refresh for TV content");
-      setTimeout(() => refreshTrendingContent("tv", 20), 4000);
-    }
-  } catch (error) {
-    console.error(
-      "[initializeContentCache] Error checking content cache:",
-      error,
-    );
-  }
+  console.log(
+    "[initializeContentCache] Cache initialization disabled in simplified implementation",
+  );
+  // No-op in simplified implementation
 }
 
-// Helper function to get pre-defined content immediately
-function getHardcodedContent(type?: "movie" | "tv", limit = 8): ContentItem[] {
-  console.log("[getHardcodedContent] Using pre-defined content");
-  console.log("[getHardcodedContent] Type:", type, "Limit:", limit);
-
-  const movies = [
-    {
-      id: "tt0111161",
-      title: "The Shawshank Redemption",
-      poster_path:
-        "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500&q=80",
-      media_type: "movie",
-      release_date: "1994",
-      vote_average: 9.3,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Classic highly-rated movie",
-    },
-    {
-      id: "tt0068646",
-      title: "The Godfather",
-      poster_path: "",
-      media_type: "movie",
-      release_date: "1972",
-      vote_average: 9.2,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Classic crime drama",
-    },
-    {
-      id: "tt0468569",
-      title: "The Dark Knight",
-      poster_path: "",
-      media_type: "movie",
-      release_date: "2008",
-      vote_average: 9.0,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Popular superhero movie",
-    },
-    {
-      id: "tt0816692",
-      title: "Interstellar",
-      poster_path: "",
-      media_type: "movie",
-      release_date: "2014",
-      vote_average: 8.6,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Popular sci-fi movie",
-    },
-    {
-      id: "tt0133093",
-      title: "The Matrix",
-      poster_path: "",
-      media_type: "movie",
-      release_date: "1999",
-      vote_average: 8.7,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Groundbreaking sci-fi action",
-    },
-    {
-      id: "tt0110912",
-      title: "Pulp Fiction",
-      poster_path: "",
-      media_type: "movie",
-      release_date: "1994",
-      vote_average: 8.9,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Iconic crime film",
-    },
-    {
-      id: "tt0109830",
-      title: "Forrest Gump",
-      poster_path: "",
-      media_type: "movie",
-      release_date: "1994",
-      vote_average: 8.8,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Beloved drama",
-    },
-    {
-      id: "tt0167260",
-      title: "The Lord of the Rings: The Return of the King",
-      poster_path: "",
-      media_type: "movie",
-      release_date: "2003",
-      vote_average: 8.9,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Epic fantasy adventure",
-    },
-  ];
-
-  const tvShows = [
-    {
-      id: "tt0944947",
-      title: "Game of Thrones",
-      poster_path: "",
-      media_type: "tv",
-      release_date: "2011",
-      vote_average: 9.3,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Epic fantasy series",
-    },
-    {
-      id: "tt0903747",
-      title: "Breaking Bad",
-      poster_path: "",
-      media_type: "tv",
-      release_date: "2008",
-      vote_average: 9.5,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Critically acclaimed drama",
-    },
-    {
-      id: "tt1520211",
-      title: "The Walking Dead",
-      poster_path: "",
-      media_type: "tv",
-      release_date: "2010",
-      vote_average: 8.2,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Popular zombie drama",
-    },
-    {
-      id: "tt4574334",
-      title: "Stranger Things",
-      poster_path: "",
-      media_type: "tv",
-      release_date: "2016",
-      vote_average: 8.7,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Nostalgic sci-fi thriller",
-    },
-    {
-      id: "tt0108778",
-      title: "Friends",
-      poster_path: "",
-      media_type: "tv",
-      release_date: "1994",
-      vote_average: 8.9,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Beloved sitcom",
-    },
-    {
-      id: "tt0386676",
-      title: "The Office",
-      poster_path: "",
-      media_type: "tv",
-      release_date: "2005",
-      vote_average: 8.9,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Popular workplace comedy",
-    },
-    {
-      id: "tt2442560",
-      title: "Peaky Blinders",
-      poster_path: "",
-      media_type: "tv",
-      release_date: "2013",
-      vote_average: 8.8,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Gritty period crime drama",
-    },
-    {
-      id: "tt1475582",
-      title: "Sherlock",
-      poster_path: "",
-      media_type: "tv",
-      release_date: "2010",
-      vote_average: 9.1,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: "Modern detective series",
-    },
-  ];
-
-  if (type === "tv") {
-    const result = tvShows.slice(0, limit);
-    console.log("[getHardcodedContent] Returning TV shows:", result);
-    return result;
-  } else if (type === "movie") {
-    const result = movies.slice(0, limit);
-    console.log("[getHardcodedContent] Returning movies:", result);
-    return result;
-  } else {
-    // Mix movies and TV shows
-    const combined = [
-      ...movies.slice(0, Math.ceil(limit / 2)),
-      ...tvShows.slice(0, Math.floor(limit / 2)),
-    ];
-    console.log("[getHardcodedContent] Returning combined content:", combined);
-    return combined.slice(0, limit);
-  }
-}
+// This function is no longer needed in the simplified implementation

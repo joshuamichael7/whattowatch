@@ -45,233 +45,64 @@ const HomePage = () => {
 
   useEffect(() => {
     const fetchContent = async () => {
+      const startTime = performance.now();
+      console.log(
+        "[HomePage] Starting content fetch at",
+        new Date().toISOString(),
+      );
       setIsLoading(true);
       setError(null);
 
       try {
-        // Initialize content cache on page load
-        // This will check if we need to refresh the cache in the background
-        try {
-          import("@/lib/omdbClient")
-            .then((module) => {
-              if (typeof module.initializeContentCache === "function") {
-                console.log("Initializing content cache on page load");
-                module.initializeContentCache();
-              }
-            })
-            .catch((err) => {
-              console.warn("Failed to initialize content cache:", err);
-              // Non-critical error, continue execution
-            });
-        } catch (initError) {
-          console.warn("Error during content cache initialization:", initError);
-          // Non-critical error, continue execution
-        }
+        // Simplified approach: directly fetch trending content from the API
+        console.log("[HomePage] Fetching trending movies directly from API");
+        const movieData = await getTrendingContent("movie", 4);
+        console.log(`[HomePage] Received ${movieData.length} movies`);
 
-        console.log("Fetching trending content from cache or fallback");
+        console.log("[HomePage] Fetching trending TV shows directly from API");
+        const tvData = await getTrendingContent("tv", 4);
+        console.log(`[HomePage] Received ${tvData.length} TV shows`);
 
-        // Wrap each getTrendingContent call in try/catch to handle individual failures
-        let movieData = [];
-        let tvData = [];
+        // Simple transformation to match the component's expected format
+        const formattedMovies = movieData.map((movie) => ({
+          Title: movie.title || "Unknown Title",
+          Year: movie.release_date || "Unknown Year",
+          imdbID:
+            movie.id || `unknown-${Math.random().toString(36).substring(2, 9)}`,
+          Type: "movie",
+          Poster: movie.poster_path || "",
+          imdbRating:
+            movie.vote_average !== undefined
+              ? movie.vote_average.toString()
+              : "0",
+        }));
 
-        try {
-          // Get initial movie content from local storage or fallback to hardcoded content
-          movieData = await getTrendingContent("movie", 4);
-          console.log(`Received ${movieData.length} movies`);
-        } catch (movieError) {
-          console.error("Error fetching movie data:", movieError);
-          setError(
-            (prev) =>
-              prev || "Error loading movie data. Using fallback content.",
-          );
-          // Use empty array, will show appropriate UI for no content
-        }
+        const formattedShows = tvData.map((show) => ({
+          Title: show.title || "Unknown Title",
+          Year: show.release_date || show.first_air_date || "Unknown Year",
+          imdbID:
+            show.id || `unknown-${Math.random().toString(36).substring(2, 9)}`,
+          Type: "series",
+          Poster: show.poster_path || "",
+          imdbRating:
+            show.vote_average !== undefined
+              ? show.vote_average.toString()
+              : "0",
+        }));
 
-        try {
-          // Get initial TV show content from local storage or fallback to hardcoded content
-          tvData = await getTrendingContent("tv", 4);
-          console.log(`Received ${tvData.length} TV shows`);
-        } catch (tvError) {
-          console.error("Error fetching TV data:", tvError);
-          setError(
-            (prev) =>
-              prev || "Error loading TV show data. Using fallback content.",
-          );
-          // Use empty array, will show appropriate UI for no content
-        }
-
-        // Format the data to match the expected format with additional validation
-        const formattedMovies = movieData
-          .map((movie) => {
-            // Validate required fields and provide fallbacks
-            if (!movie || typeof movie !== "object") {
-              console.warn("Invalid movie object:", movie);
-              return null;
-            }
-
-            console.log("Raw movie data:", movie);
-            console.log("Movie poster path:", movie.poster_path);
-
-            return {
-              Title: movie.title || "Unknown Title",
-              Year: movie.release_date || "Unknown Year",
-              imdbID:
-                movie.id ||
-                `unknown-${Math.random().toString(36).substring(2, 9)}`,
-              Type: "movie",
-              Poster: movie.poster_path || "",
-              imdbRating:
-                movie.vote_average !== undefined && movie.vote_average !== null
-                  ? movie.vote_average.toString()
-                  : "0",
-            };
-          })
-          .filter(Boolean); // Remove any null entries
-
-        console.log("Formatted movies:", formattedMovies);
-
-        const formattedShows = tvData
-          .map((show) => {
-            // Validate required fields and provide fallbacks
-            if (!show || typeof show !== "object") {
-              console.warn("Invalid TV show object:", show);
-              return null;
-            }
-
-            console.log("Raw TV show data:", show);
-            console.log("TV show poster path:", show.poster_path);
-
-            return {
-              Title: show.title || "Unknown Title",
-              Year: show.release_date || show.first_air_date || "Unknown Year",
-              imdbID:
-                show.id ||
-                `unknown-${Math.random().toString(36).substring(2, 9)}`,
-              Type: "series",
-              Poster: show.poster_path || "",
-              imdbRating:
-                show.vote_average !== undefined && show.vote_average !== null
-                  ? show.vote_average.toString()
-                  : "0",
-            };
-          })
-          .filter(Boolean); // Remove any null entries
-
-        console.log("Formatted TV shows:", formattedShows);
-
-        // Set initial content
+        // Update state with the fetched content
         setTrendingMovies(formattedMovies);
         setPopularTVShows(formattedShows);
 
-        // Listen for fresh content updates
-        const handleFreshContent = (event: CustomEvent) => {
-          try {
-            if (!event || !event.detail) {
-              console.warn("Received invalid fresh content event:", event);
-              return;
-            }
-
-            const { type, content } = event.detail;
-
-            if (!content || !Array.isArray(content)) {
-              console.warn(`Received invalid ${type} content:`, content);
-              return;
-            }
-
-            console.log(
-              `Received fresh ${type} content with ${content.length} items`,
-            );
-
-            if (type === "movie" && content.length > 0) {
-              // Format and update movie content
-              const freshMovies = content
-                .slice(0, 4)
-                .map((movie: any) => {
-                  if (!movie || typeof movie !== "object") return null;
-
-                  return {
-                    Title: movie.title || "Unknown Title",
-                    Year: movie.release_date || "Unknown Year",
-                    imdbID:
-                      movie.id ||
-                      `unknown-${Math.random().toString(36).substring(2, 9)}`,
-                    Type: "movie",
-                    Poster: movie.poster_path || "",
-                    imdbRating:
-                      movie.vote_average !== undefined &&
-                      movie.vote_average !== null
-                        ? movie.vote_average.toString()
-                        : "0",
-                  };
-                })
-                .filter(Boolean);
-
-              if (freshMovies.length > 0) {
-                console.log(
-                  `Updating trending movies with ${freshMovies.length} items`,
-                );
-                setTrendingMovies(freshMovies);
-              }
-            } else if (type === "tv" && content.length > 0) {
-              // Format and update TV content
-              const freshShows = content
-                .slice(0, 4)
-                .map((show: any) => {
-                  if (!show || typeof show !== "object") return null;
-
-                  return {
-                    Title: show.title || "Unknown Title",
-                    Year:
-                      show.release_date ||
-                      show.first_air_date ||
-                      "Unknown Year",
-                    imdbID:
-                      show.id ||
-                      `unknown-${Math.random().toString(36).substring(2, 9)}`,
-                    Type: "series",
-                    Poster: show.poster_path || "",
-                    imdbRating:
-                      show.vote_average !== undefined &&
-                      show.vote_average !== null
-                        ? show.vote_average.toString()
-                        : "0",
-                  };
-                })
-                .filter(Boolean);
-
-              if (freshShows.length > 0) {
-                console.log(
-                  `Updating popular TV shows with ${freshShows.length} items`,
-                );
-                setPopularTVShows(freshShows);
-              }
-            }
-          } catch (eventError) {
-            console.error("Error processing fresh content event:", eventError);
-            // Non-critical error, don't update state or show error to user
-          }
-        };
-
-        // Add event listener for fresh content
-        window.addEventListener(
-          "freshContentAvailable",
-          handleFreshContent as EventListener,
+        const endTime = performance.now();
+        console.log(
+          `[HomePage] Total fetch and processing time: ${endTime - startTime}ms`,
         );
-
-        // Clean up event listener on unmount
-        return () => {
-          window.removeEventListener(
-            "freshContentAvailable",
-            handleFreshContent as EventListener,
-          );
-        };
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "An unknown error occurred",
         );
-        console.error("Error fetching data:", err);
-        // Ensure loading state is turned off even if there's an error
-        setIsLoading(false);
+        console.error("[HomePage] Error fetching data:", err);
       } finally {
         setIsLoading(false);
       }
