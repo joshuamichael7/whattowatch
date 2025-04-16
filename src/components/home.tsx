@@ -156,11 +156,9 @@ const HomePage = () => {
             <Button variant="ghost" asChild>
               <Link to="/dashboard">Discover</Link>
             </Button>
-            <Button variant="ghost" asChild>
-              <Link to="/plot-similarity-test">Plot Similarity Test</Link>
-            </Button>
-            <Button variant="ghost" asChild>
-              <Link to="/edge-function-test">Edge Function Test</Link>
+
+            <Button variant="outline" asChild className="mr-2">
+              <Link to="/auth">Sign In / Sign Up</Link>
             </Button>
             <UserProfileButton />
           </nav>
