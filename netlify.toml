@@ -7,12 +7,12 @@
 
 # Edge functions configuration
 [[edge_functions]]
-  function = "omdb-edge"
   path = "/api/omdb-edge"
+  function = "omdb-edge"
 
 [[edge_functions]]
-  function = "test-edge"
   path = "/api/test-edge"
+  function = "test-edge"
 
 # Redirects and rewrites
 [[redirects]]
