@@ -67,12 +67,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Function to refresh user profile
+  // Function to refresh user profile with detailed logging
   const refreshProfile = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log(`[REFRESH] No user available, cannot refresh profile`);
+      return;
+    }
 
     try {
-      console.log(`Refreshing profile for user ID: ${user.id}`);
+      console.log(`[REFRESH] Refreshing profile for user ID: ${user.id}`);
+      console.log(
+        `[REFRESH] Current session valid: ${!!session?.access_token}`,
+      );
+
+      // Log the request we're about to make
+      console.log(`[REFRESH] Making request to users table with id=${user.id}`);
+
       const { data, error } = await supabase
         .from("users")
         .select("*")
@@ -80,14 +90,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
-        console.error("Error fetching user profile:", error);
+        console.error(
+          `[REFRESH] Error fetching user profile: ${error.code} - ${error.message}`,
+        );
+        console.log(`[REFRESH] Full error details:`, JSON.stringify(error));
+
+        // Try to get table info to verify the table exists
+        const { data: tableInfo, error: tableError } = await supabase
+          .from("users")
+          .select("count(*)")
+          .limit(1);
+
+        if (tableError) {
+          console.error(
+            `[REFRESH] Error checking users table: ${tableError.code} - ${tableError.message}`,
+          );
+        } else {
+          console.log(
+            `[REFRESH] Users table exists and contains data:`,
+            tableInfo,
+          );
+        }
 
         // If no profile found, try to fetch it again after a short delay
         // This helps in cases where the auth is loaded but the profile hasn't been created yet
         if (error.code === "PGRST116") {
           // No rows found
-          console.log("No profile found, retrying after delay...");
+          console.log(`[REFRESH] No profile found, retrying after delay...`);
           setTimeout(async () => {
+            console.log(`[REFRESH] Executing retry for user ${user.id}`);
             const retryResult = await supabase
               .from("users")
               .select("*")
@@ -95,17 +126,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .single();
 
             if (!retryResult.error) {
-              console.log(`Retry profile fetch succeeded:`, retryResult.data);
+              console.log(
+                `[REFRESH] Retry profile fetch succeeded:`,
+                retryResult.data,
+              );
               setProfile(retryResult.data);
+            } else {
+              console.error(
+                `[REFRESH] Retry failed: ${retryResult.error.code} - ${retryResult.error.message}`,
+              );
             }
           }, 1000);
         }
       } else {
-        console.log(`Profile fetch result:`, data);
+        console.log(`[REFRESH] Profile fetch result:`, data);
         setProfile(data);
       }
     } catch (error) {
-      console.error("Error refreshing profile:", error);
+      console.error(`[REFRESH] Unexpected error refreshing profile:`, error);
     }
   };
 
@@ -143,18 +181,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // Ensure profile is loaded correctly
-          await refreshProfile();
-          await refreshPreferences();
+          // Ensure profile is loaded correctly with detailed logging
+          try {
+            console.log(
+              `[AUTH] Loading profile for user ID: ${session.user.id}`,
+            );
+            console.log(`[AUTH] Supabase URL: ${supabase.supabaseUrl}`);
+            console.log(`[AUTH] Auth token exists: ${!!session.access_token}`);
 
-          // Double-check profile after a delay to ensure it's loaded
-          // This helps in cases where the profile might be created after initial auth
-          setTimeout(async () => {
-            if (!profile) {
-              console.log("Profile still not loaded, retrying...");
-              await refreshProfile();
+            // First attempt to load profile
+            const { data, error } = await supabase
+              .from("users")
+              .select("*")
+              .eq("id", session.user.id)
+              .single();
+
+            if (error) {
+              console.error(
+                `[AUTH] Error fetching user profile during auth change: ${error.code} - ${error.message}`,
+                error,
+              );
+              console.log(`[AUTH] Full error details:`, JSON.stringify(error));
+
+              // Log the raw query for debugging
+              console.log(
+                `[AUTH] Query attempted: users table, id=${session.user.id}`,
+              );
+
+              // Try a different approach - get all users to see if the table exists and has data
+              const { data: allUsers, error: listError } = await supabase
+                .from("users")
+                .select("id")
+                .limit(5);
+
+              if (listError) {
+                console.error(
+                  `[AUTH] Error listing users: ${listError.code} - ${listError.message}`,
+                );
+              } else {
+                console.log(
+                  `[AUTH] Users table exists with ${allUsers?.length || 0} records`,
+                );
+              }
+            } else {
+              console.log(
+                `[AUTH] Profile loaded successfully during auth change:`,
+                data,
+              );
+              setProfile(data);
             }
-          }, 2000);
+
+            await refreshPreferences();
+          } catch (err) {
+            console.error("Unexpected error during profile loading:", err);
+          }
         } else {
           setProfile(null);
           setPreferences(null);

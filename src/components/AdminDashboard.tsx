@@ -24,37 +24,50 @@ const AdminDashboard: React.FC = () => {
   React.useEffect(() => {
     if (isLoading) {
       // Wait for loading to complete
-      console.log("AdminDashboard: Still loading, waiting...");
+      console.log("[ADMIN] Still loading, waiting...");
       return;
     }
 
-    console.log("AdminDashboard auth check:", {
-      user: user?.id,
+    console.log("[ADMIN] Auth check:", {
+      userId: user?.id,
       email: user?.email,
-      profile,
+      profileExists: !!profile,
+      profileId: profile?.id,
       profileRole: profile?.role,
       isAdmin,
       isAdminVerified,
+      isLoading,
     });
+
+    // If we have a user but no profile, trigger a manual profile refresh
+    if (user && !profile && !isLoading) {
+      console.log(
+        `[ADMIN] User exists but no profile, triggering manual refresh`,
+      );
+      refreshProfile();
+      return;
+    }
 
     // Only redirect if user is definitely not logged in or definitely not an admin
     // Don't redirect during loading or if profile isn't loaded yet
     if (!user && !isLoading) {
       // Redirect if not logged in
-      console.log("Redirecting: No user logged in");
+      console.log("[ADMIN] Redirecting: No user logged in");
       navigate("/");
     }
     // Don't redirect if we're still waiting for profile data
     else if (!isAdmin && profile !== null && !isLoading) {
       // Only redirect if we've confirmed user is not admin (profile loaded and checked)
-      console.log("Redirecting: User is not admin", { role: profile?.role });
+      console.log("[ADMIN] Redirecting: User is not admin", {
+        role: profile?.role,
+      });
       navigate("/");
     } else {
       console.log(
-        "User might be admin or still loading, allowing access for now",
+        "[ADMIN] User might be admin or still loading, allowing access for now",
       );
     }
-  }, [user, profile, isAdmin, isLoading, navigate]);
+  }, [user, profile, isAdmin, isLoading, navigate, refreshProfile]);
 
   if (isLoading) {
     return (
@@ -64,7 +77,10 @@ const AdminDashboard: React.FC = () => {
     );
   }
 
-  if (!user || !isAdmin) {
+  // Only show the no permission alert if we're sure the user is not an admin
+  // (profile has loaded and they're definitely not an admin)
+  if ((!user && !isLoading) || (profile !== null && !isAdmin && !isLoading)) {
+    console.log("Showing no permission alert, user is definitely not admin");
     return (
       <div className="flex justify-center items-center min-h-screen">
         <Alert variant="destructive" className="max-w-md">
@@ -79,7 +95,15 @@ const AdminDashboard: React.FC = () => {
 
   // If user is admin but hasn't verified with password yet
   if (isAdmin && !isAdminVerified) {
-    return <AdminPasswordForm onSuccess={() => refreshProfile()} />;
+    console.log("Showing admin password form, user is admin but not verified");
+    return (
+      <AdminPasswordForm
+        onSuccess={() => {
+          console.log("Admin password verified, refreshing profile");
+          refreshProfile();
+        }}
+      />
+    );
   }
 
   return (
