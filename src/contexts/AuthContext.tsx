@@ -81,6 +81,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error("Error fetching user profile:", error);
+
+        // If no profile found, try to fetch it again after a short delay
+        // This helps in cases where the auth is loaded but the profile hasn't been created yet
+        if (error.code === "PGRST116") {
+          // No rows found
+          console.log("No profile found, retrying after delay...");
+          setTimeout(async () => {
+            const retryResult = await supabase
+              .from("users")
+              .select("*")
+              .eq("id", user.id)
+              .single();
+
+            if (!retryResult.error) {
+              console.log(`Retry profile fetch succeeded:`, retryResult.data);
+              setProfile(retryResult.data);
+            }
+          }, 1000);
+        }
       } else {
         console.log(`Profile fetch result:`, data);
         setProfile(data);
@@ -124,8 +143,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
+          // Ensure profile is loaded correctly
           await refreshProfile();
           await refreshPreferences();
+
+          // Double-check profile after a delay to ensure it's loaded
+          // This helps in cases where the profile might be created after initial auth
+          setTimeout(async () => {
+            if (!profile) {
+              console.log("Profile still not loaded, retrying...");
+              await refreshProfile();
+            }
+          }, 2000);
         } else {
           setProfile(null);
           setPreferences(null);
@@ -160,6 +189,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log("Checking admin status:", { profile, userId: user?.id });
     if (!profile) {
       console.log("No profile found, user is not admin");
+      // If no profile but we have a user, trigger a refresh
+      if (user && !isLoading) {
+        console.log("User exists but no profile, triggering refresh");
+        refreshProfile();
+      }
       return false;
     }
     if (!profile.role) {
@@ -169,7 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const result = profile.role === "admin";
     console.log(`Admin check result: ${result}, role=${profile.role}`);
     return result;
-  }, [profile, user?.id]);
+  }, [profile, user?.id, isLoading]);
 
   const value = {
     user,
