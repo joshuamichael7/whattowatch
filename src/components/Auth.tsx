@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { signIn, signUp, resetPassword } from "@/services/authService";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface AuthProps {
   redirectTo?: string;
@@ -206,6 +207,7 @@ const Auth: React.FC<AuthProps> = ({
                     required
                   />
                 </div>
+
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
                     <>

@@ -19,7 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Loader2, LogOut, Save, User } from "lucide-react";
+import { AlertCircle, Loader2, LogOut, Save, User, Shield } from "lucide-react";
 
 interface UserProfileProps {
   onClose?: () => void;
@@ -306,23 +306,36 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
               </p>
             </div>
 
-            <Button
-              variant="destructive"
-              onClick={handleSignOut}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing out...
-                </>
-              ) : (
-                <>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Sign Out
-                </>
+            <div className="space-y-4">
+              {profile.role === "admin" && (
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/admin")}
+                  className="w-full"
+                >
+                  <Shield className="mr-2 h-4 w-4" />
+                  Admin Dashboard
+                </Button>
               )}
-            </Button>
+              <Button
+                variant="destructive"
+                onClick={handleSignOut}
+                disabled={isLoading}
+                className="w-full"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing out...
+                  </>
+                ) : (
+                  <>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </>
+                )}
+              </Button>
+            </div>
           </TabsContent>
         </Tabs>
       </CardContent>

@@ -15,6 +15,7 @@ interface AuthContextType {
   preferences: any | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   refreshUser: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   refreshPreferences: () => Promise<void>;
@@ -27,6 +28,7 @@ const AuthContext = createContext<AuthContextType>({
   preferences: null,
   isLoading: true,
   isAuthenticated: false,
+  isAdmin: false,
   refreshUser: async () => {},
   refreshProfile: async () => {},
   refreshPreferences: async () => {},
@@ -133,6 +135,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     preferences,
     isLoading,
     isAuthenticated: !!user,
+    isAdmin: !!profile?.role && profile.role === "admin",
     refreshUser,
     refreshProfile,
     refreshPreferences,

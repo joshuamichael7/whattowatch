@@ -9,6 +9,45 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Helper function to verify admin privileges
+async function verifyAdminUser(token) {
+  if (!token) {
+    return { authorized: false, error: "No authorization token provided" };
+  }
+
+  try {
+    // Verify the JWT token
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return { authorized: false, error: "Invalid or expired token" };
+    }
+
+    // Check if user has admin role in the profiles table
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return { authorized: false, error: "User profile not found" };
+    }
+
+    if (profile.role !== "admin") {
+      return { authorized: false, error: "Insufficient permissions" };
+    }
+
+    return { authorized: true, user };
+  } catch (error) {
+    console.error("Error verifying admin user:", error);
+    return { authorized: false, error: "Authentication error" };
+  }
+}
+
 // Helper function to process CSV data and format it for Supabase
 function processContentItem(item) {
   // Convert string values to appropriate types
@@ -45,6 +84,20 @@ exports.handler = async (event) => {
     return {
       statusCode: 405,
       body: JSON.stringify({ error: "Method Not Allowed" }),
+    };
+  }
+
+  // Get the authorization token from the request headers
+  const authHeader = event.headers.authorization || event.headers.Authorization;
+  const token = authHeader ? authHeader.replace("Bearer ", "") : null;
+
+  // Verify admin privileges
+  const { authorized, error, user } = await verifyAdminUser(token);
+
+  if (!authorized) {
+    return {
+      statusCode: 403,
+      body: JSON.stringify({ error: "Unauthorized: " + error }),
     };
   }
 

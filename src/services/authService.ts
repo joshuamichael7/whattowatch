@@ -29,7 +29,7 @@ export async function signUp(email: string, password: string) {
 
     // If sign up is successful, create a user profile in the public.users table
     if (data.user && !error) {
-      await createUserProfile(data.user.id, email);
+      await createUserProfile(data.user.id, email, "user");
     }
 
     return { data, error };
@@ -105,11 +105,16 @@ export async function getCurrentSession(): Promise<Session | null> {
 }
 
 // Create user profile in the public.users table
-async function createUserProfile(userId: string, email: string) {
+async function createUserProfile(
+  userId: string,
+  email: string,
+  role: string = "user",
+) {
   try {
     const { error } = await supabase.from("users").insert({
       id: userId,
       email,
+      role,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });

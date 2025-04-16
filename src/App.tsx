@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { useRoutes, Routes, Route } from "react-router-dom";
+import { useRoutes, Routes, Route, Navigate } from "react-router-dom";
 import Home from "./components/home";
 import Dashboard from "./components/Dashboard";
 import MovieDetailPage from "./components/MovieDetailPage";
@@ -8,7 +8,9 @@ import { ThemeProvider } from "./components/theme-provider";
 import { ThemeToggle } from "./components/ui/theme-toggle";
 import PlotSimilarityTest from "./components/PlotSimilarityTest";
 import EdgeFunctionTester from "./components/EdgeFunctionTester";
+import AdminDashboard from "./components/AdminDashboard";
 import { AuthProvider } from "./contexts/AuthContext";
+import { useAuth } from "./contexts/AuthContext";
 
 // Lazy load authentication components
 const Auth = lazy(() => import("./components/Auth"));
@@ -40,6 +42,7 @@ function App() {
                 path="/edge-function-test"
                 element={<EdgeFunctionTester />}
               />
+              <Route path="/admin" element={<AdminDashboard />} />
             </Routes>
           </>
         </Suspense>
