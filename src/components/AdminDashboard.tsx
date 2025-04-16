@@ -23,7 +23,6 @@ const AdminDashboard: React.FC = () => {
   // Redirect non-admin users
   React.useEffect(() => {
     if (isLoading) {
-      // Wait for loading to complete
       console.log("[ADMIN] Still loading, waiting...");
       return;
     }
@@ -32,42 +31,20 @@ const AdminDashboard: React.FC = () => {
       userId: user?.id,
       email: user?.email,
       profileExists: !!profile,
-      profileId: profile?.id,
       profileRole: profile?.role,
       isAdmin,
       isAdminVerified,
-      isLoading,
     });
 
-    // If we have a user but no profile, trigger a manual profile refresh
-    if (user && !profile && !isLoading) {
-      console.log(
-        `[ADMIN] User exists but no profile, triggering manual refresh`,
-      );
-      refreshProfile();
-      return;
-    }
-
-    // Only redirect if user is definitely not logged in or definitely not an admin
-    // Don't redirect during loading or if profile isn't loaded yet
-    if (!user && !isLoading) {
-      // Redirect if not logged in
+    // Simple redirect logic
+    if (!user) {
       console.log("[ADMIN] Redirecting: No user logged in");
       navigate("/");
-    }
-    // Don't redirect if we're still waiting for profile data
-    else if (!isAdmin && profile !== null && !isLoading) {
-      // Only redirect if we've confirmed user is not admin (profile loaded and checked)
-      console.log("[ADMIN] Redirecting: User is not admin", {
-        role: profile?.role,
-      });
+    } else if (!isAdmin && !isLoading) {
+      console.log("[ADMIN] Redirecting: User is not admin");
       navigate("/");
-    } else {
-      console.log(
-        "[ADMIN] User might be admin or still loading, allowing access for now",
-      );
     }
-  }, [user, profile, isAdmin, isLoading, navigate, refreshProfile]);
+  }, [user, isAdmin, isLoading, navigate]);
 
   if (isLoading) {
     return (

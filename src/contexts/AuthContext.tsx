@@ -39,7 +39,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 // Create the provider component
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
@@ -165,82 +165,94 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Initial load of user data
   useEffect(() => {
-    const initializeAuth = async () => {
+    // Simple function to get session and profile in one go
+    const getSessionAndProfile = async () => {
       setIsLoading(true);
-      await refreshUser();
+
+      // Get current session
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      console.log("[AUTH] Initial session check:", !!session);
+
+      // Set user and session state
+      setSession(session);
+      setUser(session?.user || null);
+
+      // If we have a user, get their profile
+      if (session?.user) {
+        console.log(`[AUTH] Loading profile for user ID: ${session.user.id}`);
+
+        // Direct query to get profile
+        const { data, error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
+
+        if (error) {
+          console.error(
+            `[AUTH] Error loading profile: ${error.code} - ${error.message}`,
+          );
+
+          // Check if users table exists
+          const { data: tableCheck, error: tableError } = await supabase
+            .from("users")
+            .select("count(*)")
+            .limit(1);
+
+          console.log("[AUTH] Users table check:", { tableCheck, tableError });
+        } else {
+          console.log("[AUTH] Profile loaded successfully:", data);
+          setProfile(data);
+
+          // Also load preferences
+          const { data: prefs } = await supabase
+            .from("user_preferences")
+            .select("*")
+            .eq("user_id", session.user.id)
+            .single();
+
+          if (prefs) setPreferences(prefs);
+        }
+      }
+
       setIsLoading(false);
     };
 
-    initializeAuth();
+    // Run the initial load
+    getSessionAndProfile();
 
     // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log(`Auth event: ${event}`);
+        console.log(`[AUTH] Auth event: ${event}`);
+
+        // Update user and session state
         setSession(session);
-        setUser(session?.user ?? null);
+        setUser(session?.user || null);
 
         if (session?.user) {
-          // Ensure profile is loaded correctly with detailed logging
-          try {
-            console.log(
-              `[AUTH] Loading profile for user ID: ${session.user.id}`,
+          // Load profile on auth change
+          const { data, error } = await supabase
+            .from("users")
+            .select("*")
+            .eq("id", session.user.id)
+            .single();
+
+          if (error) {
+            console.error(
+              `[AUTH] Error loading profile on auth change: ${error.message}`,
             );
-            console.log(`[AUTH] Supabase URL: ${supabase.supabaseUrl}`);
-            console.log(`[AUTH] Auth token exists: ${!!session.access_token}`);
-
-            // First attempt to load profile
-            const { data, error } = await supabase
-              .from("users")
-              .select("*")
-              .eq("id", session.user.id)
-              .single();
-
-            if (error) {
-              console.error(
-                `[AUTH] Error fetching user profile during auth change: ${error.code} - ${error.message}`,
-                error,
-              );
-              console.log(`[AUTH] Full error details:`, JSON.stringify(error));
-
-              // Log the raw query for debugging
-              console.log(
-                `[AUTH] Query attempted: users table, id=${session.user.id}`,
-              );
-
-              // Try a different approach - get all users to see if the table exists and has data
-              const { data: allUsers, error: listError } = await supabase
-                .from("users")
-                .select("id")
-                .limit(5);
-
-              if (listError) {
-                console.error(
-                  `[AUTH] Error listing users: ${listError.code} - ${listError.message}`,
-                );
-              } else {
-                console.log(
-                  `[AUTH] Users table exists with ${allUsers?.length || 0} records`,
-                );
-              }
-            } else {
-              console.log(
-                `[AUTH] Profile loaded successfully during auth change:`,
-                data,
-              );
-              setProfile(data);
-            }
-
-            await refreshPreferences();
-          } catch (err) {
-            console.error("Unexpected error during profile loading:", err);
+          } else {
+            console.log("[AUTH] Profile loaded on auth change:", data);
+            setProfile(data);
           }
         } else {
+          // Clear profile and preferences if user logs out
           setProfile(null);
           setPreferences(null);
         }
-
-        setIsLoading(false);
       },
     );
 
@@ -269,24 +281,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Determine if user is admin
   const isAdmin = React.useMemo(() => {
-    console.log("Checking admin status:", { profile, userId: user?.id });
-    if (!profile) {
-      console.log("No profile found, user is not admin");
-      // If no profile but we have a user, trigger a refresh
-      if (user && !isLoading) {
-        console.log("User exists but no profile, triggering refresh");
-        refreshProfile();
-      }
-      return false;
-    }
-    if (!profile.role) {
-      console.log("Profile has no role field, user is not admin");
-      return false;
-    }
+    console.log("[AUTH] Checking admin status:", {
+      profileExists: !!profile,
+      profileRole: profile?.role,
+      userId: user?.id,
+    });
+
+    // Simple check - if profile exists and has admin role
+    if (!profile) return false;
+    if (!profile.role) return false;
+
     const result = profile.role === "admin";
-    console.log(`Admin check result: ${result}, role=${profile.role}`);
+    console.log(`[AUTH] Admin check result: ${result}, role=${profile.role}`);
     return result;
-  }, [profile, user?.id, isLoading]);
+  }, [profile]);
 
   const value = {
     user,
@@ -304,9 +312,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
+};
 
-// Export the hook directly
+// Export the hook as a function declaration for better HMR compatibility
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {

@@ -14,11 +14,12 @@ console.log(
   !!import.meta.env.VITE_SUPABASE_ANON_KEY,
 );
 
-// Create Supabase client with fallback URL and key if environment variables are not available
-export const supabase = createClient(
-  supabaseUrl || "https://your-project-id.supabase.co",
-  supabaseKey || "your-anon-key-placeholder",
-);
+// Create Supabase client with environment variables
+export const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Log connection details for debugging
+console.log("[SUPABASE] Client initialized with URL:", supabaseUrl);
+console.log("[SUPABASE] Anon key exists:", !!supabaseKey);
 
 // Check if Supabase is properly configured
 export const isSupabaseConfigured = (): boolean => {
