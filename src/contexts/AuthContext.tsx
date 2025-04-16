@@ -151,9 +151,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Determine if user is admin
   const isAdmin = React.useMemo(() => {
-    console.log("Checking admin status:", { profile });
-    return !!profile?.role && profile.role === "admin";
-  }, [profile]);
+    console.log("Checking admin status:", { profile, userId: user?.id });
+    // Add more detailed logging to diagnose the issue
+    if (!profile) {
+      console.warn("Profile is null or undefined when checking admin status");
+      return false;
+    }
+    if (!profile.role) {
+      console.warn(
+        `Profile exists but role is missing: ${JSON.stringify(profile)}`,
+      );
+      return false;
+    }
+    const result = profile.role === "admin";
+    console.log(`Admin check result: ${result}, role=${profile.role}`);
+    return result;
+  }, [profile, user?.id]);
 
   const value = {
     user,

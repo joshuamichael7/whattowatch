@@ -140,11 +140,22 @@ async function createUserProfile(
 // Get user profile from the public.users table
 export async function getUserProfile(userId: string) {
   try {
+    console.log(`Fetching profile for user ID: ${userId}`);
     const { data, error } = await supabase
       .from("users")
       .select("*")
       .eq("id", userId)
       .single();
+
+    console.log(`Profile fetch result:`, { data, error });
+
+    if (error) {
+      console.error(`Error fetching profile: ${error.message}`);
+    } else if (!data) {
+      console.warn(`No profile found for user ID: ${userId}`);
+    } else {
+      console.log(`Successfully fetched profile with role: ${data.role}`);
+    }
 
     return { data, error };
   } catch (error: any) {
