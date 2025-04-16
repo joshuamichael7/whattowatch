@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
@@ -35,6 +36,11 @@ const EdgeFunctionTester: React.FC = () => {
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
+      <div className="mb-4">
+        <Link to="/" className="text-blue-500 hover:underline">
+          ← Back to Home
+        </Link>
+      </div>
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center">

@@ -7,6 +7,7 @@ import routes from "tempo-routes";
 import { ThemeProvider } from "./components/theme-provider";
 import { ThemeToggle } from "./components/ui/theme-toggle";
 import PlotSimilarityTest from "./components/PlotSimilarityTest";
+import EdgeFunctionTester from "./components/EdgeFunctionTester";
 
 function App() {
   return (
@@ -25,6 +26,10 @@ function App() {
             <Route
               path="/plot-similarity-test"
               element={<PlotSimilarityTest />}
+            />
+            <Route
+              path="/edge-function-test"
+              element={<EdgeFunctionTester />}
             />
           </Routes>
         </>
