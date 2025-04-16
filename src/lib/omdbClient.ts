@@ -1208,8 +1208,11 @@ export async function getTrendingContent(
       `[getTrendingContent] Fetching from edge function: ${EDGE_API_ENDPOINT}?${params.toString()}`,
     );
 
-    // Fetch content from the edge function
-    const response = await fetch(`${EDGE_API_ENDPOINT}?${params.toString()}`);
+    // Fetch content from the edge function - use absolute URL for local development
+    const baseUrl = window.location.origin;
+    const edgeUrl = `${baseUrl}${EDGE_API_ENDPOINT}?${params.toString()}`;
+    console.log(`[getTrendingContent] Full URL: ${edgeUrl}`);
+    const response = await fetch(edgeUrl);
 
     if (!response.ok) {
       console.error(`Edge function returned status: ${response.status}`);

@@ -1,27 +1,27 @@
+# Netlify configuration file
+
+# Build settings
 [build]
   command = "npm run build"
   publish = "dist"
   functions = "netlify/functions"
+
+# Edge functions configuration
+[[edge_functions]]
+  path = "/api/omdb-edge"
+  function = "omdb-edge"
+
+# Redirects and rewrites
+[[redirects]]
+  from = "/api/omdb-edge"
+  to = "/.netlify/edge-functions/omdb-edge"
+  status = 200
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-[functions]
-  node_bundler = "esbuild"
-  external_node_modules = ["@tensorflow/tfjs-node"]
-  # Schedule the trending content refresh function to run daily at 00:00 UTC
-  included_files = []
-
-[functions.refresh-trending]
-  schedule = "0 0 * * *"
-
-[[edge_functions]]
-  path = "/api/omdb-edge"
-  function = "omdb-edge"
-
-[[redirects]]
-  from = "/api/omdb-edge"
-  to = "/.netlify/edge-functions/omdb-edge"
-  status = 200
+# Environment variable configuration
+[build.environment]
+  NODE_VERSION = "18"
