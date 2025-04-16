@@ -2,22 +2,9 @@
 export default async (request, context) => {
   try {
     // Get the API key from environment variables
-    const API_KEY = context.env.get("OMDB_API_KEY");
-
-    if (!API_KEY) {
-      return new Response(
-        JSON.stringify({
-          error: "Missing OMDB API key in server environment variables.",
-        }),
-        {
-          status: 500,
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
-        },
-      );
-    }
+    const API_KEY =
+      process.env.OMDB_API_KEY ||
+      (context && context.env ? context.env.get("OMDB_API_KEY") : null);
 
     // Get query parameters from the request URL
     const url = new URL(request.url);

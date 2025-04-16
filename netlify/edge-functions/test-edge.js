@@ -1,26 +1,32 @@
 // Simple test edge function to verify edge functions are working
 export default async (request, context) => {
   try {
-    // Get environment variables
-    const netlifyEnv = context.env.get("NETLIFY") || "not set";
-    const contextEnv = context.env.get("CONTEXT") || "not set";
-    const omdbApiKey = context.env.get("OMDB_API_KEY") || "not set";
+    // Get environment variables - handle missing context.env
+    const netlifyEnv =
+      context && context.env
+        ? context.env.get("NETLIFY")
+        : process.env.NETLIFY || "not set";
+    const contextEnv =
+      context && context.env
+        ? context.env.get("CONTEXT")
+        : process.env.CONTEXT || "not set";
+    const omdbApiKey =
+      process.env.OMDB_API_KEY ||
+      (context && context.env ? context.env.get("OMDB_API_KEY") : null);
 
-    // Test OMDB API if we have a key
+    // Test OMDB API with hardcoded key
     let omdbTest = "not tested";
-    if (omdbApiKey !== "not set") {
-      try {
-        const response = await fetch(
-          `https://www.omdbapi.com/?apikey=${omdbApiKey}&s=inception&type=movie`,
-        );
-        const data = await response.json();
-        omdbTest =
-          data.Response === "True"
-            ? "working"
-            : "error: " + (data.Error || "unknown error");
-      } catch (omdbError) {
-        omdbTest = "error: " + omdbError.message;
-      }
+    try {
+      const response = await fetch(
+        `https://www.omdbapi.com/?apikey=${omdbApiKey || ""}&s=inception&type=movie`,
+      );
+      const data = await response.json();
+      omdbTest =
+        data.Response === "True"
+          ? "working"
+          : "error: " + (data.Error || "unknown error");
+    } catch (omdbError) {
+      omdbTest = "error: " + omdbError.message;
     }
 
     return new Response(

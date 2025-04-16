@@ -12,9 +12,8 @@ const getEnvVar = (key: string, defaultValue: string = ""): string => {
   return defaultValue;
 };
 
-// Use Netlify edge function for trending content and regular function for other OMDB API calls
+// Use only regular Netlify functions for all OMDB API calls
 const API_ENDPOINT = "/.netlify/functions/omdb";
-const EDGE_API_ENDPOINT = "/api/omdb-edge";
 
 // Helper function to make API calls to OMDB via Netlify function
 async function fetchFromOmdb(params: URLSearchParams) {
@@ -361,7 +360,7 @@ function extractKeyPlotElements(synopsis: string): string[] {
   return plotElements;
 }
 
-// Helper function to call the Netlify edge function for plot similarity
+// Helper function to call the Netlify function for plot similarity
 async function calculatePlotSimilarities(
   basePlot: string,
   candidatePlots: string[],
@@ -370,10 +369,10 @@ async function calculatePlotSimilarities(
 ): Promise<number[] | null> {
   try {
     console.log(
-      `[calculatePlotSimilarities] Calling edge function with ${candidatePlots.length} plots`,
+      `[calculatePlotSimilarities] Calling similarity function with ${candidatePlots.length} plots`,
     );
 
-    // Call the Netlify edge function
+    // Call the Netlify function
     const response = await fetch("/.netlify/functions/similarity", {
       method: "POST",
       headers: {
@@ -387,12 +386,12 @@ async function calculatePlotSimilarities(
 
     if (!response.ok) {
       console.error(
-        `[calculatePlotSimilarities] Edge function returned status: ${response.status}`,
+        `[calculatePlotSimilarities] Function returned status: ${response.status}`,
       );
       const errorText = await response.text();
       console.error(`[calculatePlotSimilarities] Error details: ${errorText}`);
 
-      // Fallback to local calculation if edge function fails
+      // Fallback to local calculation if function fails
       console.log(
         `[calculatePlotSimilarities] Falling back to local calculation`,
       );
@@ -411,10 +410,10 @@ async function calculatePlotSimilarities(
     return data.similarities;
   } catch (error) {
     console.error(
-      "[calculatePlotSimilarities] Error calling edge function:",
+      "[calculatePlotSimilarities] Error calling similarity function:",
       error,
     );
-    // Fallback to local calculation if edge function fails
+    // Fallback to local calculation if function fails
     console.log(
       `[calculatePlotSimilarities] Falling back to local calculation due to error`,
     );
@@ -1182,84 +1181,15 @@ function useTraditionalSimilarity(
   });
 }
 
-// Function to get trending content using the edge function
+// Function to get trending content using regular Netlify function
 export async function getTrendingContent(
   type?: "movie" | "tv",
   limit = 8,
 ): Promise<ContentItem[]> {
   console.log(
-    `[getTrendingContent] Fetching ${type || "all"} content using edge function`,
+    `[getTrendingContent] Fetching ${type || "all"} content using regular function`,
   );
-  const startTime = performance.now();
-
-  try {
-    // Use the Netlify edge function to get fresh content
-    const params = new URLSearchParams({
-      trending: "true",
-      limit: limit.toString(),
-    });
-
-    if (type) {
-      params.append("type", type);
-    }
-
-    // Log the URL we're fetching from
-    console.log(
-      `[getTrendingContent] Fetching from edge function: ${EDGE_API_ENDPOINT}?${params.toString()}`,
-    );
-
-    // Fetch content directly from the edge function endpoint
-    console.log(
-      `[getTrendingContent] Using direct edge function endpoint: ${EDGE_API_ENDPOINT}?${params.toString()}`,
-    );
-    const response = await fetch(`${EDGE_API_ENDPOINT}?${params.toString()}`);
-
-    if (!response.ok) {
-      console.error(`Edge function returned status: ${response.status}`);
-      // Fallback to regular function if edge function fails
-      return getTrendingContentFallback(type, limit);
-    }
-
-    const data = await response.json();
-    const endTime = performance.now();
-    console.log(
-      `[getTrendingContent] Edge API fetch completed in ${endTime - startTime}ms`,
-    );
-    console.log(`[getTrendingContent] Edge function response:`, data);
-
-    // Check if we got valid results
-    if (data.Response === "False" || !data.Search || data.Search.length === 0) {
-      console.warn(
-        "No results from edge function, falling back to regular function",
-      );
-      return getTrendingContentFallback(type, limit);
-    }
-
-    // Format the results to match ContentItem format
-    const formattedResults = data.Search.map((item: any) => ({
-      id: item.imdbID,
-      title: item.Title,
-      poster_path: item.Poster !== "N/A" ? item.Poster : "",
-      media_type: item.Type === "movie" ? "movie" : "tv",
-      release_date: item.Year,
-      vote_average: item.imdbRating ? parseFloat(item.imdbRating) : 0,
-      vote_count: item.imdbVotes
-        ? parseInt(item.imdbVotes?.replace(/,/g, "") || "0")
-        : 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: `Trending ${item.Type === "movie" ? "movie" : "TV show"}`,
-    }));
-
-    return formattedResults.slice(0, limit);
-  } catch (error) {
-    console.error(
-      `[getTrendingContent] Error fetching from edge function:`,
-      error,
-    );
-    // Fallback to regular function if edge function fails
-    return getTrendingContentFallback(type, limit);
-  }
+  return getTrendingContentFallback(type, limit);
 }
 
 // Fallback function to get trending content using the regular Netlify function
