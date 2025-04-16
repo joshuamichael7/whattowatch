@@ -54,12 +54,14 @@ const HomePage = () => {
       setError(null);
 
       try {
-        // Simplified approach: directly fetch trending content from the API
-        console.log("[HomePage] Fetching trending movies directly from API");
+        // Fetch trending content using the edge function
+        console.log("[HomePage] Fetching trending movies using edge function");
         const movieData = await getTrendingContent("movie", 4);
         console.log(`[HomePage] Received ${movieData.length} movies`);
 
-        console.log("[HomePage] Fetching trending TV shows directly from API");
+        console.log(
+          "[HomePage] Fetching trending TV shows using edge function",
+        );
         const tvData = await getTrendingContent("tv", 4);
         console.log(`[HomePage] Received ${tvData.length} TV shows`);
 

@@ -12,8 +12,9 @@ const getEnvVar = (key: string, defaultValue: string = ""): string => {
   return defaultValue;
 };
 
-// Always use Netlify function for OMDB API calls
+// Use Netlify edge function for trending content and regular function for other OMDB API calls
 const API_ENDPOINT = "/.netlify/functions/omdb";
+const EDGE_API_ENDPOINT = "/api/omdb-edge";
 
 // Helper function to make API calls to OMDB via Netlify function
 async function fetchFromOmdb(params: URLSearchParams) {
@@ -1181,13 +1182,13 @@ function useTraditionalSimilarity(
   });
 }
 
-// Simplified function to get trending content directly from the OMDB API via edge function
+// Function to get trending content using the edge function
 export async function getTrendingContent(
   type?: "movie" | "tv",
   limit = 8,
 ): Promise<ContentItem[]> {
   console.log(
-    `[getTrendingContent] Fetching ${type || "all"} content directly from API`,
+    `[getTrendingContent] Fetching ${type || "all"} content using edge function`,
   );
   const startTime = performance.now();
 
@@ -1202,21 +1203,98 @@ export async function getTrendingContent(
       params.append("type", type);
     }
 
-    // Fetch content directly from the edge function
-    const response = await fetch(`${API_ENDPOINT}?${params.toString()}`);
+    // Log the URL we're fetching from
+    console.log(
+      `[getTrendingContent] Fetching from edge function: ${EDGE_API_ENDPOINT}?${params.toString()}`,
+    );
+
+    // Fetch content from the edge function
+    const response = await fetch(`${EDGE_API_ENDPOINT}?${params.toString()}`);
 
     if (!response.ok) {
-      throw new Error(`Edge function returned status: ${response.status}`);
+      console.error(`Edge function returned status: ${response.status}`);
+      // Fallback to regular function if edge function fails
+      return getTrendingContentFallback(type, limit);
     }
 
     const data = await response.json();
     const endTime = performance.now();
     console.log(
-      `[getTrendingContent] API fetch completed in ${endTime - startTime}ms`,
+      `[getTrendingContent] Edge API fetch completed in ${endTime - startTime}ms`,
+    );
+    console.log(`[getTrendingContent] Edge function response:`, data);
+
+    // Check if we got valid results
+    if (data.Response === "False" || !data.Search || data.Search.length === 0) {
+      console.warn(
+        "No results from edge function, falling back to regular function",
+      );
+      return getTrendingContentFallback(type, limit);
+    }
+
+    // Format the results to match ContentItem format
+    const formattedResults = data.Search.map((item: any) => ({
+      id: item.imdbID,
+      title: item.Title,
+      poster_path: item.Poster !== "N/A" ? item.Poster : "",
+      media_type: item.Type === "movie" ? "movie" : "tv",
+      release_date: item.Year,
+      vote_average: item.imdbRating ? parseFloat(item.imdbRating) : 0,
+      vote_count: item.imdbVotes
+        ? parseInt(item.imdbVotes?.replace(/,/g, "") || "0")
+        : 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: `Trending ${item.Type === "movie" ? "movie" : "TV show"}`,
+    }));
+
+    return formattedResults.slice(0, limit);
+  } catch (error) {
+    console.error(
+      `[getTrendingContent] Error fetching from edge function:`,
+      error,
+    );
+    // Fallback to regular function if edge function fails
+    return getTrendingContentFallback(type, limit);
+  }
+}
+
+// Fallback function to get trending content using the regular Netlify function
+async function getTrendingContentFallback(
+  type?: "movie" | "tv",
+  limit = 8,
+): Promise<ContentItem[]> {
+  console.log(
+    `[getTrendingContentFallback] Fetching ${type || "all"} content using regular function`,
+  );
+  const startTime = performance.now();
+
+  try {
+    // Use the regular Netlify function as fallback
+    const params = new URLSearchParams({
+      trending: "true",
+      limit: limit.toString(),
+    });
+
+    if (type) {
+      params.append("type", type);
+    }
+
+    // Fetch content from the regular function
+    const response = await fetch(`${API_ENDPOINT}?${params.toString()}`);
+
+    if (!response.ok) {
+      throw new Error(`Function returned status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const endTime = performance.now();
+    console.log(
+      `[getTrendingContentFallback] API fetch completed in ${endTime - startTime}ms`,
     );
 
     if (!data || !Array.isArray(data.results) || data.results.length === 0) {
-      throw new Error("No results returned from edge function");
+      throw new Error("No results returned from function");
     }
 
     // Format the results to match ContentItem format
@@ -1237,7 +1315,10 @@ export async function getTrendingContent(
 
     return formattedResults.slice(0, limit);
   } catch (error) {
-    console.error(`[getTrendingContent] Error fetching content:`, error);
+    console.error(
+      `[getTrendingContentFallback] Error fetching content:`,
+      error,
+    );
     return [];
   }
 }
