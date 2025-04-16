@@ -19,17 +19,27 @@ export async function signIn(email: string, password: string) {
 // Sign up with email and password
 export async function signUp(email: string, password: string) {
   try {
+    console.log(
+      "Signing up with Supabase URL:",
+      import.meta.env.VITE_SUPABASE_URL,
+    );
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/login`,
       },
     });
 
     // If sign up is successful, create a user profile in the public.users table
     if (data.user && !error) {
-      await createUserProfile(data.user.id, email, "user");
+      try {
+        await createUserProfile(data.user.id, email, "user");
+        console.log("User profile created successfully");
+      } catch (profileError) {
+        console.error("Error creating user profile:", profileError);
+        // Continue even if profile creation fails
+      }
     }
 
     return { data, error };

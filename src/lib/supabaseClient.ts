@@ -3,17 +3,13 @@ import { getEnvVar } from "./utils";
 import { ContentItem } from "../types/omdb";
 
 // Get Supabase URL and key from environment variables
-const supabaseUrl = getEnvVar("SUPABASE_URL", "");
-const supabaseKey = getEnvVar("SUPABASE_ANON_KEY", "");
+const supabaseUrl =
+  import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+const supabaseKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
 
-// Create Supabase client with fallback values for development
-export const supabase =
-  supabaseUrl && supabaseKey
-    ? createClient(supabaseUrl, supabaseKey)
-    : createClient(
-        "https://placeholder-project.supabase.co",
-        "placeholder-key-for-development-only",
-      );
+// Create Supabase client
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Check if Supabase is properly configured
 export const isSupabaseConfigured = (): boolean => {

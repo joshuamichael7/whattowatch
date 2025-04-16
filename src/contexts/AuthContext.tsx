@@ -21,6 +21,7 @@ interface AuthContextType {
   refreshPreferences: () => Promise<void>;
 }
 
+// Create the context with default values
 const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
@@ -34,7 +35,8 @@ const AuthContext = createContext<AuthContextType>({
   refreshPreferences: async () => {},
 });
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+// Create the provider component
+function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
@@ -142,9 +144,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-// Define useAuth hook at the end of the file
-export function useAuth() {
-  return useContext(AuthContext);
 }
+
+// Create the hook
+function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+}
+
+// Export both the provider and the hook
+export { AuthProvider, useAuth };
