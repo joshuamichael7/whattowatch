@@ -1,6 +1,5 @@
 # Netlify configuration file
 
-# Build settings
 [build]
   command = "npm run build"
   publish = "dist"
@@ -8,8 +7,8 @@
 
 # Edge functions configuration
 [[edge_functions]]
-  path = "/api/omdb-edge"
   function = "omdb-edge"
+  path = "/.netlify/edge-functions/omdb-edge"
 
 # Redirects and rewrites
 [[redirects]]
@@ -21,7 +20,3 @@
   from = "/*"
   to = "/index.html"
   status = 200
-
-# Environment variable configuration
-[build.environment]
-  NODE_VERSION = "18"

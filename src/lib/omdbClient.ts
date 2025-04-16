@@ -14,7 +14,7 @@ const getEnvVar = (key: string, defaultValue: string = ""): string => {
 
 // Use Netlify edge function for trending content and regular function for other OMDB API calls
 const API_ENDPOINT = "/.netlify/functions/omdb";
-const EDGE_API_ENDPOINT = "/api/omdb-edge";
+const EDGE_API_ENDPOINT = "/.netlify/edge-functions/omdb-edge";
 
 // Helper function to make API calls to OMDB via Netlify function
 async function fetchFromOmdb(params: URLSearchParams) {
@@ -1208,11 +1208,11 @@ export async function getTrendingContent(
       `[getTrendingContent] Fetching from edge function: ${EDGE_API_ENDPOINT}?${params.toString()}`,
     );
 
-    // Fetch content from the edge function - use absolute URL for local development
-    const baseUrl = window.location.origin;
-    const edgeUrl = `${baseUrl}${EDGE_API_ENDPOINT}?${params.toString()}`;
-    console.log(`[getTrendingContent] Full URL: ${edgeUrl}`);
-    const response = await fetch(edgeUrl);
+    // Fetch content directly from the edge function endpoint
+    console.log(
+      `[getTrendingContent] Using direct edge function endpoint: ${EDGE_API_ENDPOINT}?${params.toString()}`,
+    );
+    const response = await fetch(`${EDGE_API_ENDPOINT}?${params.toString()}`);
 
     if (!response.ok) {
       console.error(`Edge function returned status: ${response.status}`);
