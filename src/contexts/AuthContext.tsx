@@ -149,6 +149,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return isCorrect;
   };
 
+  // Determine if user is admin
+  const isAdmin = React.useMemo(() => {
+    console.log("Checking admin status:", { profile });
+    return !!profile?.role && profile.role === "admin";
+  }, [profile]);
+
   const value = {
     user,
     session,
@@ -156,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     preferences,
     isLoading,
     isAuthenticated: !!user,
-    isAdmin: !!profile?.role && profile.role === "admin",
+    isAdmin,
     isAdminVerified,
     refreshUser,
     refreshProfile,

@@ -21,14 +21,25 @@ const AdminDashboard: React.FC = () => {
 
   // Redirect non-admin users
   React.useEffect(() => {
-    if (!isLoading && !user) {
-      // Redirect if not logged in
-      navigate("/");
-    } else if (!isLoading && user && !isAdmin) {
-      // Redirect if logged in but not admin
-      navigate("/");
+    if (isLoading) {
+      // Wait for loading to complete
+      return;
     }
-  }, [user, isAdmin, isLoading, navigate]);
+
+    console.log("AdminDashboard auth check:", { user, profile, isAdmin });
+
+    if (!user) {
+      // Redirect if not logged in
+      console.log("Redirecting: No user logged in");
+      navigate("/");
+    } else if (!isAdmin) {
+      // Redirect if logged in but not admin
+      console.log("Redirecting: User is not admin", { role: profile?.role });
+      navigate("/");
+    } else {
+      console.log("User is admin, allowing access");
+    }
+  }, [user, profile, isAdmin, isLoading, navigate]);
 
   if (isLoading) {
     return (
