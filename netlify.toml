@@ -10,10 +10,19 @@
   function = "omdb-edge"
   path = "/.netlify/edge-functions/omdb-edge"
 
+[[edge_functions]]
+  function = "test-edge"
+  path = "/api/test-edge"
+
 # Redirects and rewrites
 [[redirects]]
   from = "/api/omdb-edge"
   to = "/.netlify/edge-functions/omdb-edge"
+  status = 200
+
+[[redirects]]
+  from = "/api/test-edge"
+  to = "/.netlify/edge-functions/test-edge"
   status = 200
 
 [[redirects]]
