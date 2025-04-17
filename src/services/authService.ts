@@ -138,17 +138,33 @@ export async function getUserProfile(userId: string) {
 // Update user profile in the public.users table
 export async function updateUserProfile(userId: string, updates: any) {
   try {
+    console.log(
+      "[updateUserProfile] Updating profile for user:",
+      userId,
+      updates,
+    );
+
     const { data, error } = await supabase
       .from("users")
       .update({
         ...updates,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", userId);
+      .eq("id", userId)
+      .select(); // Add select() to return the updated data
+
+    if (error) {
+      console.error("[updateUserProfile] Error details:", error);
+    } else {
+      console.log(
+        "[updateUserProfile] Update successful, returned data:",
+        data,
+      );
+    }
 
     return { data, error };
   } catch (error: any) {
-    console.error("Error updating user profile:", error.message);
+    console.error("Error updating user profile:", error.message, error.stack);
     return { data: null, error };
   }
 }

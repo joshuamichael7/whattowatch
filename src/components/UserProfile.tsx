@@ -77,6 +77,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
         setError(error.message);
       } else {
         setMessage("Profile updated successfully");
+        // Refresh profile immediately to get the latest data
         await refreshProfile();
       }
     } catch (err: any) {
