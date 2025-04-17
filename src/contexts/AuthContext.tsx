@@ -31,21 +31,106 @@ const AuthContext = createContext<AuthContextType>({
   refreshProfile: async () => {},
 });
 
-// Helper function to load a user profile with retry logic
+// Helper function to load a user profile with retry logic - prioritizes email lookup
 async function loadUserProfile(
-  userId: string,
+  user: User,
   isMounted: boolean,
   logPrefix: string,
 ) {
-  // First check if the profile exists
-  console.log(`[${logPrefix}] Checking if profile exists for user: ${userId}`);
-  const { exists, error: checkError } = await checkUserProfileExists(userId);
+  // First try to get the profile by email (faster and more reliable)
+  if (user.email) {
+    console.log(
+      `[${logPrefix}] Checking if profile exists by email: ${user.email}`,
+    );
+    const { exists, error: checkError } = await checkUserProfileExists(
+      user.email,
+      true,
+    );
+
+    if (!isMounted) return { profileData: null, profileError: null };
+
+    if (checkError) {
+      console.error(
+        `[${logPrefix}] Error checking if profile exists by email:`,
+        checkError,
+      );
+    }
+
+    // If profile exists by email, try to load it
+    if (exists) {
+      console.log(`[${logPrefix}] Profile exists by email, loading it`);
+      let profileData = null;
+      let profileError = null;
+      let attempts = 0;
+      const maxAttempts = 2; // Fewer attempts needed for email lookup
+
+      while (!profileData && attempts < maxAttempts) {
+        attempts++;
+        console.log(
+          `[${logPrefix}] Profile fetch by email attempt ${attempts}`,
+        );
+
+        try {
+          // Wait for profile data with a small delay between attempts
+          const { data, error } = await getUserProfile(user.email!, true);
+
+          if (!isMounted) return { profileData: null, profileError: null };
+
+          if (error) {
+            console.error(
+              `[${logPrefix}] Error fetching user profile by email (attempt ${attempts}):`,
+              error,
+            );
+            profileError = error;
+
+            // Add a small delay before retrying
+            if (attempts < maxAttempts) {
+              await new Promise((resolve) =>
+                setTimeout(resolve, 300 * attempts),
+              );
+            }
+          } else {
+            console.log(
+              `[${logPrefix}] Profile loaded successfully by email (attempt ${attempts}):`,
+              data,
+            );
+            profileData = data;
+            break; // Exit the loop if we got the profile
+          }
+        } catch (error: any) {
+          if (!isMounted) return { profileData: null, profileError: null };
+          console.error(
+            `[${logPrefix}] Exception in profile fetch by email (attempt ${attempts}):`,
+            error.message,
+            error.stack,
+          );
+          profileError = error;
+
+          // Add a small delay before retrying
+          if (attempts < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, 300 * attempts));
+          }
+        }
+      }
+
+      // If we found the profile by email, return it
+      if (profileData) {
+        return { profileData, profileError };
+      }
+    }
+  }
+
+  // Fallback to ID-based lookup if email lookup failed or wasn't possible
+  console.log(
+    `[${logPrefix}] Checking if profile exists for user ID: ${user.id}`,
+  );
+  const { exists, error: checkError } = await checkUserProfileExists(user.id);
 
   if (!isMounted) return { profileData: null, profileError: null };
 
   if (checkError) {
     console.error(
-      `[${logPrefix}] Error checking if profile exists:`,
+      `[${logPrefix}] Error checking if profile exists by ID:`,
       checkError,
     );
   }
@@ -53,12 +138,12 @@ async function loadUserProfile(
   // If profile doesn't exist, don't try to load it
   if (!exists) {
     console.log(
-      `[${logPrefix}] No profile exists for user ${userId}, not creating one automatically`,
+      `[${logPrefix}] No profile exists for user ${user.id}, not creating one automatically`,
     );
     return { profileData: null, profileError: null };
   }
 
-  // If profile exists, make multiple attempts to get it
+  // If profile exists by ID, make multiple attempts to get it
   let profileData = null;
   let profileError = null;
   let attempts = 0;
@@ -66,17 +151,17 @@ async function loadUserProfile(
 
   while (!profileData && attempts < maxAttempts) {
     attempts++;
-    console.log(`[${logPrefix}] Profile fetch attempt ${attempts}`);
+    console.log(`[${logPrefix}] Profile fetch by ID attempt ${attempts}`);
 
     try {
       // Wait for profile data with a small delay between attempts
-      const { data, error } = await getUserProfile(userId);
+      const { data, error } = await getUserProfile(user.id);
 
       if (!isMounted) return { profileData: null, profileError: null };
 
       if (error) {
         console.error(
-          `[${logPrefix}] Error fetching user profile (attempt ${attempts}):`,
+          `[${logPrefix}] Error fetching user profile by ID (attempt ${attempts}):`,
           error,
         );
         profileError = error;
@@ -87,7 +172,7 @@ async function loadUserProfile(
         }
       } else {
         console.log(
-          `[${logPrefix}] Profile loaded successfully (attempt ${attempts}):`,
+          `[${logPrefix}] Profile loaded successfully by ID (attempt ${attempts}):`,
           data,
         );
         profileData = data;
@@ -96,7 +181,7 @@ async function loadUserProfile(
     } catch (error: any) {
       if (!isMounted) return { profileData: null, profileError: null };
       console.error(
-        `[${logPrefix}] Exception in profile fetch (attempt ${attempts}):`,
+        `[${logPrefix}] Exception in profile fetch by ID (attempt ${attempts}):`,
         error.message,
         error.stack,
       );
@@ -134,17 +219,78 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
     try {
       console.log(
         "[refreshProfile] Refreshing profile for user:",
-        session.user.id,
+        session.user.email || session.user.id,
       );
 
-      // Check if profile exists before attempting to load it
+      // First try to get the profile by email if available (faster and more reliable)
+      if (session.user.email) {
+        console.log("[refreshProfile] Trying to get profile by email first");
+
+        // Check if profile exists by email before attempting to load it
+        const { exists: existsByEmail, error: checkEmailError } =
+          await checkUserProfileExists(
+            session.user.email,
+            true, // isEmail = true
+          );
+
+        if (checkEmailError) {
+          console.error(
+            "[refreshProfile] Error checking if profile exists by email:",
+            checkEmailError,
+          );
+        }
+
+        if (existsByEmail) {
+          // Fetch user profile by email with proper error handling
+          const { data, error } = await getUserProfile(
+            session.user.email,
+            true,
+          );
+
+          if (error) {
+            console.error(
+              "[refreshProfile] Error fetching user profile by email:",
+              error,
+            );
+          } else {
+            console.log(
+              "[refreshProfile] Profile loaded successfully by email:",
+              data,
+            );
+            // Ensure we update the profile state immediately
+            setProfile(data);
+
+            // Fetch user preferences after profile is loaded
+            const { data: prefsData, error: prefsError } =
+              await getUserPreferences(session.user.id);
+            console.log("[refreshProfile] Preferences result:", {
+              data: prefsData,
+              error: prefsError,
+            });
+
+            if (prefsData) {
+              setPreferences(prefsData);
+            }
+
+            // If we found the profile by email, we're done
+            return;
+          }
+        } else {
+          console.log(
+            "[refreshProfile] No profile exists by email, falling back to ID lookup",
+          );
+        }
+      }
+
+      // Fallback to ID-based lookup
+      console.log("[refreshProfile] Checking profile by user ID");
       const { exists, error: checkError } = await checkUserProfileExists(
         session.user.id,
       );
 
       if (checkError) {
         console.error(
-          "[refreshProfile] Error checking if profile exists:",
+          "[refreshProfile] Error checking if profile exists by ID:",
           checkError,
         );
       }
@@ -154,7 +300,10 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
         const { data, error } = await getUserProfile(session.user.id);
 
         if (error) {
-          console.error("[refreshProfile] Error fetching user profile:", error);
+          console.error(
+            "[refreshProfile] Error fetching user profile by ID:",
+            error,
+          );
 
           // Diagnostic query to check if users table is accessible
           const { data: allUsers, error: listError } = await supabase
@@ -167,7 +316,10 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
             error: listError,
           });
         } else {
-          console.log("[refreshProfile] Profile loaded successfully:", data);
+          console.log(
+            "[refreshProfile] Profile loaded successfully by ID:",
+            data,
+          );
           // Ensure we update the profile state immediately
           setProfile(data);
         }
@@ -224,6 +376,17 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
       if (!isMounted) return;
       setIsLoading(true);
 
+      // Set a timeout to stop loading after a reasonable time
+      // This prevents the UI from being stuck in loading state
+      const loadingTimeout = setTimeout(() => {
+        if (isMounted) {
+          console.log(
+            "[initializeAuth] Loading timeout reached, stopping loading state",
+          );
+          setIsLoading(false);
+        }
+      }, 5000); // 5 seconds max loading time
+
       try {
         // Step 1: Get the session
         console.log("[initializeAuth] Step 1: Getting session");
@@ -248,7 +411,7 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
 
           // Use the extracted helper function to load the profile
           const { profileData } = await loadUserProfile(
-            session.user.id,
+            session.user,
             isMounted,
             "initializeAuth",
           );
@@ -257,8 +420,10 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
             setProfile(profileData);
           }
 
-          // Step 3: Only proceed to preferences after profile is loaded or confirmed not to exist
-          console.log("[initializeAuth] Step 3: Loading user preferences");
+          // Step 3: Preferences are optional, don't block on them
+          console.log(
+            "[initializeAuth] Step 3: Loading user preferences (optional)",
+          );
           try {
             const { data: prefsData, error: prefsError } =
               await getUserPreferences(session.user.id);
@@ -271,11 +436,11 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
                 prefsData,
               );
               setPreferences(prefsData);
-            } else if (prefsError) {
-              console.error(
-                "[initializeAuth] Error loading preferences:",
-                prefsError,
-              );
+            } else {
+              // No preferences found, that's fine
+              console.log("[initializeAuth] No preferences found, continuing");
+              // Set empty preferences to avoid further loading attempts
+              setPreferences({});
             }
           } catch (error: any) {
             if (!isMounted) return;
@@ -284,6 +449,8 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
               error.message,
               error.stack,
             );
+            // Set empty preferences to avoid further loading attempts
+            setPreferences({});
           }
         }
       } catch (error) {
@@ -291,6 +458,7 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
         console.error("[initializeAuth] Error:", error);
       } finally {
         if (isMounted) {
+          clearTimeout(loadingTimeout);
           setIsLoading(false);
         }
       }
@@ -331,7 +499,7 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
 
           // Use the extracted helper function to load the profile
           const { profileData } = await loadUserProfile(
-            session.user.id,
+            session.user,
             isMounted,
             "AuthContext",
           );
@@ -340,8 +508,8 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
             setProfile(profileData);
           }
 
-          // Step 3: Only proceed to preferences after profile is loaded or confirmed not to exist
-          console.log("[AuthContext] Loading user preferences");
+          // Step 3: Preferences are optional, don't block on them
+          console.log("[AuthContext] Loading user preferences (optional)");
           try {
             const { data: prefsData, error: prefsError } =
               await getUserPreferences(session.user.id);
@@ -354,11 +522,11 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
                 prefsData,
               );
               setPreferences(prefsData);
-            } else if (prefsError) {
-              console.error(
-                "[AuthContext] Error loading preferences:",
-                prefsError,
-              );
+            } else {
+              // No preferences found, that's fine
+              console.log("[AuthContext] No preferences found, continuing");
+              // Set empty preferences to avoid further loading attempts
+              setPreferences({});
             }
           } catch (error: any) {
             if (!isMounted) return;
@@ -367,6 +535,8 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
               error.message,
               error.stack,
             );
+            // Set empty preferences to avoid further loading attempts
+            setPreferences({});
           }
         }
       },
@@ -393,6 +563,7 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
       currentUser?.email && adminEmails.includes(currentUser.email);
     console.log("[isAdmin check] Is admin by email:", isAdminByEmail);
 
+    // If we have a profile, use the role, otherwise use the email check
     return hasAdminRole || isAdminByEmail;
   }, [profile, currentUser?.email]);
 

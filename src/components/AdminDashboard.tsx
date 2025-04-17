@@ -33,8 +33,11 @@ const AdminDashboard: React.FC = () => {
 
   // Redirect non-admin users
   React.useEffect(() => {
-    if (isLoading) {
-      console.log("[ADMIN] Still loading, waiting...");
+    // Don't wait for loading to complete if we already know the user is admin by email
+    if (isLoading && !isAdmin) {
+      console.log(
+        "[ADMIN] Still loading and not yet identified as admin, waiting...",
+      );
       return;
     }
 
@@ -65,7 +68,8 @@ const AdminDashboard: React.FC = () => {
     }
   }, [user, isAdmin, isLoading, navigate, profile]);
 
-  if (isLoading) {
+  // Only show loading if we're still loading AND not yet identified as admin
+  if (isLoading && !isAdmin) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <p>Loading...</p>

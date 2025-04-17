@@ -89,10 +89,16 @@ export async function updatePassword(password: string) {
   }
 }
 
-// Get user profile from the public.users table
-export async function getUserProfile(userId: string) {
+// Get user profile from the public.users table - can look up by userId or email
+export async function getUserProfile(
+  userIdOrEmail: string,
+  isEmail: boolean = false,
+) {
   try {
-    console.log("[getUserProfile] Fetching profile for user ID:", userId);
+    console.log(
+      `[getUserProfile] Fetching profile for user ${isEmail ? "email" : "ID"}:`,
+      userIdOrEmail,
+    );
     console.log("[getUserProfile] Supabase URL:", supabase.supabaseUrl);
     console.log("[getUserProfile] Table being queried:", "users");
 
@@ -106,12 +112,13 @@ export async function getUserProfile(userId: string) {
       tableError,
     });
 
-    // Now try to get the specific user
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", userId)
-      .single();
+    // Now try to get the specific user - either by ID or email
+    const query = supabase.from("users").select("*");
+
+    // Apply the appropriate filter based on whether we're using email or ID
+    const { data, error } = await (isEmail
+      ? query.eq("email", userIdOrEmail).single()
+      : query.eq("id", userIdOrEmail).single());
 
     console.log("[getUserProfile] Query result:", { data, error });
 
@@ -123,41 +130,12 @@ export async function getUserProfile(userId: string) {
         hint: error.hint,
       });
 
-      // If we can't find the user, try to create a default profile
-      if (error.code === "PGRST116") {
+      // If we can't find the user and we're looking up by ID, try to get user details from auth
+      if (error.code === "PGRST116" && !isEmail) {
         // No rows returned
         console.log(
-          "[getUserProfile] User not found, attempting to create default profile",
+          "[getUserProfile] User not found by ID, not creating default profile automatically",
         );
-
-        // Get user details from auth
-        const { data: authUser } = await supabase.auth.getUser();
-        if (authUser?.user) {
-          // Create a default profile
-          const { data: newProfile, error: insertError } = await supabase
-            .from("users")
-            .insert({
-              id: userId,
-              email: authUser.user.email,
-              role:
-                authUser.user.email === "joshmputnam@gmail.com"
-                  ? "admin"
-                  : "user",
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
-
-          console.log("[getUserProfile] Created default profile:", {
-            newProfile,
-            insertError,
-          });
-
-          if (!insertError && newProfile) {
-            return { data: newProfile, error: null };
-          }
-        }
       }
     }
 
@@ -181,18 +159,25 @@ export async function getUserProfile(userId: string) {
   }
 }
 
-// Check if a user profile exists in the public.users table
-export async function checkUserProfileExists(userId: string) {
+// Check if a user profile exists in the public.users table - can check by userId or email
+export async function checkUserProfileExists(
+  userIdOrEmail: string,
+  isEmail: boolean = false,
+) {
   try {
     console.log(
-      "[checkUserProfileExists] Checking if profile exists for user ID:",
-      userId,
+      `[checkUserProfileExists] Checking if profile exists for user ${isEmail ? "email" : "ID"}:`,
+      userIdOrEmail,
     );
 
-    const { count, error } = await supabase
+    const query = supabase
       .from("users")
-      .select("id", { count: "exact", head: true })
-      .eq("id", userId);
+      .select("id", { count: "exact", head: true });
+
+    // Apply the appropriate filter based on whether we're using email or ID
+    const { count, error } = await (isEmail
+      ? query.eq("email", userIdOrEmail)
+      : query.eq("id", userIdOrEmail));
 
     const exists = count !== null && count > 0;
     console.log(`[checkUserProfileExists] Profile exists: ${exists}`);
@@ -245,16 +230,53 @@ export async function updateUserProfile(userId: string, updates: any) {
 // Get user preferences from the user_preferences table
 export async function getUserPreferences(userId: string) {
   try {
+    console.log(
+      "[getUserPreferences] Checking for preferences for user ID:",
+      userId,
+    );
+
+    // First check if the table exists
+    const { count, error: tableError } = await supabase
+      .from("user_preferences")
+      .select("*", { count: "exact", head: true });
+
+    if (tableError) {
+      console.log(
+        "[getUserPreferences] Error checking preferences table:",
+        tableError,
+      );
+      // Return empty preferences rather than error
+      return { data: {}, error: null };
+    }
+
+    if (count === 0) {
+      console.log(
+        "[getUserPreferences] No preferences in table, returning empty object",
+      );
+      // Return empty preferences if table is empty
+      return { data: {}, error: null };
+    }
+
+    // Now try to get the specific user's preferences
     const { data, error } = await supabase
       .from("user_preferences")
       .select("*")
       .eq("user_id", userId)
       .single();
 
+    if (error && error.code === "PGRST116") {
+      // No rows found
+      console.log(
+        "[getUserPreferences] No preferences found for user, returning empty object",
+      );
+      return { data: {}, error: null };
+    }
+
     return { data, error };
   } catch (error: any) {
     console.error("Error getting user preferences:", error.message);
-    return { data: null, error };
+    // Return empty preferences rather than error
+    return { data: {}, error: null };
   }
 }
 
