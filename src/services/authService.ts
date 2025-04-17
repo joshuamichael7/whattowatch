@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
+import { getUserByEmail, createUser } from "@/lib/supabaseProxy";
 
 // Sign in with email and password
 export async function signIn(email: string, password: string) {
@@ -29,17 +30,18 @@ export async function signUp(email: string, password: string) {
 
     // If auth user creation is successful, create a public user profile
     if (data.user && !error) {
-      const { error: profileError } = await supabase.from("users").insert({
-        id: data.user.id,
-        email: email,
-        role: "user", // Always set regular users by default
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-
-      if (profileError) {
+      try {
+        // Try to create user profile using REST API directly
+        await createUser({
+          id: data.user.id,
+          email: email,
+          role: "user", // Always set regular users by default
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      } catch (profileError: any) {
         console.error("Error creating user profile:", profileError);
-        return { data, error: profileError };
+        return { data, error: { message: profileError.message } };
       }
     }
 
@@ -99,206 +101,39 @@ export async function getUserProfile(
       `[getUserProfile] Fetching profile for user ${isEmail ? "email" : "ID"}:`,
       userIdOrEmail,
     );
-    console.log("[getUserProfile] Supabase URL:", supabase.supabaseUrl);
-    console.log("[getUserProfile] Table being queried:", "users");
 
-    // First, check if the table exists and is accessible
-    console.log("[getUserProfile] STEP 1: Checking if table exists");
-    const tableCheckQuery = supabase
-      .from("users")
-      .select("count(*)", { count: "exact", head: true });
-
-    console.log("[getUserProfile] Table check query:", "users table check", {
-      query: "SELECT count(*) FROM users",
-    });
-
+    // Use direct REST API calls instead of Supabase client
     try {
-      console.log("[getUserProfile] Executing table check query...");
-      const {
-        data: tableCheck,
-        error: tableError,
-        count: tableCount,
-      } = await tableCheckQuery;
-      console.log("[getUserProfile] Table check query completed");
+      let userData;
 
-      console.log("[getUserProfile] Table check result:", {
-        tableCheck,
-        tableError,
-        tableCount,
-        status: tableError ? "ERROR" : "SUCCESS",
-      });
-    } catch (innerError) {
-      console.error("[getUserProfile] Exception during table check query:", {
-        message: innerError.message,
-        stack: innerError.stack,
-        name: innerError.name,
-      });
-      throw innerError;
-    }
-
-    if (tableError) {
-      console.error("[getUserProfile] Table check failed:", {
-        code: tableError.code,
-        message: tableError.message,
-        details: tableError.details,
-        hint: tableError.hint,
-      });
-      return { data: null, error: tableError };
-    }
-
-    // STEP 2: Try to get all users to see if any exist
-    console.log("[getUserProfile] STEP 2: Checking for any users in table");
-    const allUsersQuery = supabase
-      .from("users")
-      .select("id, email, role")
-      .limit(5);
-
-    console.log(
-      "[getUserProfile] All users query:",
-      "users table all users query",
-      { query: "SELECT id, email, role FROM users LIMIT 5" },
-    );
-
-    try {
-      console.log("[getUserProfile] Executing all users query...");
-      const { data: allUsers, error: allUsersError } = await allUsersQuery;
-      console.log("[getUserProfile] All users query completed");
-
-      console.log("[getUserProfile] All users result:", {
-        userCount: allUsers?.length || 0,
-        users: allUsers,
-        error: allUsersError,
-        status: allUsersError ? "ERROR" : "SUCCESS",
-      });
-    } catch (innerError) {
-      console.error("[getUserProfile] Exception during all users query:", {
-        message: innerError.message,
-        stack: innerError.stack,
-        name: innerError.name,
-      });
-      throw innerError;
-    }
-
-    // STEP 3: Now try to get the specific user - either by ID or email
-    console.log(
-      `[getUserProfile] STEP 3: Looking up specific user by ${isEmail ? "email" : "ID"}: ${userIdOrEmail}`,
-    );
-    const query = supabase.from("users").select("*");
-
-    // Apply the appropriate filter based on whether we're using email or ID
-    const specificQuery = isEmail
-      ? query.eq("email", userIdOrEmail).single()
-      : query.eq("id", userIdOrEmail).single();
-
-    console.log(
-      "[getUserProfile] Specific user query:",
-      "specific user query",
-      {
-        query: isEmail
-          ? `SELECT * FROM users WHERE email = '${userIdOrEmail}'`
-          : `SELECT * FROM users WHERE id = '${userIdOrEmail}'`,
-      },
-    );
-
-    try {
-      console.log("[getUserProfile] Executing specific user query...");
-      const { data, error } = await specificQuery;
-      console.log("[getUserProfile] Specific user query completed");
-
-      console.log("[getUserProfile] Specific user query result:", {
-        data,
-        error,
-        status: error ? "ERROR" : "SUCCESS",
-      });
-    } catch (innerError) {
-      console.error("[getUserProfile] Exception during specific user query:", {
-        message: innerError.message,
-        stack: innerError.stack,
-        name: innerError.name,
-      });
-      throw innerError;
-    }
-
-    if (error) {
-      console.error("[getUserProfile] Error details:", {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-      });
-
-      // If we can't find the user and we're looking up by ID, try to get user details from auth
-      if (error.code === "PGRST116" && !isEmail) {
-        // No rows returned
+      if (isEmail) {
         console.log(
-          "[getUserProfile] User not found by ID, not creating default profile automatically",
+          `[getUserProfile] Looking up user by email: ${userIdOrEmail}`,
         );
+        userData = await getUserByEmail(userIdOrEmail);
+      } else {
+        console.log(`[getUserProfile] Looking up user by ID: ${userIdOrEmail}`);
+        userData = await getUserById(userIdOrEmail);
       }
 
-      // STEP 4: If lookup by email fails, try a case-insensitive search
-      if (isEmail && error.code === "PGRST116") {
+      if (userData && userData.length > 0) {
+        const data = userData[0];
+        console.log("[getUserProfile] Successfully retrieved profile:", {
+          id: data.id,
+          email: data.email,
+          role: data.role,
+        });
+        return { data, error: null };
+      } else {
         console.log(
-          "[getUserProfile] STEP 4: Email lookup failed, trying case-insensitive search",
+          `[getUserProfile] No user found with ${isEmail ? "email" : "ID"}: ${userIdOrEmail}`,
         );
-        const caseInsensitiveQuery = supabase
-          .from("users")
-          .select("*")
-          .ilike("email", userIdOrEmail)
-          .single();
-
-        console.log(
-          "[getUserProfile] Case-insensitive query:",
-          "case-insensitive email query",
-          { query: `SELECT * FROM users WHERE email ILIKE '${userIdOrEmail}'` },
-        );
-
-        try {
-          console.log("[getUserProfile] Executing case-insensitive query...");
-          const { data: caseData, error: caseError } =
-            await caseInsensitiveQuery;
-          console.log("[getUserProfile] Case-insensitive query completed");
-
-          console.log("[getUserProfile] Case-insensitive result:", {
-            data: caseData,
-            error: caseError,
-            status: caseError ? "ERROR" : "SUCCESS",
-          });
-        } catch (innerError) {
-          console.error(
-            "[getUserProfile] Exception during case-insensitive query:",
-            {
-              message: innerError.message,
-              stack: innerError.stack,
-              name: innerError.name,
-            },
-          );
-          throw innerError;
-        }
-
-        if (!caseError && caseData) {
-          console.log(
-            "[getUserProfile] Found user with case-insensitive search:",
-            {
-              id: caseData.id,
-              email: caseData.email,
-              role: caseData.role,
-            },
-          );
-          return { data: caseData, error: null };
-        }
+        return { data: null, error: { message: "User not found" } };
       }
+    } catch (error: any) {
+      console.error("[getUserProfile] Error fetching user profile:", error);
+      return { data: null, error };
     }
-
-    // Ensure we wait for the data to be fully available before returning
-    if (data) {
-      console.log("[getUserProfile] Successfully retrieved profile:", {
-        id: data.id,
-        email: data.email,
-        role: data.role,
-      });
-    }
-
-    return { data, error };
   } catch (error: any) {
     console.error(
       "[getUserProfile] Exception caught:",

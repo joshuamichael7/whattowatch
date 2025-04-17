@@ -2,10 +2,14 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import {
-  getUserProfile,
   getUserPreferences,
   checkUserProfileExists,
 } from "@/services/authService";
+import {
+  getUserById,
+  getUserByEmail,
+  fetchFromSupabase,
+} from "@/lib/supabaseProxy";
 
 type AuthContextType = {
   user: User | null;
@@ -71,17 +75,16 @@ async function loadUserProfile(
         );
 
         try {
-          // Wait for profile data with a small delay between attempts
-          const { data, error } = await getUserProfile(user.email!, true);
+          // Wait for profile data with a small delay between attempts using supabaseProxy
+          const userData = await getUserByEmail(user.email!);
 
           if (!isMounted) return { profileData: null, profileError: null };
 
-          if (error) {
+          if (!userData || userData.length === 0) {
             console.error(
-              `[${logPrefix}] Error fetching user profile by email (attempt ${attempts}):`,
-              error,
+              `[${logPrefix}] Error fetching user profile by email (attempt ${attempts}): User not found`,
             );
-            profileError = error;
+            profileError = { message: "User not found" };
 
             // Add a small delay before retrying
             if (attempts < maxAttempts) {
@@ -90,6 +93,7 @@ async function loadUserProfile(
               );
             }
           } else {
+            const data = userData[0];
             console.log(
               `[${logPrefix}] Profile loaded successfully by email (attempt ${attempts}):`,
               data,
@@ -154,23 +158,23 @@ async function loadUserProfile(
     console.log(`[${logPrefix}] Profile fetch by ID attempt ${attempts}`);
 
     try {
-      // Wait for profile data with a small delay between attempts
-      const { data, error } = await getUserProfile(user.id);
+      // Wait for profile data with a small delay between attempts using supabaseProxy
+      const userData = await getUserById(user.id);
 
       if (!isMounted) return { profileData: null, profileError: null };
 
-      if (error) {
+      if (!userData || userData.length === 0) {
         console.error(
-          `[${logPrefix}] Error fetching user profile by ID (attempt ${attempts}):`,
-          error,
+          `[${logPrefix}] Error fetching user profile by ID (attempt ${attempts}): User not found`,
         );
-        profileError = error;
+        profileError = { message: "User not found" };
 
         // Add a small delay before retrying
         if (attempts < maxAttempts) {
           await new Promise((resolve) => setTimeout(resolve, 500 * attempts));
         }
       } else {
+        const data = userData[0];
         console.log(
           `[${logPrefix}] Profile loaded successfully by ID (attempt ${attempts}):`,
           data,
@@ -241,39 +245,45 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
         }
 
         if (existsByEmail) {
-          // Fetch user profile by email with proper error handling
-          const { data, error } = await getUserProfile(
-            session.user.email,
-            true,
-          );
+          // Fetch user profile by email with proper error handling using supabaseProxy
+          try {
+            const userData = await getUserByEmail(session.user.email);
+            const data = userData && userData.length > 0 ? userData[0] : null;
+            const error = !data ? { message: "User not found" } : null;
 
-          if (error) {
+            if (error) {
+              console.error(
+                "[refreshProfile] Error fetching user profile by email:",
+                error,
+              );
+            } else {
+              console.log(
+                "[refreshProfile] Profile loaded successfully by email:",
+                data,
+              );
+              // Ensure we update the profile state immediately
+              setProfile(data);
+
+              // Fetch user preferences after profile is loaded
+              const { data: prefsData, error: prefsError } =
+                await getUserPreferences(session.user.id);
+              console.log("[refreshProfile] Preferences result:", {
+                data: prefsData,
+                error: prefsError,
+              });
+
+              if (prefsData) {
+                setPreferences(prefsData);
+              }
+
+              // If we found the profile by email, we're done
+              return;
+            }
+          } catch (error) {
             console.error(
-              "[refreshProfile] Error fetching user profile by email:",
+              "[refreshProfile] Exception fetching user profile by email:",
               error,
             );
-          } else {
-            console.log(
-              "[refreshProfile] Profile loaded successfully by email:",
-              data,
-            );
-            // Ensure we update the profile state immediately
-            setProfile(data);
-
-            // Fetch user preferences after profile is loaded
-            const { data: prefsData, error: prefsError } =
-              await getUserPreferences(session.user.id);
-            console.log("[refreshProfile] Preferences result:", {
-              data: prefsData,
-              error: prefsError,
-            });
-
-            if (prefsData) {
-              setPreferences(prefsData);
-            }
-
-            // If we found the profile by email, we're done
-            return;
           }
         } else {
           console.log(
@@ -296,32 +306,46 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
       }
 
       if (exists) {
-        // Fetch user profile with proper error handling
-        const { data, error } = await getUserProfile(session.user.id);
+        // Fetch user profile with proper error handling using supabaseProxy
+        try {
+          const userData = await getUserById(session.user.id);
+          const data = userData && userData.length > 0 ? userData[0] : null;
+          const error = !data ? { message: "User not found" } : null;
 
-        if (error) {
+          if (error) {
+            console.error(
+              "[refreshProfile] Error fetching user profile by ID:",
+              error,
+            );
+
+            // Diagnostic query to check if users table is accessible
+            try {
+              const allUsers = await fetchFromSupabase(
+                "users?select=id,email&limit=5",
+              );
+              console.log("[refreshProfile] Sample users in table:", {
+                users: allUsers,
+                error: null,
+              });
+            } catch (listError) {
+              console.log(
+                "[refreshProfile] Error fetching sample users:",
+                listError,
+              );
+            }
+          } else {
+            console.log(
+              "[refreshProfile] Profile loaded successfully by ID:",
+              data,
+            );
+            // Ensure we update the profile state immediately
+            setProfile(data);
+          }
+        } catch (error) {
           console.error(
-            "[refreshProfile] Error fetching user profile by ID:",
+            "[refreshProfile] Exception fetching user profile by ID:",
             error,
           );
-
-          // Diagnostic query to check if users table is accessible
-          const { data: allUsers, error: listError } = await supabase
-            .from("users")
-            .select("id, email")
-            .limit(5);
-
-          console.log("[refreshProfile] Sample users in table:", {
-            users: allUsers,
-            error: listError,
-          });
-        } else {
-          console.log(
-            "[refreshProfile] Profile loaded successfully by ID:",
-            data,
-          );
-          // Ensure we update the profile state immediately
-          setProfile(data);
         }
       } else {
         console.log(
