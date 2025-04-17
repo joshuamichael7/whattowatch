@@ -5,19 +5,61 @@
   publish = "dist"
   functions = "netlify/functions"
 
-# Edge functions configuration
+# Configure Edge Functions
 [[edge_functions]]
-  path = "/api/omdb-edge"
+  path = "/api/*"
   function = "omdb-edge"
 
 [[edge_functions]]
   path = "/api/test-edge"
   function = "test-edge"
 
+# Configure function settings
+[functions]
+  # Increase timeout to 30 seconds (default is 10)
+  node_bundler = "esbuild"
+  external_node_modules = ["natural", "formidable"]
+
+[functions.auth-helper]
+  included_files = []
+  excluded_files = []
+  
+[functions.calculate-similarity]
+  included_files = []
+  excluded_files = []
+
+[functions.check-edge]
+  included_files = []
+  excluded_files = []
+
+[functions.feedback]
+  included_files = []
+  excluded_files = []
+
+[functions.omdb]
+  included_files = []
+  excluded_files = []
+
+[functions.populate-database]
+  included_files = []
+  excluded_files = []
+
+[functions.refresh-trending]
+  included_files = []
+  excluded_files = []
+
+[functions.similarity]
+  included_files = []
+  excluded_files = []
+
+[functions.upload-csv]
+  included_files = []
+  excluded_files = []
+
 # Redirects and rewrites
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/:splat"
+  to = "/.netlify/edge-functions/:splat"
   status = 200
 
 [[redirects]]
