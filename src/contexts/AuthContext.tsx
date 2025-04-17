@@ -1,10 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
-import {
-  getUserProfileById,
-  getUserProfileByEmail,
-} from "@/services/userProfileService";
+import { getUserProfile } from "@/services/userProfileService";
 
 type AuthContextType = {
   user: User | null;
@@ -13,7 +10,6 @@ type AuthContextType = {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  refreshProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -23,58 +19,12 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   isAuthenticated: false,
   isAdmin: false,
-  refreshProfile: async () => {},
 });
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Get the current user directly from session
-  const currentUser = session?.user || null;
-
-  // Function to refresh user profile
-  const refreshProfile = async () => {
-    if (!currentUser) {
-      console.log(
-        "[refreshProfile] No user logged in, skipping profile refresh",
-      );
-      return;
-    }
-
-    try {
-      console.log(
-        "[refreshProfile] Refreshing profile for user:",
-        currentUser.email || currentUser.id,
-      );
-
-      let userProfile = null;
-
-      // First try to get profile by email if available
-      if (currentUser.email) {
-        userProfile = await getUserProfileByEmail(currentUser.email);
-      }
-
-      // If no profile found by email, try by ID
-      if (!userProfile) {
-        userProfile = await getUserProfileById(currentUser.id);
-      }
-
-      if (userProfile) {
-        console.log(
-          "[refreshProfile] Profile loaded successfully:",
-          userProfile,
-        );
-        setProfile(userProfile);
-      } else {
-        console.log("[refreshProfile] No profile found for user");
-        setProfile(null);
-      }
-    } catch (error) {
-      console.error("[refreshProfile] Error refreshing profile:", error);
-    }
-  };
 
   // Initialize auth state
   useEffect(() => {
@@ -86,7 +36,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         // Get the session
-        console.log("[initializeAuth] Getting session");
+        console.log("[AuthContext] Getting session");
         const {
           data: { session },
         } = await supabase.auth.getSession();
@@ -96,11 +46,15 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // If we have a user, get their profile
         if (session?.user) {
-          console.log("[initializeAuth] User found, loading profile");
-          await refreshProfile();
+          console.log("[AuthContext] User found, loading profile");
+          const userProfile = await getUserProfile(session.user.id);
+          if (isMounted) {
+            console.log("[AuthContext] Profile loaded:", userProfile);
+            setProfile(userProfile);
+          }
         }
       } catch (error) {
-        console.error("[initializeAuth] Error:", error);
+        console.error("[AuthContext] Error:", error);
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -121,19 +75,19 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // For sign out events, clear profile
         if (!session) {
-          console.log(
-            `[AuthContext] Auth event ${event} with no session, clearing profile`,
-          );
+          console.log(`[AuthContext] No session, clearing profile`);
           setProfile(null);
           return;
         }
 
         // For events with a user, load their profile
         if (session?.user) {
-          console.log(
-            `[AuthContext] Auth event ${event} with user, loading profile`,
-          );
-          await refreshProfile();
+          console.log(`[AuthContext] User present, loading profile`);
+          const userProfile = await getUserProfile(session.user.id);
+          if (isMounted) {
+            console.log("[AuthContext] Profile loaded:", userProfile);
+            setProfile(userProfile);
+          }
         }
       },
     );
@@ -146,6 +100,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Determine if user is admin based on profile role
   const isAdmin = profile?.role === "admin";
+  const currentUser = session?.user || null;
 
   const value = {
     user: currentUser,
@@ -154,10 +109,9 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     isAuthenticated: !!currentUser,
     isAdmin,
-    refreshProfile,
   };
 
-  console.log("[AUTH_CONTEXT] Current state:", {
+  console.log("[AuthContext] Current state:", {
     user: currentUser ? { id: currentUser.id, email: currentUser.email } : null,
     profile,
     isAuthenticated: !!currentUser,
