@@ -11,8 +11,16 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Database, Upload, Users } from "lucide-react";
+import {
+  AlertCircle,
+  Database,
+  Upload,
+  Users,
+  ShieldCheck,
+  Check,
+} from "lucide-react";
 import CsvManagement from "./admin/CsvManagement";
+import AdminPasswordReset from "./admin/AdminPasswordReset";
 import AdminPasswordForm from "./AdminPasswordForm";
 
 const AdminDashboard: React.FC = () => {
@@ -118,7 +126,7 @@ const AdminDashboard: React.FC = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="data" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-8">
+            <TabsList className="grid w-full grid-cols-4 mb-8">
               <TabsTrigger value="data" className="flex items-center gap-2">
                 <Database className="h-4 w-4" />
                 Data Management
@@ -130,6 +138,10 @@ const AdminDashboard: React.FC = () => {
               <TabsTrigger value="import" className="flex items-center gap-2">
                 <Upload className="h-4 w-4" />
                 Import Data
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" />
+                Security
               </TabsTrigger>
             </TabsList>
 
@@ -204,6 +216,16 @@ const AdminDashboard: React.FC = () => {
               </p>
               <div className="mt-6">
                 <CsvManagement />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="settings" className="space-y-4">
+              <h3 className="text-lg font-medium">Security Settings</h3>
+              <p className="text-muted-foreground">
+                Manage admin password and security settings.
+              </p>
+              <div className="mt-6">
+                <AdminPasswordReset />
               </div>
             </TabsContent>
           </Tabs>
