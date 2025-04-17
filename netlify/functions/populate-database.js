@@ -144,7 +144,7 @@ exports.handler = async (event) => {
     for (const batch of batches) {
       const { data, error } = await supabase
         .from("content")
-        .upsert(batch, { onConflict: "id" });
+        .upsert(batch, { onConflict: "imdb_id" });
 
       if (error) {
         console.error("Error inserting batch:", error);
