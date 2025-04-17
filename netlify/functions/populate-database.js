@@ -142,16 +142,74 @@ exports.handler = async (event) => {
     const insertResults = [];
 
     for (const batch of batches) {
-      const { data, error } = await supabase
-        .from("content")
-        .upsert(batch, { onConflict: "imdb_id" });
+      // Use individual inserts with ON CONFLICT DO NOTHING to skip duplicates
+      const batchResults = { success: true, count: 0, skipped: 0, errors: [] };
 
-      if (error) {
-        console.error("Error inserting batch:", error);
-        insertResults.push({ success: false, error });
-      } else {
-        insertResults.push({ success: true, count: batch.length });
+      for (const item of batch) {
+        try {
+          // First check if the item already exists by imdb_id
+          const { data: existingData, error: checkError } = await supabase.rpc(
+            "content_exists_by_imdb_id",
+            { p_imdb_id: item.imdb_id },
+          );
+
+          if (checkError) {
+            console.error("Error checking if content exists:", checkError);
+            batchResults.errors.push({
+              item: item.title,
+              error: checkError.message,
+            });
+            continue;
+          }
+
+          // If the item already exists, skip it
+          if (existingData === true) {
+            console.log(
+              `Skipping duplicate item: ${item.title} (${item.imdb_id})`,
+            );
+            batchResults.skipped++;
+            continue;
+          }
+
+          // Insert the item using our custom function
+          const { data, error } = await supabase.rpc("upsert_content", {
+            p_id: item.id,
+            p_title: item.title,
+            p_media_type: item.media_type,
+            p_imdb_id: item.imdb_id,
+            p_year: item.year,
+            p_poster_path: item.poster_path,
+            p_overview: item.overview,
+            p_plot: item.plot,
+            p_content_rating: item.content_rating,
+            p_runtime: item.runtime,
+            p_genre_strings: item.genre_strings,
+            p_director: item.director,
+            p_actors: item.actors,
+            p_imdb_rating: item.imdb_rating,
+            p_vote_average: item.vote_average,
+          });
+
+          if (error) {
+            console.error(`Error inserting item ${item.title}:`, error);
+            batchResults.errors.push({
+              item: item.title,
+              error: error.message,
+            });
+          } else {
+            batchResults.count++;
+          }
+        } catch (itemError) {
+          console.error(`Exception processing item ${item.title}:`, itemError);
+          batchResults.errors.push({
+            item: item.title,
+            error: itemError.message,
+          });
+        }
       }
+
+      batchResults.success = batchResults.errors.length === 0;
+      insertResults.push(batchResults);
     }
 
     // Trigger similarity calculation (will be implemented in another function)

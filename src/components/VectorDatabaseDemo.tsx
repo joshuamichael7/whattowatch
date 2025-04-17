@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Loader2 } from "lucide-react";
 import {
-  initVectorDB,
   storeContentVector,
   querySimilarContent,
 } from "@/services/vectorService";
@@ -31,13 +30,10 @@ const VectorDatabaseDemo: React.FC = () => {
       setIsInitializing(true);
       setError(null);
       try {
-        const success = await initVectorDB();
-        setIsInitialized(success);
-        if (!success) {
-          setError(
-            "Failed to initialize vector database. Check API keys and endpoint.",
-          );
-        }
+        // Vector database initialization has been removed
+        console.log("Vector database functionality has been removed");
+        // Set initialized to true to allow component to function
+        setIsInitialized(true);
       } catch (err) {
         setError("Error initializing vector database");
         console.error("Vector DB initialization error:", err);

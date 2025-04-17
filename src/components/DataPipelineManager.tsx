@@ -91,17 +91,9 @@ const DataPipelineManager: React.FC<DataPipelineManagerProps> = ({
     addLog("Starting data pipeline...");
 
     try {
-      // Initialize TensorFlow.js and the vector database
-      addLog("Initializing Pinecone vector database...");
-      const initSuccess = await storeContentVector({
-        id: "test",
-        title: "Test",
-        media_type: "movie",
-      } as any);
-      if (!initSuccess) {
-        throw new Error("Failed to initialize Pinecone vector database");
-      }
-      addLog("Pinecone vector database initialized successfully");
+      // Vector database initialization removed
+      addLog("Vector database functionality has been removed");
+      // Continue with the pipeline without vector database
 
       // Randomly select search terms to use with weighted categories
       const categories = {
@@ -280,15 +272,10 @@ const DataPipelineManager: React.FC<DataPipelineManagerProps> = ({
               return false;
             }
 
-            // Store in vector database
-            const success = await storeContentVector(content);
-            if (success) {
-              addLog(
-                `Stored "${content.title}" (${content.media_type}) in vector database`,
-              );
-            } else {
-              addLog(`Failed to store "${content.title}" in vector database`);
-            }
+            // Vector database storage removed
+            addLog(
+              `Processed "${content.title}" (${content.media_type}) - vector storage skipped`,
+            );
             return success;
           } catch (err) {
             const errorMessage =

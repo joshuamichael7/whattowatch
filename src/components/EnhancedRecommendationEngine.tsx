@@ -3,9 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Brain, Database } from "lucide-react";
+import { Loader2, Sparkles, Brain } from "lucide-react";
 import { getPersonalizedRecommendations } from "@/services/aiService";
-import { querySimilarContent } from "@/services/vectorService";
 import { getContentById } from "@/lib/omdbClient";
 import { ContentItem } from "@/types/omdb";
 
@@ -34,14 +33,9 @@ const EnhancedRecommendationEngine: React.FC<
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recommendations, setRecommendations] = useState<ContentItem[]>([]);
-  const [activeTab, setActiveTab] = useState<"ai" | "vector" | "hybrid">(
-    "hybrid",
-  );
+  const [activeTab, setActiveTab] = useState<"ai" | "database">("ai");
   const [aiRecommendations, setAiRecommendations] = useState<
     Array<{ title: string; reason: string }>
-  >([]);
-  const [vectorRecommendations, setVectorRecommendations] = useState<
-    ContentItem[]
   >([]);
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
@@ -141,7 +135,7 @@ const EnhancedRecommendationEngine: React.FC<
         setProgress(70);
 
         try {
-          // First try to get similar content from Supabase
+          // Get similar content from Supabase
           const { getSimilarContentFromSupabase } = await import(
             "../lib/supabaseClient"
           );
@@ -158,7 +152,6 @@ const EnhancedRecommendationEngine: React.FC<
               recommendationSource: "database",
             }));
 
-            setVectorRecommendations(supabaseItems);
             setProgress(90);
 
             // If we already have AI recommendations, combine them
@@ -176,90 +169,44 @@ const EnhancedRecommendationEngine: React.FC<
             } else {
               setRecommendations(supabaseItems);
             }
+          } else {
+            // If no similar content found in Supabase, use the OMDB API
+            setStatusMessage("Finding similar content via OMDB API...");
 
-            setProgress(100);
-            setStatusMessage("Recommendations generated successfully");
-            onRecommendationsGenerated(recommendations);
-            setIsLoading(false);
-            return;
+            // Get the original content details
+            const originalContent = await getContentById(contentId);
+
+            if (originalContent) {
+              // Use the title and genre to find similar content
+              const { searchContent } = await import("@/lib/omdbClient");
+              const searchResults = await searchContent(
+                originalContent.genre_strings
+                  ? `${originalContent.genre_strings[0]} ${originalContent.title.split(" ")[0]}`
+                  : originalContent.title,
+                originalContent.media_type,
+              );
+
+              if (searchResults.length > 0) {
+                const similarItems = searchResults
+                  .filter((item) => item.id !== contentId) // Filter out the original content
+                  .map((item) => ({
+                    ...item,
+                    recommendationReason: `Similar to ${originalContent.title}`,
+                    recommendationSource: "database",
+                  }));
+
+                setRecommendations(similarItems.slice(0, limit));
+              }
+            }
           }
         } catch (dbError) {
           console.error(
             "Error fetching similar content from database:",
             dbError,
           );
-          // Fall back to vector database if Supabase query fails
-        }
-
-        // If no results from Supabase, fall back to vector database
-        setStatusMessage("Querying vector database for similar content...");
-
-        // Get similar content IDs from vector database
-        const similarIds = await querySimilarContent(
-          contentId,
-          undefined,
-          limit,
-        );
-
-        if (similarIds.length > 0) {
-          setStatusMessage("Fetching details for vector recommendations...");
-
-          // Fetch content details for each ID
-          const vectorItems = await Promise.all(
-            similarIds.map(async (id) => {
-              try {
-                const content = await getContentById(id);
-
-                // If content is found, store it in Supabase for future queries
-                if (content) {
-                  try {
-                    const { addContentToSupabase, addContentSimilarity } =
-                      await import("../lib/supabaseClient");
-                    await addContentToSupabase(content);
-                    await addContentSimilarity(contentId, id, 0.8); // Default similarity score
-                  } catch (storeError) {
-                    console.error(
-                      `Error storing content in database:`,
-                      storeError,
-                    );
-                    // Continue even if storing fails
-                  }
-                }
-
-                return content
-                  ? ({
-                      ...content,
-                      recommendationReason:
-                        "Similar content based on vector similarity",
-                      recommendationSource: "vector",
-                    } as ContentItem)
-                  : null;
-              } catch (err) {
-                console.error(`Error fetching content for ID ${id}:`, err);
-                return null;
-              }
-            }),
+          setError(
+            "Could not retrieve similar content. Please try again later.",
           );
-
-          const validVectorItems = vectorItems.filter(Boolean) as ContentItem[];
-          setVectorRecommendations(validVectorItems);
-          setProgress(90);
-
-          // If we have both AI and vector recommendations, combine them
-          if (recommendations.length > 0) {
-            // Combine and deduplicate
-            const combinedRecs = [...recommendations];
-
-            for (const vectorItem of validVectorItems) {
-              if (!combinedRecs.some((item) => item.id === vectorItem.id)) {
-                combinedRecs.push(vectorItem as ContentItem);
-              }
-            }
-
-            setRecommendations(combinedRecs.slice(0, limit));
-          } else {
-            setRecommendations(validVectorItems);
-          }
         }
       }
 
@@ -326,10 +273,10 @@ const EnhancedRecommendationEngine: React.FC<
 
   // Filter recommendations based on active tab
   const filteredRecommendations =
-    activeTab === "hybrid"
-      ? recommendations
+    activeTab === "ai"
+      ? recommendations.filter((item) => item.recommendationSource === "ai")
       : recommendations.filter(
-          (item) => item.recommendationSource === activeTab,
+          (item) => item.recommendationSource === "database",
         );
 
   return (
@@ -384,35 +331,19 @@ const EnhancedRecommendationEngine: React.FC<
           {recommendations.length > 0 && (
             <div>
               <Tabs
-                defaultValue="hybrid"
+                defaultValue="ai"
                 onValueChange={(value) => setActiveTab(value as any)}
               >
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="hybrid" className="flex items-center">
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Hybrid
-                  </TabsTrigger>
+                <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="ai" className="flex items-center">
                     <Brain className="mr-2 h-4 w-4" />
-                    AI
+                    AI Recommendations
                   </TabsTrigger>
-                  <TabsTrigger value="vector" className="flex items-center">
-                    <Database className="mr-2 h-4 w-4" />
-                    Vector
+                  <TabsTrigger value="database" className="flex items-center">
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Similar Content
                   </TabsTrigger>
                 </TabsList>
-
-                <TabsContent value="hybrid" className="mt-4">
-                  <h3 className="text-lg font-medium mb-2">
-                    Hybrid Recommendations
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Combined recommendations from both AI and vector similarity
-                  </p>
-                  <RecommendationList
-                    recommendations={filteredRecommendations}
-                  />
-                </TabsContent>
 
                 <TabsContent value="ai" className="mt-4">
                   <h3 className="text-lg font-medium mb-2">
@@ -428,12 +359,11 @@ const EnhancedRecommendationEngine: React.FC<
                   />
                 </TabsContent>
 
-                <TabsContent value="vector" className="mt-4">
-                  <h3 className="text-lg font-medium mb-2">
-                    Vector Similarity Recommendations
-                  </h3>
+                <TabsContent value="database" className="mt-4">
+                  <h3 className="text-lg font-medium mb-2">Similar Content</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Recommendations based on content vector similarity
+                    Recommendations based on content similarity from our
+                    database
                   </p>
                   <RecommendationList
                     recommendations={filteredRecommendations}
@@ -513,7 +443,7 @@ const RecommendationList: React.FC<RecommendationListProps> = ({
                       {item.recommendationSource === "ai" ? (
                         <Brain className="mr-1 h-3 w-3" />
                       ) : (
-                        <Database className="mr-1 h-3 w-3" />
+                        <Sparkles className="mr-1 h-3 w-3" />
                       )}
                       {item.recommendationReason}
                     </Badge>
