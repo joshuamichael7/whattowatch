@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Loader2, ShieldCheck } from "lucide-react";
+import { AlertCircle, Loader2, ShieldCheck, Check } from "lucide-react";
 
 const AdminPasswordReset: React.FC = () => {
   const [newPassword, setNewPassword] = useState("");

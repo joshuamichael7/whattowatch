@@ -257,8 +257,9 @@ exports.handler = async (event) => {
 
           // Add detailed logging
           console.log("Password verification details:", {
-            providedPassword: password,
-            storedHash: credData.password_hash,
+            providedPasswordLength: password.length,
+            storedHashLength: credData.password_hash.length,
+            storedHashPrefix: credData.password_hash.substring(0, 7),
             bcryptVersion: bcrypt.version || "unknown",
           });
 
