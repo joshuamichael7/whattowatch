@@ -255,17 +255,43 @@ exports.handler = async (event) => {
             };
           }
 
-          // Compare the password
-          const isValid = await bcrypt.compare(
-            password,
-            credData.password_hash,
-          );
+          // Add detailed logging
+          console.log("Password verification details:", {
+            providedPassword: password,
+            storedHash: credData.password_hash,
+            bcryptVersion: bcrypt.version || "unknown",
+          });
 
-          return {
-            statusCode: 200,
-            headers,
-            body: JSON.stringify({ success: isValid }),
-          };
+          // Try to compare the password
+          try {
+            const isValid = await bcrypt.compare(
+              password,
+              credData.password_hash,
+            );
+
+            console.log("Password verification result:", {
+              isValid,
+              passwordLength: password.length,
+              hashLength: credData.password_hash.length,
+            });
+
+            return {
+              statusCode: 200,
+              headers,
+              body: JSON.stringify({ success: isValid }),
+            };
+          } catch (bcryptError) {
+            console.error("bcrypt.compare error:", bcryptError);
+            return {
+              statusCode: 200,
+              headers,
+              body: JSON.stringify({
+                success: false,
+                error: bcryptError.message,
+                debug: true,
+              }),
+            };
+          }
         } catch (error) {
           console.error("Error in verifyAdminPassword:", error);
           return {
