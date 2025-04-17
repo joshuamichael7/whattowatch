@@ -1317,38 +1317,77 @@ async function getTrendingContentFallback(
       `[getTrendingContentFallback] API fetch completed in ${endTime - startTime}ms`,
     );
 
-    if (!data || !Array.isArray(data.results) || data.results.length === 0) {
+    // Check if we have results in the expected format
+    if (
+      data &&
+      data.results &&
+      Array.isArray(data.results) &&
+      data.results.length > 0
+    ) {
       console.log(
-        `[getTrendingContentFallback] No results returned from function, data:`,
-        data,
+        `[getTrendingContentFallback] Received ${data.results.length} results`,
       );
-      throw new Error("No results returned from function");
+
+      // Format the results to match ContentItem format
+      const formattedResults = data.results.map((item: any) => ({
+        id: item.imdbID,
+        title: item.Title,
+        poster_path: item.Poster !== "N/A" ? item.Poster : "",
+        media_type: item.Type === "movie" ? "movie" : "tv",
+        release_date: item.Year,
+        vote_average: item.imdbRating ? parseFloat(item.imdbRating) : 0,
+        vote_count: item.imdbVotes
+          ? parseInt(item.imdbVotes.replace(/,/g, ""))
+          : 0,
+        genre_ids: [],
+        overview: "",
+        recommendationReason: `Trending ${item.Type === "movie" ? "movie" : "TV show"}`,
+      }));
+
+      console.log(
+        `[getTrendingContentFallback] Returning ${formattedResults.length} formatted results`,
+      );
+      return formattedResults.slice(0, limit);
+    }
+    // Check if we have results in the Search format (OMDB API format)
+    else if (
+      data &&
+      data.Search &&
+      Array.isArray(data.Search) &&
+      data.Search.length > 0
+    ) {
+      console.log(
+        `[getTrendingContentFallback] Received ${data.Search.length} results in Search format`,
+      );
+
+      // Format the results to match ContentItem format
+      const formattedResults = data.Search.map((item: any) => ({
+        id: item.imdbID,
+        title: item.Title,
+        poster_path: item.Poster !== "N/A" ? item.Poster : "",
+        media_type: item.Type === "movie" ? "movie" : "tv",
+        release_date: item.Year,
+        vote_average: item.imdbRating ? parseFloat(item.imdbRating) : 0,
+        vote_count: 0, // Not available in this format
+        genre_ids: [],
+        overview: "",
+        recommendationReason: `Trending ${item.Type === "movie" ? "movie" : "TV show"}`,
+      }));
+
+      console.log(
+        `[getTrendingContentFallback] Returning ${formattedResults.length} formatted results from Search`,
+      );
+      return formattedResults.slice(0, limit);
     }
 
+    // If we reach here, we didn't find any usable results
     console.log(
-      `[getTrendingContentFallback] Received ${data.results.length} results`,
+      `[getTrendingContentFallback] No usable results found in response, data:`,
+      data,
     );
 
-    // Format the results to match ContentItem format
-    const formattedResults = data.results.map((item: any) => ({
-      id: item.imdbID,
-      title: item.Title,
-      poster_path: item.Poster !== "N/A" ? item.Poster : "",
-      media_type: item.Type === "movie" ? "movie" : "tv",
-      release_date: item.Year,
-      vote_average: item.imdbRating ? parseFloat(item.imdbRating) : 0,
-      vote_count: item.imdbVotes
-        ? parseInt(item.imdbVotes.replace(/,/g, ""))
-        : 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: `Trending ${item.Type === "movie" ? "movie" : "TV show"}`,
-    }));
-
-    console.log(
-      `[getTrendingContentFallback] Returning ${formattedResults.length} formatted results`,
-    );
-    return formattedResults.slice(0, limit);
+    // Return empty array instead of throwing an error
+    return [];
   } catch (error) {
     console.error(
       `[getTrendingContentFallback] Error fetching content:`,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Search as SearchIcon,
@@ -6,6 +6,7 @@ import {
   ListFilter,
   PlayCircle,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import UserProfileButton from "./UserProfileButton";
@@ -14,8 +15,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 
-// Import the OMDB client functions
-import { getTrendingContent, getContentById } from "@/lib/omdbClient";
+// Import the custom hook for trending content
+import { useTrendingContent } from "@/hooks/useTrendingContent";
 
 // Define interfaces for OMDB API responses
 interface OmdbSearchResponse {
@@ -38,104 +39,22 @@ interface OmdbMovie {
 const USE_DIRECT_API = false;
 
 const HomePage = () => {
-  const [trendingMovies, setTrendingMovies] = useState<OmdbMovie[]>([]);
-  const [popularTVShows, setPopularTVShows] = useState<OmdbMovie[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchValue, setSearchValue] = useState("");
+  const [searchResults, setSearchResults] = useState<OmdbMovie[]>([]);
+  const [searchIsLoading, setSearchIsLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchContent = async () => {
-      console.log("[HomePage] Starting content fetch");
-      const startTime = performance.now();
-      console.log(
-        "[HomePage] Starting content fetch at",
-        new Date().toISOString(),
-      );
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        // Fetch trending content using the edge function
-        console.log("[HomePage] Fetching trending movies using edge function");
-        const movieData = await getTrendingContent("movie", 4);
-        console.log(
-          `[HomePage] Movie data type: ${typeof movieData}, isArray: ${Array.isArray(movieData)}`,
-        );
-        console.log(`[HomePage] Received ${movieData.length} movies`);
-        if (movieData.length > 0) {
-          console.log(
-            `[HomePage] First movie: ${JSON.stringify(movieData[0])}`,
-          );
-        }
-
-        console.log(
-          "[HomePage] Fetching trending TV shows using edge function",
-        );
-        const tvData = await getTrendingContent("tv", 4);
-        console.log(`[HomePage] Received ${tvData.length} TV shows`);
-        if (tvData.length > 0) {
-          console.log(`[HomePage] First TV show: ${JSON.stringify(tvData[0])}`);
-        }
-
-        // Simple transformation to match the component's expected format
-        const formattedMovies = movieData.map((movie) => ({
-          Title: movie.title || "Unknown Title",
-          Year: movie.release_date || "Unknown Year",
-          imdbID:
-            movie.id || `unknown-${Math.random().toString(36).substring(2, 9)}`,
-          Type: "movie",
-          Poster: movie.poster_path || "",
-          imdbRating:
-            movie.vote_average !== undefined
-              ? movie.vote_average.toString()
-              : "0",
-        }));
-
-        const formattedShows = tvData.map((show) => ({
-          Title: show.title || "Unknown Title",
-          Year: show.release_date || show.first_air_date || "Unknown Year",
-          imdbID:
-            show.id || `unknown-${Math.random().toString(36).substring(2, 9)}`,
-          Type: "series",
-          Poster: show.poster_path || "",
-          imdbRating:
-            show.vote_average !== undefined
-              ? show.vote_average.toString()
-              : "0",
-        }));
-
-        console.log(
-          `[HomePage] Formatted ${formattedMovies.length} movies and ${formattedShows.length} TV shows`,
-        );
-
-        // Update state with the fetched content
-        setTrendingMovies(formattedMovies);
-        setPopularTVShows(formattedShows);
-
-        const endTime = performance.now();
-        console.log(
-          `[HomePage] Total fetch and processing time: ${endTime - startTime}ms`,
-        );
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "An unknown error occurred",
-        );
-        console.error("[HomePage] Error fetching data:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchContent();
-  }, []);
+  // Use the custom hook to fetch trending content
+  const { trendingMovies, popularTVShows, isLoading, error, refetch } =
+    useTrendingContent();
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchValue.trim()) return;
 
     try {
-      setIsLoading(true);
+      setSearchIsLoading(true);
+      setSearchError(null);
       // Use Netlify function to search
       const response = await fetch(
         `/.netlify/functions/omdb?s=${encodeURIComponent(searchValue)}&type=movie,series`,
@@ -148,13 +67,14 @@ const HomePage = () => {
 
       // Process results here
       console.log("Search results:", data);
-      // You could update state with search results here
+      setSearchResults(data.Search || []);
     } catch (err) {
-      setError(
+      setSearchError(
         err instanceof Error ? err.message : "An unknown error occurred",
       );
+      console.error("Search error:", err);
     } finally {
-      setIsLoading(false);
+      setSearchIsLoading(false);
     }
   };
 
@@ -227,9 +147,21 @@ const HomePage = () => {
               <h2 className="text-2xl font-bold tracking-tight">
                 Trending Now
               </h2>
-              <Button variant="outline" size="sm">
-                View All
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetch()}
+                  disabled={isLoading}
+                  className="flex items-center gap-1"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </Button>
+                <Button variant="outline" size="sm">
+                  View All
+                </Button>
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {isLoading ? (
@@ -261,6 +193,7 @@ const HomePage = () => {
                     rating={movie.imdbRating || "N/A"}
                     image={movie.Poster}
                     id={movie.imdbID}
+                    type={movie.Type}
                   />
                 ))
               )}
@@ -306,6 +239,7 @@ const HomePage = () => {
                     rating={show.imdbRating || "N/A"}
                     image={show.Poster}
                     id={show.imdbID}
+                    type={show.Type}
                   />
                 ))
               )}
@@ -332,19 +266,68 @@ const HomePage = () => {
                   value={searchValue}
                   onChange={(e) => setSearchValue(e.target.value)}
                 />
-                <Button type="submit">
-                  <SearchIcon className="h-4 w-4 mr-2" />
+                <Button type="submit" disabled={searchIsLoading}>
+                  {searchIsLoading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <SearchIcon className="h-4 w-4 mr-2" />
+                  )}
                   Search
                 </Button>
               </form>
             </div>
 
-            <div className="mt-12 text-center text-muted-foreground">
-              <Film className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>
-                Search for your favorite content to see similar recommendations
-              </p>
-            </div>
+            {searchIsLoading ? (
+              <div className="flex justify-center items-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2">Searching...</span>
+              </div>
+            ) : searchError ? (
+              <div className="text-center py-8 text-destructive">
+                <p>{searchError}</p>
+                <Button
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => setSearchError(null)}
+                >
+                  Try Again
+                </Button>
+              </div>
+            ) : searchResults.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {searchResults.map((item) =>
+                  item.Type === "series" ? (
+                    <TVShowCard
+                      key={item.imdbID}
+                      title={item.Title}
+                      year={item.Year}
+                      rating={item.imdbRating || "N/A"}
+                      image={item.Poster}
+                      id={item.imdbID}
+                      type={item.Type}
+                    />
+                  ) : (
+                    <MovieCard
+                      key={item.imdbID}
+                      title={item.Title}
+                      year={item.Year}
+                      rating={item.imdbRating || "N/A"}
+                      image={item.Poster}
+                      id={item.imdbID}
+                      type={item.Type}
+                    />
+                  ),
+                )}
+              </div>
+            ) : (
+              <div className="mt-12 text-center text-muted-foreground">
+                <Film className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>
+                  Search for your favorite content to see similar
+                  recommendations
+                </p>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="quiz" className="space-y-6">
@@ -502,6 +485,7 @@ interface MediaCardProps {
   rating?: string;
   image?: string;
   id?: string;
+  type?: string;
 }
 
 const MovieCard = ({
@@ -511,15 +495,24 @@ const MovieCard = ({
   image = "",
   id,
 }: MediaCardProps) => {
-  console.log(`MovieCard: title=${title}, image=${image}`);
+  // Handle case where image is N/A or empty
+  const posterUrl =
+    image && image !== "N/A"
+      ? image
+      : "https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=500&q=80";
+
   return (
     <Link to={id ? `/movie/${id}` : "#"} className="block">
       <Card className="overflow-hidden group cursor-pointer hover:shadow-md transition-shadow">
         <div className="aspect-[2/3] relative overflow-hidden bg-muted">
           <img
-            src={image}
+            src={posterUrl}
             alt={title}
             className="object-cover w-full h-full transition-transform group-hover:scale-105"
+            onError={(e) => {
+              e.currentTarget.src =
+                "https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=500&q=80";
+            }}
           />
           <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm text-xs font-medium py-1 px-2 rounded-md">
             {rating}
@@ -541,15 +534,24 @@ const TVShowCard = ({
   image = "",
   id,
 }: MediaCardProps) => {
-  console.log(`TVShowCard: title=${title}, image=${image}`);
+  // Handle case where image is N/A or empty
+  const posterUrl =
+    image && image !== "N/A"
+      ? image
+      : "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=500&q=80";
+
   return (
     <Link to={id ? `/tv/${id}` : "#"} className="block">
       <Card className="overflow-hidden group cursor-pointer hover:shadow-md transition-shadow">
         <div className="aspect-[2/3] relative overflow-hidden bg-muted">
           <img
-            src={image}
+            src={posterUrl}
             alt={title}
             className="object-cover w-full h-full transition-transform group-hover:scale-105"
+            onError={(e) => {
+              e.currentTarget.src =
+                "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=500&q=80";
+            }}
           />
           <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm text-xs font-medium py-1 px-2 rounded-md">
             {rating}
