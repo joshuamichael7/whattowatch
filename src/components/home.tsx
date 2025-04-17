@@ -46,6 +46,7 @@ const HomePage = () => {
 
   useEffect(() => {
     const fetchContent = async () => {
+      console.log("[HomePage] Starting content fetch");
       const startTime = performance.now();
       console.log(
         "[HomePage] Starting content fetch at",
@@ -58,13 +59,24 @@ const HomePage = () => {
         // Fetch trending content using the edge function
         console.log("[HomePage] Fetching trending movies using edge function");
         const movieData = await getTrendingContent("movie", 4);
+        console.log(
+          `[HomePage] Movie data type: ${typeof movieData}, isArray: ${Array.isArray(movieData)}`,
+        );
         console.log(`[HomePage] Received ${movieData.length} movies`);
+        if (movieData.length > 0) {
+          console.log(
+            `[HomePage] First movie: ${JSON.stringify(movieData[0])}`,
+          );
+        }
 
         console.log(
           "[HomePage] Fetching trending TV shows using edge function",
         );
         const tvData = await getTrendingContent("tv", 4);
         console.log(`[HomePage] Received ${tvData.length} TV shows`);
+        if (tvData.length > 0) {
+          console.log(`[HomePage] First TV show: ${JSON.stringify(tvData[0])}`);
+        }
 
         // Simple transformation to match the component's expected format
         const formattedMovies = movieData.map((movie) => ({
@@ -92,6 +104,10 @@ const HomePage = () => {
               ? show.vote_average.toString()
               : "0",
         }));
+
+        console.log(
+          `[HomePage] Formatted ${formattedMovies.length} movies and ${formattedShows.length} TV shows`,
+        );
 
         // Update state with the fetched content
         setTrendingMovies(formattedMovies);
@@ -551,17 +567,19 @@ const TVShowCard = ({
 const FeatureCard = ({
   icon,
   title = "Feature Title",
-  description = "Feature description goes here.",
+  description = "Feature description",
+}: {
+  icon: React.ReactNode;
+  title?: string;
+  description?: string;
 }) => {
   return (
-    <Card>
-      <CardContent className="p-6 text-center space-y-4">
-        <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-          {icon}
-        </div>
-        <h3 className="text-lg font-semibold">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </CardContent>
+    <Card className="p-6 flex flex-col items-center text-center">
+      <div className="p-3 rounded-full bg-primary/10 text-primary mb-4">
+        {icon}
+      </div>
+      <h3 className="text-lg font-semibold mb-2">{title}</h3>
+      <p className="text-sm text-muted-foreground">{description}</p>
     </Card>
   );
 };

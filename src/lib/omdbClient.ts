@@ -1231,6 +1231,52 @@ export async function getTrendingContent(
   console.log(
     `[getTrendingContent] Fetching ${type || "all"} content using regular function`,
   );
+
+  // Add detailed logging to troubleshoot
+  console.log(`[getTrendingContent] Checking if Supabase is configured`);
+  const { isSupabaseConfigured } = await import("./supabaseClient");
+  const supabaseConfigured = isSupabaseConfigured();
+  console.log(
+    `[getTrendingContent] Supabase configured: ${supabaseConfigured}`,
+  );
+
+  if (supabaseConfigured) {
+    try {
+      const { getTrendingContentFromSupabase } = await import(
+        "./supabaseClient"
+      );
+      console.log(
+        `[getTrendingContent] Calling getTrendingContentFromSupabase with type=${type}, limit=${limit}`,
+      );
+      const supabaseResults = await getTrendingContentFromSupabase(type, limit);
+      console.log(
+        `[getTrendingContent] Supabase returned ${supabaseResults?.length || 0} results`,
+      );
+
+      if (supabaseResults && supabaseResults.length > 0) {
+        console.log(`[getTrendingContent] Using results from Supabase`);
+        if (supabaseResults.length > 0) {
+          console.log(
+            `[getTrendingContent] First result: ${supabaseResults[0].id}, ${supabaseResults[0].title}`,
+          );
+        }
+        return supabaseResults;
+      }
+
+      console.log(
+        `[getTrendingContent] No results from Supabase, falling back to Netlify function`,
+      );
+    } catch (error) {
+      console.error(
+        `[getTrendingContent] Error getting content from Supabase:`,
+        error,
+      );
+      console.log(
+        `[getTrendingContent] Falling back to Netlify function due to error`,
+      );
+    }
+  }
+
   return getTrendingContentFallback(type, limit);
 }
 
@@ -1256,6 +1302,9 @@ async function getTrendingContentFallback(
     }
 
     // Fetch content from the regular function
+    console.log(
+      `[getTrendingContentFallback] Calling Netlify function with params: ${params.toString()}`,
+    );
     const response = await fetch(`${API_ENDPOINT}?${params.toString()}`);
 
     if (!response.ok) {
@@ -1269,8 +1318,16 @@ async function getTrendingContentFallback(
     );
 
     if (!data || !Array.isArray(data.results) || data.results.length === 0) {
+      console.log(
+        `[getTrendingContentFallback] No results returned from function, data:`,
+        data,
+      );
       throw new Error("No results returned from function");
     }
+
+    console.log(
+      `[getTrendingContentFallback] Received ${data.results.length} results`,
+    );
 
     // Format the results to match ContentItem format
     const formattedResults = data.results.map((item: any) => ({
@@ -1288,6 +1345,9 @@ async function getTrendingContentFallback(
       recommendationReason: `Trending ${item.Type === "movie" ? "movie" : "TV show"}`,
     }));
 
+    console.log(
+      `[getTrendingContentFallback] Returning ${formattedResults.length} formatted results`,
+    );
     return formattedResults.slice(0, limit);
   } catch (error) {
     console.error(

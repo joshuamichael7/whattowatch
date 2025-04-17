@@ -364,6 +364,10 @@ export async function getTrendingContentFromSupabase(
   type?: "movie" | "tv",
   limit: number = 8,
 ): Promise<ContentItem[]> {
+  console.log(
+    `[supabaseClient] Getting trending ${type || "all"} content, limit: ${limit}`,
+  );
+
   if (!isSupabaseConfigured()) {
     console.warn(
       "[supabaseClient] Supabase not configured, skipping getTrendingContent",
@@ -371,21 +375,47 @@ export async function getTrendingContentFromSupabase(
     return [];
   }
 
+  console.log("[supabaseClient] Supabase URL:", supabaseUrl);
+  console.log("[supabaseClient] Supabase key exists:", !!supabaseKey);
+
   try {
+    console.log("[supabaseClient] Building query for content table");
     let query = supabase
       .from("content")
       .select("*")
       .order("popularity", { ascending: false });
 
     if (type) {
+      console.log(`[supabaseClient] Filtering by media_type: ${type}`);
       query = query.eq("media_type", type);
     }
 
+    console.log("[supabaseClient] Executing query with limit:", limit);
     const { data, error } = await query.limit(limit);
 
     if (error) {
       console.error("[supabaseClient] Error getting trending content:", error);
       return [];
+    }
+
+    console.log(`[supabaseClient] Query returned ${data?.length || 0} results`);
+    if (data && data.length > 0) {
+      console.log("[supabaseClient] First result:", data[0].id, data[0].title);
+    } else {
+      console.log("[supabaseClient] No results found in content table");
+      // Let's check if the table exists and has data
+      try {
+        const { count, error: countError } = await supabase
+          .from("content")
+          .select("*", { count: "exact", head: true });
+
+        console.log(
+          `[supabaseClient] Total count in content table: ${count}`,
+          countError ? `Error: ${countError.message}` : "",
+        );
+      } catch (countErr) {
+        console.error("[supabaseClient] Error counting content:", countErr);
+      }
     }
 
     return data as ContentItem[];
