@@ -41,7 +41,7 @@ const AdminPasswordForm: React.FC<AdminPasswordFormProps> = ({
 
       if (success) {
         console.log("Admin password verified successfully");
-        // Just call onSuccess without any parameters
+        // Call onSuccess and ensure we don't reload the page
         if (typeof onSuccess === "function") {
           onSuccess();
         }

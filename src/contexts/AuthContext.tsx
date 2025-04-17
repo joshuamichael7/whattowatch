@@ -29,7 +29,10 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAdminVerified, setIsAdminVerified] = useState(false);
+  const [isAdminVerified, setIsAdminVerified] = useState(() => {
+    // Check if admin was previously verified in this session
+    return localStorage.getItem("isAdminVerified") === "true";
+  });
 
   // Initialize auth state
   useEffect(() => {
@@ -56,6 +59,12 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
           if (isMounted) {
             console.log("[AuthContext] Profile loaded:", userProfile);
             setProfile(userProfile);
+
+            // If user is not admin, clear admin verification
+            if (userProfile?.role !== "admin") {
+              localStorage.removeItem("isAdminVerified");
+              setIsAdminVerified(false);
+            }
           }
         }
       } catch (error) {
@@ -143,7 +152,9 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("[AuthContext] Verification response:", data);
 
       if (data.success) {
+        // Set admin verified state and persist it in localStorage
         setIsAdminVerified(true);
+        localStorage.setItem("isAdminVerified", "true");
         return true;
       }
 

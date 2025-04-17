@@ -100,8 +100,8 @@ const AdminDashboard: React.FC = () => {
       <AdminPasswordForm
         onSuccess={() => {
           console.log("Admin password verified, setting admin verified");
-          // Instead of refreshing profile, we can just set a state variable
-          window.location.reload();
+          // Don't reload the page, just update the state
+          refreshProfile();
         }}
       />
     );
