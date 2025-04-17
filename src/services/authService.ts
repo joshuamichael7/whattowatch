@@ -103,24 +103,71 @@ export async function getUserProfile(
     console.log("[getUserProfile] Table being queried:", "users");
 
     // First, check if the table exists and is accessible
-    const { data: tableCheck, error: tableError } = await supabase
+    console.log("[getUserProfile] STEP 1: Checking if table exists");
+    const tableCheckQuery = supabase
       .from("users")
       .select("count(*)", { count: "exact", head: true });
+
+    console.log("[getUserProfile] Table check query:", tableCheckQuery.toURL());
+    const {
+      data: tableCheck,
+      error: tableError,
+      count: tableCount,
+    } = await tableCheckQuery;
 
     console.log("[getUserProfile] Table check result:", {
       tableCheck,
       tableError,
+      tableCount,
+      status: tableError ? "ERROR" : "SUCCESS",
     });
 
-    // Now try to get the specific user - either by ID or email
+    if (tableError) {
+      console.error("[getUserProfile] Table check failed:", {
+        code: tableError.code,
+        message: tableError.message,
+        details: tableError.details,
+        hint: tableError.hint,
+      });
+      return { data: null, error: tableError };
+    }
+
+    // STEP 2: Try to get all users to see if any exist
+    console.log("[getUserProfile] STEP 2: Checking for any users in table");
+    const allUsersQuery = supabase
+      .from("users")
+      .select("id, email, role")
+      .limit(5);
+
+    console.log("[getUserProfile] All users query:", allUsersQuery.toURL());
+    const { data: allUsers, error: allUsersError } = await allUsersQuery;
+
+    console.log("[getUserProfile] All users result:", {
+      userCount: allUsers?.length || 0,
+      users: allUsers,
+      error: allUsersError,
+      status: allUsersError ? "ERROR" : "SUCCESS",
+    });
+
+    // STEP 3: Now try to get the specific user - either by ID or email
+    console.log(
+      `[getUserProfile] STEP 3: Looking up specific user by ${isEmail ? "email" : "ID"}: ${userIdOrEmail}`,
+    );
     const query = supabase.from("users").select("*");
 
     // Apply the appropriate filter based on whether we're using email or ID
-    const { data, error } = await (isEmail
+    const specificQuery = isEmail
       ? query.eq("email", userIdOrEmail).single()
-      : query.eq("id", userIdOrEmail).single());
+      : query.eq("id", userIdOrEmail).single();
 
-    console.log("[getUserProfile] Query result:", { data, error });
+    console.log("[getUserProfile] Specific user query:", specificQuery.toURL());
+    const { data, error } = await specificQuery;
+
+    console.log("[getUserProfile] Specific user query result:", {
+      data,
+      error,
+      status: error ? "ERROR" : "SUCCESS",
+    });
 
     if (error) {
       console.error("[getUserProfile] Error details:", {
@@ -136,6 +183,42 @@ export async function getUserProfile(
         console.log(
           "[getUserProfile] User not found by ID, not creating default profile automatically",
         );
+      }
+
+      // STEP 4: If lookup by email fails, try a case-insensitive search
+      if (isEmail && error.code === "PGRST116") {
+        console.log(
+          "[getUserProfile] STEP 4: Email lookup failed, trying case-insensitive search",
+        );
+        const caseInsensitiveQuery = supabase
+          .from("users")
+          .select("*")
+          .ilike("email", userIdOrEmail)
+          .single();
+
+        console.log(
+          "[getUserProfile] Case-insensitive query:",
+          caseInsensitiveQuery.toURL(),
+        );
+        const { data: caseData, error: caseError } = await caseInsensitiveQuery;
+
+        console.log("[getUserProfile] Case-insensitive result:", {
+          data: caseData,
+          error: caseError,
+          status: caseError ? "ERROR" : "SUCCESS",
+        });
+
+        if (!caseError && caseData) {
+          console.log(
+            "[getUserProfile] Found user with case-insensitive search:",
+            {
+              id: caseData.id,
+              email: caseData.email,
+              role: caseData.role,
+            },
+          );
+          return { data: caseData, error: null };
+        }
       }
     }
 
@@ -170,14 +253,103 @@ export async function checkUserProfileExists(
       userIdOrEmail,
     );
 
+    // STEP 1: First check if the table exists and is accessible
+    console.log("[checkUserProfileExists] STEP 1: Checking if table exists");
+    const tableCheckQuery = supabase
+      .from("users")
+      .select("count(*)", { count: "exact", head: true });
+
+    console.log(
+      "[checkUserProfileExists] Table check query:",
+      tableCheckQuery.toURL(),
+    );
+    const {
+      data: tableCheck,
+      error: tableError,
+      count: tableCount,
+    } = await tableCheckQuery;
+
+    console.log("[checkUserProfileExists] Table check result:", {
+      tableCheck,
+      tableError,
+      tableCount,
+      status: tableError ? "ERROR" : "SUCCESS",
+    });
+
+    if (tableError) {
+      console.error("[checkUserProfileExists] Table check failed:", {
+        code: tableError.code,
+        message: tableError.message,
+        details: tableError.details,
+        hint: tableError.hint,
+      });
+      return { exists: false, error: tableError };
+    }
+
+    // STEP 2: Check for the specific user
+    console.log(
+      `[checkUserProfileExists] STEP 2: Checking for specific ${isEmail ? "email" : "ID"}: ${userIdOrEmail}`,
+    );
     const query = supabase
       .from("users")
       .select("id", { count: "exact", head: true });
 
     // Apply the appropriate filter based on whether we're using email or ID
-    const { count, error } = await (isEmail
+    const specificQuery = isEmail
       ? query.eq("email", userIdOrEmail)
-      : query.eq("id", userIdOrEmail));
+      : query.eq("id", userIdOrEmail);
+
+    console.log(
+      "[checkUserProfileExists] Specific check query:",
+      specificQuery.toURL(),
+    );
+    const { count, error } = await specificQuery;
+
+    console.log("[checkUserProfileExists] Specific check result:", {
+      count,
+      error,
+      status: error ? "ERROR" : "SUCCESS",
+    });
+
+    if (error) {
+      console.error("[checkUserProfileExists] Error checking profile:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      return { exists: false, error };
+    }
+
+    // STEP 3: If email check fails, try case-insensitive search
+    if (isEmail && (count === null || count === 0)) {
+      console.log(
+        "[checkUserProfileExists] STEP 3: Email check returned no results, trying case-insensitive search",
+      );
+      const caseInsensitiveQuery = supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .ilike("email", userIdOrEmail);
+
+      console.log(
+        "[checkUserProfileExists] Case-insensitive query:",
+        caseInsensitiveQuery.toURL(),
+      );
+      const { count: caseCount, error: caseError } = await caseInsensitiveQuery;
+
+      console.log("[checkUserProfileExists] Case-insensitive result:", {
+        count: caseCount,
+        error: caseError,
+        status: caseError ? "ERROR" : "SUCCESS",
+      });
+
+      if (!caseError && caseCount !== null && caseCount > 0) {
+        console.log(
+          `[checkUserProfileExists] Found profile with case-insensitive search: ${caseCount} results`,
+        );
+        return { exists: true, error: null };
+      }
+    }
 
     const exists = count !== null && count > 0;
     console.log(`[checkUserProfileExists] Profile exists: ${exists}`);

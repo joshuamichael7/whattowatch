@@ -556,15 +556,51 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
     const hasAdminRole = profile?.role === "admin";
     console.log("[isAdmin check] Has admin role:", hasAdminRole);
 
-    // If we're having issues with the profile loading, add a fallback check
-    // for specific admin users by email
-    const adminEmails = ["joshmputnam@gmail.com"];
-    const isAdminByEmail =
-      currentUser?.email && adminEmails.includes(currentUser.email);
-    console.log("[isAdmin check] Is admin by email:", isAdminByEmail);
+    // If we have a profile with admin role, that's our source of truth
+    if (profile && hasAdminRole) {
+      return true;
+    }
 
-    // If we have a profile, use the role, otherwise use the email check
-    return hasAdminRole || isAdminByEmail;
+    // If we have a profile but not admin role, they're definitely not admin
+    if (profile && profile.role !== "admin") {
+      return false;
+    }
+
+    // If we don't have a profile yet, check if they're an admin in the database
+    // using a direct database query
+    if (currentUser?.email) {
+      // We'll use the RPC function to check if they're an admin
+      // This is an async operation but we can't use async in useMemo
+      // So we'll trigger it and update the state later
+      (async () => {
+        try {
+          console.log(
+            "[isAdmin check] Checking admin status via RPC for email:",
+            currentUser.email,
+          );
+          const { data, error } = await supabase.rpc("find_user_by_email", {
+            email_to_find: currentUser.email,
+          });
+
+          console.log("[isAdmin check] RPC result:", { data, error });
+
+          if (data && data.length > 0 && data[0].role === "admin") {
+            console.log("[isAdmin check] User is admin according to database");
+            // We found the user and they're an admin
+            // We can't update state here directly, but we can refresh the profile
+            refreshProfile();
+          }
+        } catch (error) {
+          console.error(
+            "[isAdmin check] Error checking admin status via RPC:",
+            error,
+          );
+        }
+      })();
+    }
+
+    // Default to false if we can't determine admin status yet
+    return false;
   }, [profile, currentUser?.email]);
 
   const value = {

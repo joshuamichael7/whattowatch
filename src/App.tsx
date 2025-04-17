@@ -12,6 +12,7 @@ import AdminDashboard from "./components/AdminDashboard";
 import { AuthProvider } from "./contexts/AuthContext";
 import { useAuth } from "./contexts/AuthContext";
 import AdminRoleDebugger from "./components/AdminRoleDebugger";
+import DebugPanel from "./components/DebugPanel";
 
 // Lazy load authentication components
 const Auth = lazy(() => import("./components/Auth"));
@@ -46,6 +47,7 @@ function App() {
               />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin-debug" element={<AdminRoleDebugger />} />
+              <Route path="/debug" element={<DebugPanel />} />
             </Routes>
           </>
         </Suspense>
