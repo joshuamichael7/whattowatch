@@ -52,23 +52,35 @@ exports.handler = async (event, context) => {
 
     // Handle multipart form data
     if (contentType && contentType.includes("multipart/form-data")) {
-      const form = formidable({
+      console.log("Processing multipart form data");
+
+      // Create a new formidable form instance
+      const form = new formidable.IncomingForm({
         uploadDir: tempDir,
-        filename: () => fileName,
         keepExtensions: true,
+        maxFileSize: 10 * 1024 * 1024, // 10MB limit
       });
 
       // Parse the form data
-      const [fields, files] = await new Promise((resolve, reject) => {
+      const formData = await new Promise((resolve, reject) => {
+        // Handle both modern and legacy formidable API formats
         form.parse(event, (err, fields, files) => {
-          if (err) return reject(err);
-          resolve([fields, files]);
+          if (err) {
+            console.error("Error parsing form:", err);
+            return reject(err);
+          }
+          resolve({ fields, files });
         });
       });
 
-      console.log("Files received:", files);
+      console.log("Form data parsed:", JSON.stringify(formData, null, 2));
 
-      if (!files || !files.file) {
+      // Extract the file from the parsed form data
+      const files = formData.files;
+      const fileField = files.file;
+
+      if (!fileField) {
+        console.error("No file found in the upload");
         return {
           statusCode: 400,
           headers,
@@ -76,11 +88,18 @@ exports.handler = async (event, context) => {
         };
       }
 
-      // Get the uploaded file path
-      const uploadedFile = files.file[0] || files.file;
-      const uploadedFilePath = uploadedFile.filepath || uploadedFile.path;
+      // Handle both array and direct object formats
+      const uploadedFile = Array.isArray(fileField) ? fileField[0] : fileField;
 
-      console.log("File uploaded successfully:", uploadedFilePath);
+      // Handle different property names in formidable versions
+      const uploadedFilePath = uploadedFile.filepath || uploadedFile.path;
+      const originalFilename =
+        uploadedFile.originalFilename || uploadedFile.name;
+
+      console.log("File uploaded successfully:", {
+        path: uploadedFilePath,
+        originalName: originalFilename,
+      });
 
       return {
         statusCode: 200,
@@ -89,6 +108,7 @@ exports.handler = async (event, context) => {
           success: true,
           message: "File uploaded successfully",
           filePath: uploadedFilePath,
+          originalName: originalFilename,
         }),
       };
     } else {
@@ -134,7 +154,7 @@ exports.handler = async (event, context) => {
       },
       body: JSON.stringify({
         error: "Internal Server Error",
-        details: error.message,
+        message: error.message,
         stack: error.stack,
       }),
     };

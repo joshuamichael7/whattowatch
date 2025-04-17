@@ -41,33 +41,52 @@ const CsvManagement: React.FC = () => {
     setResult(null);
 
     try {
-      // First, upload the file to a temporary location
-      const formData = new FormData();
-      formData.append("file", file);
+      console.log(
+        "Uploading file:",
+        file.name,
+        "Size:",
+        file.size,
+        "Type:",
+        file.type,
+      );
 
-      // Upload the file
+      // Read the file as base64
+      const fileReader = new FileReader();
+      const filePromise = new Promise((resolve, reject) => {
+        fileReader.onload = () => resolve(fileReader.result);
+        fileReader.onerror = () => reject(new Error("Failed to read file"));
+      });
+      fileReader.readAsDataURL(file);
+
+      // Wait for file to be read
+      const fileDataUrl = (await filePromise) as string;
+      // Remove the data URL prefix (e.g., "data:text/csv;base64,")
+      const base64Data = fileDataUrl.split(",")[1];
+
+      setProgress(30);
+
+      // Upload the file using the simple-upload function
       const uploadResponse = await axios.post(
-        "/.netlify/functions/upload-csv",
-        formData,
+        "/.netlify/functions/simple-upload",
+        { fileData: base64Data },
         {
           headers: {
-            "Content-Type": "multipart/form-data",
+            "Content-Type": "application/json",
             Authorization: `Bearer ${session?.access_token}`,
-          },
-          onUploadProgress: (progressEvent) => {
-            const percentCompleted = Math.round(
-              (progressEvent.loaded * 50) / (progressEvent.total || 100),
-            );
-            setProgress(10 + percentCompleted);
           },
         },
       );
 
+      console.log("Upload response:", uploadResponse.data);
       setProgress(60);
 
       // If upload successful, process the file
       if (uploadResponse.data.success) {
         const filePath = uploadResponse.data.filePath;
+        console.log(
+          "File uploaded successfully, processing at path:",
+          filePath,
+        );
 
         // Process the uploaded file
         const processResponse = await axios.post(
@@ -80,6 +99,7 @@ const CsvManagement: React.FC = () => {
           },
         );
 
+        console.log("Process response:", processResponse.data);
         setProgress(100);
         setResult({
           success: true,
@@ -91,10 +111,27 @@ const CsvManagement: React.FC = () => {
       }
     } catch (error: any) {
       console.error("Error uploading CSV:", error);
+      let errorDetails = error.message;
+
+      // Extract more detailed error information if available
+      if (error.response) {
+        console.error("Error response:", error.response);
+        errorDetails =
+          error.response.data?.error ||
+          error.response.data?.message ||
+          error.response.data ||
+          `Server error: ${error.response.status}`;
+
+        // If the error response contains a stack trace, log it but don't show to user
+        if (error.response.data?.stack) {
+          console.error("Error stack:", error.response.data.stack);
+        }
+      }
+
       setResult({
         success: false,
         message: "Error processing CSV file",
-        details: error.response?.data || error.message,
+        details: errorDetails,
       });
     } finally {
       setUploading(false);
