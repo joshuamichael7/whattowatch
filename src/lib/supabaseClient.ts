@@ -201,7 +201,8 @@ export async function searchContentInSupabase(
 
     // Apply type filter if specified
     if (type && type !== "all") {
-      const mediaType = type === "movie" ? "movie" : "tv";
+      // Convert 'tv' to 'series' for database compatibility
+      const mediaType = type === "movie" ? "movie" : "series";
       supabaseQuery = supabaseQuery.eq("media_type", mediaType);
     }
 
@@ -387,7 +388,9 @@ export async function getTrendingContentFromSupabase(
 
     if (type) {
       console.log(`[supabaseClient] Filtering by media_type: ${type}`);
-      query = query.eq("media_type", type);
+      // Convert 'tv' to 'series' for database compatibility
+      const mediaType = type === "tv" ? "series" : type;
+      query = query.eq("media_type", mediaType);
     }
 
     console.log("[supabaseClient] Executing query with limit:", limit);
