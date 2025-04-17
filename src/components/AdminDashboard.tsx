@@ -47,6 +47,14 @@ const AdminDashboard: React.FC = () => {
       isAdminVerified,
     });
 
+    // If user exists but no profile is found after loading completes, handle appropriately
+    if (!isLoading && user && !profile) {
+      console.log(
+        "[ADMIN] User exists but no profile found, checking admin by email",
+      );
+      // Only proceed with email-based admin check
+    }
+
     // Simple redirect logic
     if (!user) {
       console.log("[ADMIN] Redirecting: No user logged in");
@@ -55,7 +63,7 @@ const AdminDashboard: React.FC = () => {
       console.log("[ADMIN] Redirecting: User is not admin");
       navigate("/");
     }
-  }, [user, isAdmin, isLoading, navigate]);
+  }, [user, isAdmin, isLoading, navigate, profile]);
 
   if (isLoading) {
     return (

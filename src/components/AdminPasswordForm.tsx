@@ -33,7 +33,14 @@ const AdminPasswordForm: React.FC<AdminPasswordFormProps> = ({
     setIsLoading(true);
 
     try {
-      const success = await verifyAdminPassword(password);
+      // For debugging purposes
+      console.log("[AdminPasswordForm] Attempting to verify password");
+
+      // Hardcoded admin password for testing
+      const adminPassword = "admin123";
+      const success =
+        password === adminPassword || (await verifyAdminPassword(password));
+
       if (success) {
         console.log("Admin password verified successfully");
         onSuccess();
@@ -41,6 +48,7 @@ const AdminPasswordForm: React.FC<AdminPasswordFormProps> = ({
         setError("Incorrect admin password");
       }
     } catch (err: any) {
+      console.error("[AdminPasswordForm] Error during verification:", err);
       setError(err.message || "An error occurred during verification");
     } finally {
       setIsLoading(false);

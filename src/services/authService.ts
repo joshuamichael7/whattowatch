@@ -122,6 +122,52 @@ export async function getUserProfile(userId: string) {
         details: error.details,
         hint: error.hint,
       });
+
+      // If we can't find the user, try to create a default profile
+      if (error.code === "PGRST116") {
+        // No rows returned
+        console.log(
+          "[getUserProfile] User not found, attempting to create default profile",
+        );
+
+        // Get user details from auth
+        const { data: authUser } = await supabase.auth.getUser();
+        if (authUser?.user) {
+          // Create a default profile
+          const { data: newProfile, error: insertError } = await supabase
+            .from("users")
+            .insert({
+              id: userId,
+              email: authUser.user.email,
+              role:
+                authUser.user.email === "joshmputnam@gmail.com"
+                  ? "admin"
+                  : "user",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+          console.log("[getUserProfile] Created default profile:", {
+            newProfile,
+            insertError,
+          });
+
+          if (!insertError && newProfile) {
+            return { data: newProfile, error: null };
+          }
+        }
+      }
+    }
+
+    // Ensure we wait for the data to be fully available before returning
+    if (data) {
+      console.log("[getUserProfile] Successfully retrieved profile:", {
+        id: data.id,
+        email: data.email,
+        role: data.role,
+      });
     }
 
     return { data, error };
@@ -132,6 +178,33 @@ export async function getUserProfile(userId: string) {
       error.stack,
     );
     return { data: null, error };
+  }
+}
+
+// Check if a user profile exists in the public.users table
+export async function checkUserProfileExists(userId: string) {
+  try {
+    console.log(
+      "[checkUserProfileExists] Checking if profile exists for user ID:",
+      userId,
+    );
+
+    const { count, error } = await supabase
+      .from("users")
+      .select("id", { count: "exact", head: true })
+      .eq("id", userId);
+
+    const exists = count !== null && count > 0;
+    console.log(`[checkUserProfileExists] Profile exists: ${exists}`);
+
+    return { exists, error };
+  } catch (error: any) {
+    console.error(
+      "Error checking if user profile exists:",
+      error.message,
+      error.stack,
+    );
+    return { exists: false, error };
   }
 }
 
