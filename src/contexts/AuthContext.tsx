@@ -10,6 +10,8 @@ type AuthContextType = {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isAdminVerified?: boolean;
+  verifyAdminPassword: (password: string) => Promise<boolean>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -19,12 +21,15 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   isAuthenticated: false,
   isAdmin: false,
+  isAdminVerified: false,
+  verifyAdminPassword: async () => false,
 });
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdminVerified, setIsAdminVerified] = useState(false);
 
   // Initialize auth state
   useEffect(() => {
@@ -102,6 +107,37 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   const isAdmin = profile?.role === "admin";
   const currentUser = session?.user || null;
 
+  // Function to verify admin password using Netlify function
+  const verifyAdminPassword = async (password: string): Promise<boolean> => {
+    if (!currentUser) return false;
+
+    try {
+      const response = await fetch("/.netlify/functions/auth-helper", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "verifyAdminPassword",
+          userId: currentUser.id,
+          password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setIsAdminVerified(true);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error("[AuthContext] Error verifying admin password:", error);
+      return false;
+    }
+  };
+
   const value = {
     user: currentUser,
     session,
@@ -109,6 +145,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     isAuthenticated: !!currentUser,
     isAdmin,
+    isAdminVerified,
+    verifyAdminPassword,
   };
 
   console.log("[AuthContext] Current state:", {
@@ -116,6 +154,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     profile,
     isAuthenticated: !!currentUser,
     isAdmin,
+    isAdminVerified,
     isLoading,
   });
 

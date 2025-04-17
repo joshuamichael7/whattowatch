@@ -36,14 +36,15 @@ const AdminPasswordForm: React.FC<AdminPasswordFormProps> = ({
       // For debugging purposes
       console.log("[AdminPasswordForm] Attempting to verify password");
 
-      // Hardcoded admin password for testing
-      const adminPassword = "admin123";
-      const success =
-        password === adminPassword || (await verifyAdminPassword(password));
+      // Use the verifyAdminPassword function from AuthContext
+      const success = await verifyAdminPassword(password);
 
       if (success) {
         console.log("Admin password verified successfully");
-        onSuccess();
+        // Just call onSuccess without any parameters
+        if (typeof onSuccess === "function") {
+          onSuccess();
+        }
       } else {
         setError("Incorrect admin password");
       }

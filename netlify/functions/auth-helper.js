@@ -1,4 +1,5 @@
 const { createClient } = require("@supabase/supabase-js");
+const bcrypt = require("bcryptjs");
 
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -127,6 +128,74 @@ exports.handler = async (event) => {
           statusCode: 200,
           headers,
           body: JSON.stringify({ exists: data && data.length > 0 }),
+        };
+      }
+
+      case "verifyAdminPassword": {
+        if (!userId) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: "userId is required" }),
+          };
+        }
+
+        const password = event.body ? JSON.parse(event.body).password : null;
+        if (!password) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: "password is required" }),
+          };
+        }
+
+        // First check if user is an admin
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", userId)
+          .single();
+
+        if (userError) {
+          console.error("Error fetching user role:", userError);
+          return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: userError.message }),
+          };
+        }
+
+        if (userData.role !== "admin") {
+          return {
+            statusCode: 403,
+            headers,
+            body: JSON.stringify({ error: "User is not an admin" }),
+          };
+        }
+
+        // Get the admin credentials
+        const { data: credData, error: credError } = await supabase
+          .from("admin_credentials")
+          .select("password_hash")
+          .eq("user_id", userId)
+          .single();
+
+        if (credError) {
+          console.error("Error fetching admin credentials:", credError);
+          return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: credError.message }),
+          };
+        }
+
+        // Compare the password
+        const isValid = await bcrypt.compare(password, credData.password_hash);
+
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ success: isValid }),
         };
       }
 

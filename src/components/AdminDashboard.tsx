@@ -99,8 +99,9 @@ const AdminDashboard: React.FC = () => {
     return (
       <AdminPasswordForm
         onSuccess={() => {
-          console.log("Admin password verified, refreshing profile");
-          refreshProfile();
+          console.log("Admin password verified, setting admin verified");
+          // Instead of refreshing profile, we can just set a state variable
+          window.location.reload();
         }}
       />
     );
