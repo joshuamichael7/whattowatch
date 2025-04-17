@@ -155,115 +155,68 @@ export async function checkUserProfileExists(
       userIdOrEmail,
     );
 
-    // STEP 1: First check if the table exists and is accessible
-    console.log("[checkUserProfileExists] STEP 1: Checking if table exists");
-    const tableCheckQuery = supabase
-      .from("users")
-      .select("count(*)", { count: "exact", head: true });
+    // Use direct REST API calls instead of Supabase client
+    try {
+      // Import the fetchFromSupabase function
+      const { fetchFromSupabase } = await import("@/lib/supabaseProxy");
 
-    console.log(
-      "[checkUserProfileExists] Table check query:",
-      "users table check",
-      { query: "SELECT count(*) FROM users" },
-    );
-    const {
-      data: tableCheck,
-      error: tableError,
-      count: tableCount,
-    } = await tableCheckQuery;
+      // Build the query path
+      const queryPath = isEmail
+        ? `users?email=eq.${encodeURIComponent(userIdOrEmail)}&select=id,count=exact`
+        : `users?id=eq.${userIdOrEmail}&select=id,count=exact`;
 
-    console.log("[checkUserProfileExists] Table check result:", {
-      tableCheck,
-      tableError,
-      tableCount,
-      status: tableError ? "ERROR" : "SUCCESS",
-    });
+      console.log(`[checkUserProfileExists] Fetching from path: ${queryPath}`);
 
-    if (tableError) {
-      console.error("[checkUserProfileExists] Table check failed:", {
-        code: tableError.code,
-        message: tableError.message,
-        details: tableError.details,
-        hint: tableError.hint,
-      });
-      return { exists: false, error: tableError };
-    }
+      // Make the direct API call
+      const result = await fetchFromSupabase(queryPath);
 
-    // STEP 2: Check for the specific user
-    console.log(
-      `[checkUserProfileExists] STEP 2: Checking for specific ${isEmail ? "email" : "ID"}: ${userIdOrEmail}`,
-    );
-    const query = supabase
-      .from("users")
-      .select("id", { count: "exact", head: true });
+      console.log("[checkUserProfileExists] Direct API result:", result);
 
-    // Apply the appropriate filter based on whether we're using email or ID
-    const specificQuery = isEmail
-      ? query.eq("email", userIdOrEmail)
-      : query.eq("id", userIdOrEmail);
+      const exists = Array.isArray(result) && result.length > 0;
+      console.log(`[checkUserProfileExists] Profile exists: ${exists}`);
 
-    console.log(
-      "[checkUserProfileExists] Specific check query:",
-      "specific user check query",
-      {
-        query: isEmail
-          ? `SELECT id FROM users WHERE email = '${userIdOrEmail}'`
-          : `SELECT id FROM users WHERE id = '${userIdOrEmail}'`,
-      },
-    );
-    const { count, error } = await specificQuery;
+      return { exists, error: null };
+    } catch (error: any) {
+      console.error(
+        "[checkUserProfileExists] Error with direct API call:",
+        error,
+      );
 
-    console.log("[checkUserProfileExists] Specific check result:", {
-      count,
-      error,
-      status: error ? "ERROR" : "SUCCESS",
-    });
+      // Try a fallback approach with case-insensitive search if it's an email
+      if (isEmail) {
+        try {
+          const { fetchFromSupabase } = await import("@/lib/supabaseProxy");
 
-    if (error) {
-      console.error("[checkUserProfileExists] Error checking profile:", {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-      });
+          // Use ILIKE for case-insensitive search
+          const queryPath = `users?email=ilike.${encodeURIComponent(userIdOrEmail)}&select=id,count=exact`;
+
+          console.log(
+            `[checkUserProfileExists] Trying case-insensitive search: ${queryPath}`,
+          );
+
+          const result = await fetchFromSupabase(queryPath);
+
+          console.log(
+            "[checkUserProfileExists] Case-insensitive result:",
+            result,
+          );
+
+          const exists = Array.isArray(result) && result.length > 0;
+          console.log(
+            `[checkUserProfileExists] Profile exists (case-insensitive): ${exists}`,
+          );
+
+          return { exists, error: null };
+        } catch (fallbackError: any) {
+          console.error(
+            "[checkUserProfileExists] Fallback search failed:",
+            fallbackError,
+          );
+        }
+      }
+
       return { exists: false, error };
     }
-
-    // STEP 3: If email check fails, try case-insensitive search
-    if (isEmail && (count === null || count === 0)) {
-      console.log(
-        "[checkUserProfileExists] STEP 3: Email check returned no results, trying case-insensitive search",
-      );
-      const caseInsensitiveQuery = supabase
-        .from("users")
-        .select("id", { count: "exact", head: true })
-        .ilike("email", userIdOrEmail);
-
-      console.log(
-        "[checkUserProfileExists] Case-insensitive query:",
-        "case-insensitive email query",
-        { query: `SELECT id FROM users WHERE email ILIKE '${userIdOrEmail}'` },
-      );
-      const { count: caseCount, error: caseError } = await caseInsensitiveQuery;
-
-      console.log("[checkUserProfileExists] Case-insensitive result:", {
-        count: caseCount,
-        error: caseError,
-        status: caseError ? "ERROR" : "SUCCESS",
-      });
-
-      if (!caseError && caseCount !== null && caseCount > 0) {
-        console.log(
-          `[checkUserProfileExists] Found profile with case-insensitive search: ${caseCount} results`,
-        );
-        return { exists: true, error: null };
-      }
-    }
-
-    const exists = count !== null && count > 0;
-    console.log(`[checkUserProfileExists] Profile exists: ${exists}`);
-
-    return { exists, error };
   } catch (error: any) {
     console.error(
       "Error checking if user profile exists:",
