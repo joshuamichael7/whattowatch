@@ -3,7 +3,6 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const formidable = require("formidable");
-const { Buffer } = require("buffer");
 
 exports.handler = async (event, context) => {
   // Set CORS headers
@@ -45,96 +44,99 @@ exports.handler = async (event, context) => {
     const contentType =
       event.headers["content-type"] || event.headers["Content-Type"];
 
-    if (!contentType || !contentType.includes("multipart/form-data")) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          error: "Invalid content type. Expected multipart/form-data",
-        }),
-      };
-    }
-
-    // Parse the multipart form data manually
-    const { file, error } = await parseFormData(event, tempDir);
-
-    if (error) {
-      console.error("Error parsing form data:", error);
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          error: "Error parsing form data",
-          details: error.message,
-        }),
-      };
-    }
-
-    if (!file) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: "No file uploaded" }),
-      };
-    }
-
-    console.log("File uploaded successfully:", file.path);
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        success: true,
-        message: "File uploaded successfully",
-        filePath: file.path,
-      }),
-    };
-  } catch (error) {
-    console.error("Error uploading file:", error);
-    return {
-      statusCode: 500,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        error: "Internal Server Error",
-        details: error.message,
-      }),
-    };
-  }
-};
-
-// Helper function to parse multipart form data in a serverless environment
-async function parseFormData(event, tempDir) {
-  try {
-    // Check if we have a body
-    if (!event.body) {
-      return { error: new Error("No request body") };
-    }
-
-    // Handle base64 encoded body (common in Netlify Functions)
-    const body = event.isBase64Encoded
-      ? Buffer.from(event.body, "base64").toString("utf8")
-      : event.body;
+    console.log("Content-Type:", contentType);
 
     // Create a unique filename
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.csv`;
     const filePath = path.join(tempDir, fileName);
 
-    // Write the file directly to disk
-    // Note: This is a simplified approach. In a real-world scenario,
-    // you would need to properly parse the multipart form data
-    fs.writeFileSync(filePath, body);
+    // Handle multipart form data
+    if (contentType && contentType.includes("multipart/form-data")) {
+      const form = formidable({
+        uploadDir: tempDir,
+        filename: () => fileName,
+        keepExtensions: true,
+      });
 
-    return {
-      file: {
-        name: fileName,
-        path: filePath,
-        type: "text/csv",
-      },
-    };
+      // Parse the form data
+      const [fields, files] = await new Promise((resolve, reject) => {
+        form.parse(event, (err, fields, files) => {
+          if (err) return reject(err);
+          resolve([fields, files]);
+        });
+      });
+
+      console.log("Files received:", files);
+
+      if (!files || !files.file) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: "No file uploaded" }),
+        };
+      }
+
+      // Get the uploaded file path
+      const uploadedFile = files.file[0] || files.file;
+      const uploadedFilePath = uploadedFile.filepath || uploadedFile.path;
+
+      console.log("File uploaded successfully:", uploadedFilePath);
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          message: "File uploaded successfully",
+          filePath: uploadedFilePath,
+        }),
+      };
+    } else {
+      // Handle direct file upload (non-multipart)
+      console.log("Processing direct file upload");
+
+      // Check if we have a body
+      if (!event.body) {
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: "No request body" }),
+        };
+      }
+
+      // Handle base64 encoded body (common in Netlify Functions)
+      const body = event.isBase64Encoded
+        ? Buffer.from(event.body, "base64")
+        : event.body;
+
+      // Write the file directly to disk
+      fs.writeFileSync(filePath, body);
+
+      console.log("File saved directly:", filePath);
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: true,
+          message: "File uploaded successfully",
+          filePath: filePath,
+        }),
+      };
+    }
   } catch (error) {
-    console.error("Error in parseFormData:", error);
-    return { error };
+    console.error("Error uploading file:", error);
+    return {
+      statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        error: "Internal Server Error",
+        details: error.message,
+        stack: error.stack,
+      }),
+    };
   }
-}
+};
