@@ -1,15 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
-import {
-  getUserPreferences,
-  checkUserProfileExists,
-} from "@/services/authService";
+import { getUserPreferences } from "@/services/authService";
 import {
   getUserById,
   getUserByEmail,
-  fetchFromSupabase,
-} from "@/lib/supabaseProxy";
+  checkUserExists,
+} from "@/services/netlifyAuthService";
 
 type AuthContextType = {
   user: User | null;
@@ -46,7 +43,7 @@ async function loadUserProfile(
     console.log(
       `[${logPrefix}] Checking if profile exists by email: ${user.email}`,
     );
-    const { exists, error: checkError } = await checkUserProfileExists(
+    const { exists, error: checkError } = await checkUserExists(
       user.email,
       true,
     );
@@ -128,7 +125,7 @@ async function loadUserProfile(
   console.log(
     `[${logPrefix}] Checking if profile exists for user ID: ${user.id}`,
   );
-  const { exists, error: checkError } = await checkUserProfileExists(user.id);
+  const { exists, error: checkError } = await checkUserExists(user.id);
 
   if (!isMounted) return { profileData: null, profileError: null };
 
@@ -232,7 +229,7 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
 
         // Check if profile exists by email before attempting to load it
         const { exists: existsByEmail, error: checkEmailError } =
-          await checkUserProfileExists(
+          await checkUserExists(
             session.user.email,
             true, // isEmail = true
           );
@@ -294,7 +291,7 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
 
       // Fallback to ID-based lookup
       console.log("[refreshProfile] Checking profile by user ID");
-      const { exists, error: checkError } = await checkUserProfileExists(
+      const { exists, error: checkError } = await checkUserExists(
         session.user.id,
       );
 
@@ -318,21 +315,10 @@ function AuthProviderComponent({ children }: { children: React.ReactNode }) {
               error,
             );
 
-            // Diagnostic query to check if users table is accessible
-            try {
-              const allUsers = await fetchFromSupabase(
-                "users?select=id,email&limit=5",
-              );
-              console.log("[refreshProfile] Sample users in table:", {
-                users: allUsers,
-                error: null,
-              });
-            } catch (listError) {
-              console.log(
-                "[refreshProfile] Error fetching sample users:",
-                listError,
-              );
-            }
+            // Log the error but don't try to fetch sample users
+            console.log(
+              "[refreshProfile] Error fetching user profile by ID, no fallback available",
+            );
           } else {
             console.log(
               "[refreshProfile] Profile loaded successfully by ID:",
