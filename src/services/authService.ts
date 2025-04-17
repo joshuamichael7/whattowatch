@@ -111,18 +111,30 @@ export async function getUserProfile(
     console.log("[getUserProfile] Table check query:", "users table check", {
       query: "SELECT count(*) FROM users",
     });
-    const {
-      data: tableCheck,
-      error: tableError,
-      count: tableCount,
-    } = await tableCheckQuery;
 
-    console.log("[getUserProfile] Table check result:", {
-      tableCheck,
-      tableError,
-      tableCount,
-      status: tableError ? "ERROR" : "SUCCESS",
-    });
+    try {
+      console.log("[getUserProfile] Executing table check query...");
+      const {
+        data: tableCheck,
+        error: tableError,
+        count: tableCount,
+      } = await tableCheckQuery;
+      console.log("[getUserProfile] Table check query completed");
+
+      console.log("[getUserProfile] Table check result:", {
+        tableCheck,
+        tableError,
+        tableCount,
+        status: tableError ? "ERROR" : "SUCCESS",
+      });
+    } catch (innerError) {
+      console.error("[getUserProfile] Exception during table check query:", {
+        message: innerError.message,
+        stack: innerError.stack,
+        name: innerError.name,
+      });
+      throw innerError;
+    }
 
     if (tableError) {
       console.error("[getUserProfile] Table check failed:", {
@@ -146,14 +158,26 @@ export async function getUserProfile(
       "users table all users query",
       { query: "SELECT id, email, role FROM users LIMIT 5" },
     );
-    const { data: allUsers, error: allUsersError } = await allUsersQuery;
 
-    console.log("[getUserProfile] All users result:", {
-      userCount: allUsers?.length || 0,
-      users: allUsers,
-      error: allUsersError,
-      status: allUsersError ? "ERROR" : "SUCCESS",
-    });
+    try {
+      console.log("[getUserProfile] Executing all users query...");
+      const { data: allUsers, error: allUsersError } = await allUsersQuery;
+      console.log("[getUserProfile] All users query completed");
+
+      console.log("[getUserProfile] All users result:", {
+        userCount: allUsers?.length || 0,
+        users: allUsers,
+        error: allUsersError,
+        status: allUsersError ? "ERROR" : "SUCCESS",
+      });
+    } catch (innerError) {
+      console.error("[getUserProfile] Exception during all users query:", {
+        message: innerError.message,
+        stack: innerError.stack,
+        name: innerError.name,
+      });
+      throw innerError;
+    }
 
     // STEP 3: Now try to get the specific user - either by ID or email
     console.log(
@@ -175,13 +199,25 @@ export async function getUserProfile(
           : `SELECT * FROM users WHERE id = '${userIdOrEmail}'`,
       },
     );
-    const { data, error } = await specificQuery;
 
-    console.log("[getUserProfile] Specific user query result:", {
-      data,
-      error,
-      status: error ? "ERROR" : "SUCCESS",
-    });
+    try {
+      console.log("[getUserProfile] Executing specific user query...");
+      const { data, error } = await specificQuery;
+      console.log("[getUserProfile] Specific user query completed");
+
+      console.log("[getUserProfile] Specific user query result:", {
+        data,
+        error,
+        status: error ? "ERROR" : "SUCCESS",
+      });
+    } catch (innerError) {
+      console.error("[getUserProfile] Exception during specific user query:", {
+        message: innerError.message,
+        stack: innerError.stack,
+        name: innerError.name,
+      });
+      throw innerError;
+    }
 
     if (error) {
       console.error("[getUserProfile] Error details:", {
@@ -215,13 +251,29 @@ export async function getUserProfile(
           "case-insensitive email query",
           { query: `SELECT * FROM users WHERE email ILIKE '${userIdOrEmail}'` },
         );
-        const { data: caseData, error: caseError } = await caseInsensitiveQuery;
 
-        console.log("[getUserProfile] Case-insensitive result:", {
-          data: caseData,
-          error: caseError,
-          status: caseError ? "ERROR" : "SUCCESS",
-        });
+        try {
+          console.log("[getUserProfile] Executing case-insensitive query...");
+          const { data: caseData, error: caseError } =
+            await caseInsensitiveQuery;
+          console.log("[getUserProfile] Case-insensitive query completed");
+
+          console.log("[getUserProfile] Case-insensitive result:", {
+            data: caseData,
+            error: caseError,
+            status: caseError ? "ERROR" : "SUCCESS",
+          });
+        } catch (innerError) {
+          console.error(
+            "[getUserProfile] Exception during case-insensitive query:",
+            {
+              message: innerError.message,
+              stack: innerError.stack,
+              name: innerError.name,
+            },
+          );
+          throw innerError;
+        }
 
         if (!caseError && caseData) {
           console.log(

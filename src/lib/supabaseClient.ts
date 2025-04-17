@@ -15,7 +15,19 @@ console.log(
 );
 
 // Create Supabase client with environment variables
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+  global: {
+    fetch: (...args) => {
+      console.log("[SUPABASE] Fetch request:", args[0]);
+      return fetch(...args);
+    },
+  },
+});
 
 // Log connection details for debugging
 console.log("[SUPABASE] Client initialized with URL:", supabaseUrl);
