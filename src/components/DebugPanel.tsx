@@ -14,6 +14,7 @@ const DebugPanel: React.FC = () => {
 
   const runDirectQuery = async () => {
     setIsLoading(true);
+    // Clear any previous errors
     setResults(null);
 
     try {
