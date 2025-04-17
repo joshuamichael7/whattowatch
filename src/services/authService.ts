@@ -108,7 +108,9 @@ export async function getUserProfile(
       .from("users")
       .select("count(*)", { count: "exact", head: true });
 
-    console.log("[getUserProfile] Table check query:", tableCheckQuery.toURL());
+    console.log("[getUserProfile] Table check query:", "users table check", {
+      query: "SELECT count(*) FROM users",
+    });
     const {
       data: tableCheck,
       error: tableError,
@@ -139,7 +141,11 @@ export async function getUserProfile(
       .select("id, email, role")
       .limit(5);
 
-    console.log("[getUserProfile] All users query:", allUsersQuery.toURL());
+    console.log(
+      "[getUserProfile] All users query:",
+      "users table all users query",
+      { query: "SELECT id, email, role FROM users LIMIT 5" },
+    );
     const { data: allUsers, error: allUsersError } = await allUsersQuery;
 
     console.log("[getUserProfile] All users result:", {
@@ -160,7 +166,15 @@ export async function getUserProfile(
       ? query.eq("email", userIdOrEmail).single()
       : query.eq("id", userIdOrEmail).single();
 
-    console.log("[getUserProfile] Specific user query:", specificQuery.toURL());
+    console.log(
+      "[getUserProfile] Specific user query:",
+      "specific user query",
+      {
+        query: isEmail
+          ? `SELECT * FROM users WHERE email = '${userIdOrEmail}'`
+          : `SELECT * FROM users WHERE id = '${userIdOrEmail}'`,
+      },
+    );
     const { data, error } = await specificQuery;
 
     console.log("[getUserProfile] Specific user query result:", {
@@ -198,7 +212,8 @@ export async function getUserProfile(
 
         console.log(
           "[getUserProfile] Case-insensitive query:",
-          caseInsensitiveQuery.toURL(),
+          "case-insensitive email query",
+          { query: `SELECT * FROM users WHERE email ILIKE '${userIdOrEmail}'` },
         );
         const { data: caseData, error: caseError } = await caseInsensitiveQuery;
 
@@ -261,7 +276,8 @@ export async function checkUserProfileExists(
 
     console.log(
       "[checkUserProfileExists] Table check query:",
-      tableCheckQuery.toURL(),
+      "users table check",
+      { query: "SELECT count(*) FROM users" },
     );
     const {
       data: tableCheck,
@@ -301,7 +317,12 @@ export async function checkUserProfileExists(
 
     console.log(
       "[checkUserProfileExists] Specific check query:",
-      specificQuery.toURL(),
+      "specific user check query",
+      {
+        query: isEmail
+          ? `SELECT id FROM users WHERE email = '${userIdOrEmail}'`
+          : `SELECT id FROM users WHERE id = '${userIdOrEmail}'`,
+      },
     );
     const { count, error } = await specificQuery;
 
@@ -333,7 +354,8 @@ export async function checkUserProfileExists(
 
       console.log(
         "[checkUserProfileExists] Case-insensitive query:",
-        caseInsensitiveQuery.toURL(),
+        "case-insensitive email query",
+        { query: `SELECT id FROM users WHERE email ILIKE '${userIdOrEmail}'` },
       );
       const { count: caseCount, error: caseError } = await caseInsensitiveQuery;
 
@@ -408,9 +430,18 @@ export async function getUserPreferences(userId: string) {
     );
 
     // First check if the table exists
+    console.log(
+      "[getUserPreferences] Checking if user_preferences table exists",
+    );
     const { count, error: tableError } = await supabase
       .from("user_preferences")
       .select("*", { count: "exact", head: true });
+
+    console.log("[getUserPreferences] Table check result:", {
+      count,
+      error: tableError,
+      status: tableError ? "ERROR" : "SUCCESS",
+    });
 
     if (tableError) {
       console.log(
@@ -430,11 +461,20 @@ export async function getUserPreferences(userId: string) {
     }
 
     // Now try to get the specific user's preferences
+    console.log(
+      `[getUserPreferences] Fetching preferences for user ID: ${userId}`,
+    );
     const { data, error } = await supabase
       .from("user_preferences")
       .select("*")
       .eq("user_id", userId)
       .single();
+
+    console.log("[getUserPreferences] User preferences query result:", {
+      data,
+      error,
+      status: error ? "ERROR" : "SUCCESS",
+    });
 
     if (error && error.code === "PGRST116") {
       // No rows found
@@ -456,15 +496,27 @@ export async function getUserPreferences(userId: string) {
 export async function updateUserPreferences(userId: string, preferences: any) {
   try {
     // Check if preferences exist for this user
-    const { data: existingPrefs } = await supabase
+    console.log(
+      `[updateUserPreferences] Checking if preferences exist for user ID: ${userId}`,
+    );
+    const { data: existingPrefs, error: checkError } = await supabase
       .from("user_preferences")
       .select("user_id")
       .eq("user_id", userId)
       .single();
 
+    console.log("[updateUserPreferences] Preferences check result:", {
+      exists: !!existingPrefs,
+      error: checkError,
+      status: checkError ? "ERROR" : "SUCCESS",
+    });
+
     let result;
     if (existingPrefs) {
       // Update existing preferences
+      console.log(
+        `[updateUserPreferences] Updating existing preferences for user ID: ${userId}`,
+      );
       result = await supabase
         .from("user_preferences")
         .update({
@@ -472,13 +524,28 @@ export async function updateUserPreferences(userId: string, preferences: any) {
           updated_at: new Date().toISOString(),
         })
         .eq("user_id", userId);
+
+      console.log("[updateUserPreferences] Update result:", {
+        data: result.data,
+        error: result.error,
+        status: result.error ? "ERROR" : "SUCCESS",
+      });
     } else {
       // Insert new preferences
+      console.log(
+        `[updateUserPreferences] Creating new preferences for user ID: ${userId}`,
+      );
       result = await supabase.from("user_preferences").insert({
         user_id: userId,
         ...preferences,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+      });
+
+      console.log("[updateUserPreferences] Insert result:", {
+        data: result.data,
+        error: result.error,
+        status: result.error ? "ERROR" : "SUCCESS",
       });
     }
 
