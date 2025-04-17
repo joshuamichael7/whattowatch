@@ -92,15 +92,45 @@ export async function updatePassword(password: string) {
 // Get user profile from the public.users table
 export async function getUserProfile(userId: string) {
   try {
+    console.log("[getUserProfile] Fetching profile for user ID:", userId);
+    console.log("[getUserProfile] Supabase URL:", supabase.supabaseUrl);
+    console.log("[getUserProfile] Table being queried:", "users");
+
+    // First, check if the table exists and is accessible
+    const { data: tableCheck, error: tableError } = await supabase
+      .from("users")
+      .select("count(*)", { count: "exact", head: true });
+
+    console.log("[getUserProfile] Table check result:", {
+      tableCheck,
+      tableError,
+    });
+
+    // Now try to get the specific user
     const { data, error } = await supabase
       .from("users")
       .select("*")
       .eq("id", userId)
       .single();
 
+    console.log("[getUserProfile] Query result:", { data, error });
+
+    if (error) {
+      console.error("[getUserProfile] Error details:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+    }
+
     return { data, error };
   } catch (error: any) {
-    console.error("Error getting user profile:", error.message);
+    console.error(
+      "[getUserProfile] Exception caught:",
+      error.message,
+      error.stack,
+    );
     return { data: null, error };
   }
 }

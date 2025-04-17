@@ -36,25 +36,62 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Function to refresh user profile
   const refreshProfile = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log("[refreshProfile] No user, skipping profile refresh");
+      return;
+    }
 
     try {
+      console.log("[refreshProfile] Refreshing profile for user:", user.id);
+
+      // Check if the user exists in auth
+      const { data: authUser, error: authError } =
+        await supabase.auth.getUser();
+      console.log("[refreshProfile] Auth user check:", {
+        exists: !!authUser?.user,
+        id: authUser?.user?.id,
+        error: authError,
+      });
+
       // Get profile from public.users table
       const { data, error } = await getUserProfile(user.id);
 
       if (error) {
-        console.error("Error fetching user profile:", error);
+        console.error("[refreshProfile] Error fetching user profile:", error);
+
+        // Try a direct query to see what's in the users table
+        const { data: allUsers, error: listError } = await supabase
+          .from("users")
+          .select("id, email")
+          .limit(5);
+
+        console.log("[refreshProfile] Sample users in table:", {
+          users: allUsers,
+          error: listError,
+        });
       } else {
+        console.log("[refreshProfile] Profile loaded successfully:", data);
         setProfile(data);
       }
 
       // Get preferences
-      const { data: prefsData } = await getUserPreferences(user.id);
+      const { data: prefsData, error: prefsError } = await getUserPreferences(
+        user.id,
+      );
+      console.log("[refreshProfile] Preferences result:", {
+        data: prefsData,
+        error: prefsError,
+      });
+
       if (prefsData) {
         setPreferences(prefsData);
       }
-    } catch (error) {
-      console.error("Error refreshing profile:", error);
+    } catch (error: any) {
+      console.error(
+        "[refreshProfile] Exception in profile refresh:",
+        error.message,
+        error.stack,
+      );
     }
   };
 
@@ -69,12 +106,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         data: { session },
       } = await supabase.auth.getSession();
 
+      console.log(
+        "[initializeAuth] Initial session:",
+        session ? "exists" : "null",
+      );
+
       // Set user and session state
       setSession(session);
       setUser(session?.user || null);
 
       // If we have a user, get their profile
       if (session?.user) {
+        console.log(
+          "[initializeAuth] User found, loading profile for:",
+          session.user.id,
+        );
         await refreshProfile();
       }
 
@@ -87,7 +133,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log(`Auth event: ${event}`);
+        console.log(`[AuthContext] Auth event: ${event}`);
 
         // Update user and session state
         setSession(session);
@@ -95,9 +141,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (session?.user) {
           // Load profile on auth change
+          console.log(
+            `[AuthContext] Auth event ${event} with user, loading profile for:`,
+            session.user.id,
+          );
+          console.log(`[AuthContext] User details:`, {
+            id: session.user.id,
+            email: session.user.email,
+            created_at: session.user.created_at,
+          });
+
+          // Try to load the profile immediately
           await refreshProfile();
         } else {
           // Clear profile and preferences if user logs out
+          console.log(
+            `[AuthContext] Auth event ${event} with no user, clearing profile`,
+          );
           setProfile(null);
           setPreferences(null);
         }
