@@ -112,6 +112,9 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!currentUser) return false;
 
     try {
+      console.log(
+        "[AuthContext] Verifying admin password via Netlify function",
+      );
       const response = await fetch("/.netlify/functions/auth-helper", {
         method: "POST",
         headers: {
@@ -124,7 +127,20 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
+      console.log(
+        `[AuthContext] Netlify function response status: ${response.status}`,
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(
+          `[AuthContext] Netlify function error: ${response.status} - ${errorText}`,
+        );
+        return false;
+      }
+
       const data = await response.json();
+      console.log("[AuthContext] Verification response:", data);
 
       if (data.success) {
         setIsAdminVerified(true);
