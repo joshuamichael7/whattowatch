@@ -39,29 +39,82 @@ const SupabaseConnectionTest: React.FC = () => {
         throw new Error("Missing Supabase URL or key in environment variables");
       }
 
+      console.log("Creating direct Supabase client with:", {
+        url: supabaseUrl,
+        keyExists: !!supabaseKey,
+      });
+
       const directClient = createClient(supabaseUrl, supabaseKey);
 
-      // Test 1: Basic ping
+      // Test 1: Basic ping - with timeout
       console.log("Testing direct connection to Supabase...");
-      const { data: pingData, error: pingError } =
-        await directClient.rpc("ping");
+      const pingPromise = directClient
+        .rpc("ping")
+        .then((result) => {
+          console.log("Ping result:", result);
+          return result;
+        })
+        .catch((err) => {
+          console.error("Ping error:", err);
+          throw err;
+        });
 
-      // Test 2: Try to access users table
+      // Add timeout to ping
+      const pingWithTimeout = Promise.race([
+        pingPromise,
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Ping timeout after 5 seconds")),
+            5000,
+          ),
+        ),
+      ]);
+
+      const pingResult = await pingWithTimeout;
+
+      // Test 2: Try to access users table - with timeout
       console.log("Testing access to users table...");
-      const { data: usersData, error: usersError } = await directClient
+      const usersPromise = directClient
         .from("users")
-        .select("count(*)", { count: "exact", head: true });
+        .select("count", { count: "exact", head: true })
+        .then((result) => {
+          console.log("Users table result:", result);
+          return result;
+        })
+        .catch((err) => {
+          console.error("Users table error:", err);
+          throw err;
+        });
+
+      // Add timeout to users query
+      const usersWithTimeout = Promise.race([
+        usersPromise,
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Users query timeout after 5 seconds")),
+            5000,
+          ),
+        ),
+      ]);
+
+      const usersResult = await usersWithTimeout;
 
       setResults((prev) => ({
         ...prev,
         directConnection: {
-          ping: { data: pingData, error: pingError },
-          usersTable: { data: usersData, error: usersError },
+          ping: pingResult,
+          usersTable: usersResult,
         },
       }));
     } catch (err: any) {
       console.error("Error testing direct connection:", err);
       setError(err.message || "An unknown error occurred");
+      setResults((prev) => ({
+        ...prev,
+        directConnection: {
+          error: err.message || "An unknown error occurred",
+        },
+      }));
     } finally {
       setIsLoading(false);
     }
@@ -79,6 +132,15 @@ const SupabaseConnectionTest: React.FC = () => {
         throw new Error("Missing Supabase URL or key in environment variables");
       }
 
+      console.log("Testing direct fetch to Supabase with:", {
+        url: `${supabaseUrl}/rest/v1/users?select=count`,
+        keyExists: !!supabaseKey,
+      });
+
+      // Create an AbortController for the timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
       // Test direct fetch to Supabase REST API
       const response = await fetch(
         `${supabaseUrl}/rest/v1/users?select=count`,
@@ -88,10 +150,18 @@ const SupabaseConnectionTest: React.FC = () => {
             Authorization: `Bearer ${supabaseKey}`,
             "Content-Type": "application/json",
           },
+          signal: controller.signal,
         },
       );
 
+      clearTimeout(timeoutId);
+      console.log("Fetch response:", {
+        status: response.status,
+        statusText: response.statusText,
+      });
+
       const data = await response.json();
+      console.log("Fetch data:", data);
 
       setResults((prev) => ({
         ...prev,
@@ -104,6 +174,59 @@ const SupabaseConnectionTest: React.FC = () => {
     } catch (err: any) {
       console.error("Error testing fetch to Supabase:", err);
       setError(err.message || "An unknown error occurred");
+      setResults((prev) => ({
+        ...prev,
+        directFetch: {
+          error: err.message || "An unknown error occurred",
+        },
+      }));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const testCorsWithNetlify = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      console.log("Testing CORS with Netlify function...");
+
+      // Create an AbortController for the timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      // Test using Netlify function as a proxy
+      const response = await fetch("/.netlify/functions/check-edge", {
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      console.log("Netlify function response:", {
+        status: response.status,
+        statusText: response.statusText,
+      });
+
+      const data = await response.json();
+      console.log("Netlify function data:", data);
+
+      setResults((prev) => ({
+        ...prev,
+        netlifyProxy: {
+          status: response.status,
+          statusText: response.statusText,
+          data,
+        },
+      }));
+    } catch (err: any) {
+      console.error("Error testing Netlify proxy:", err);
+      setError(err.message || "An unknown error occurred");
+      setResults((prev) => ({
+        ...prev,
+        netlifyProxy: {
+          error: err.message || "An unknown error occurred",
+        },
+      }));
     } finally {
       setIsLoading(false);
     }
@@ -135,6 +258,17 @@ const SupabaseConnectionTest: React.FC = () => {
               </>
             ) : (
               "Test Direct Fetch to Supabase"
+            )}
+          </Button>
+
+          <Button onClick={testCorsWithNetlify} disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Testing Netlify Proxy...
+              </>
+            ) : (
+              "Test Netlify Function Proxy"
             )}
           </Button>
         </div>
