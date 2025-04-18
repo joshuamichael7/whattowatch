@@ -112,7 +112,7 @@ const HomepageContentManager: React.FC = () => {
       let query = supabase
         .from("content")
         .select("*")
-        .ilike("title", `%${searchQuery}%`)
+        .or(`title.ilike.%${searchQuery}%,plot.ilike.%${searchQuery}%`)
         .order("popularity", { ascending: false })
         .limit(10);
 
