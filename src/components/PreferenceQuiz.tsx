@@ -155,14 +155,24 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
         aiServicePreferences,
       );
 
-      const { getPersonalizedRecommendations } = await import(
-        "@/services/aiService"
-      );
+      // Use Netlify function instead of client-side API call
+      const response = await fetch("/.netlify/functions/ai-recommendations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          preferences: aiServicePreferences,
+          limit: 10,
+        }),
+      });
 
-      const aiRecommendations = await getPersonalizedRecommendations(
-        aiServicePreferences,
-        10,
-      );
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      const aiRecommendations = data.recommendations;
 
       // If we got AI recommendations, add them to the preferences object
       if (aiRecommendations && aiRecommendations.length > 0) {

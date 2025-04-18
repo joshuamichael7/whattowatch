@@ -178,26 +178,7 @@ export async function getPersonalizedRecommendations(
         : `${Math.floor(preferences.viewingTime / 60)} hour${preferences.viewingTime >= 120 ? "s" : ""}${preferences.viewingTime % 60 > 0 ? ` ${preferences.viewingTime % 60} minutes` : ""}`;
 
     // Construct the prompt for Gemini
-    const prompt = `I need personalized movie and TV show recommendations based on the following preferences:
-
-    - Preferred genres: ${genresText || "No specific genres"}
-    - Current mood: ${preferences.mood}
-    - Available viewing time: ${viewingTimeText}
-    - Content they've enjoyed: ${favoritesText || "No examples provided"}
-    - Content they want to avoid: ${avoidText || "No examples provided"}
-    - Age/content rating preference: ${preferences.ageRating}
-
-    Please recommend exactly ${limit} movies or TV shows that match these preferences. For each recommendation, provide:
-    1. The exact title
-    2. A brief reason why it matches their preferences (1-2 sentences)
-
-    Format your response as a JSON array with title and reason properties for each recommendation. Example:
-    [
-      {"title": "Movie Title", "reason": "Reason this matches their preferences"},
-      {"title": "Another Title", "reason": "Another reason"}
-    ]
-    
-    Only return the JSON array, no other text.`;
+    const prompt = `I need personalized movie and TV show recommendations based on the following preferences:\n\n    - Preferred genres: ${genresText || "No specific genres"}\n    - Current mood: ${preferences.mood}\n    - Available viewing time: ${viewingTimeText}\n    - Content they've enjoyed: ${favoritesText || "No examples provided"}\n    - Content they want to avoid: ${avoidText || "No examples provided"}\n    - Age/content rating preference: ${preferences.ageRating}\n\n    Please recommend exactly ${limit} movies or TV shows that match these preferences. For each recommendation, provide:\n    1. The exact title\n    2. A brief reason why it matches their preferences (1-2 sentences)\n\n    Format your response as a JSON array with title and reason properties for each recommendation. Example:\n    [\n      {"title": "Movie Title", "reason": "Reason this matches their preferences"},\n      {"title": "Another Title", "reason": "Another reason"}\n    ]\n    \n    Only return the JSON array, no other text.`;
 
     // Make the API request
     const response = await axios.post(
@@ -297,31 +278,7 @@ export async function analyzeContentSimilarity(
     }
 
     // Construct the prompt for Gemini
-    const prompt = `Compare these two ${baseContent.media_type === "movie" ? "movies" : "TV shows"} and analyze their similarity:
-
-    FIRST CONTENT:
-    Title: ${baseContent.title}
-    Plot: ${baseContent.overview || "No plot available"}
-    ${baseContent.genre_strings ? `Genres: ${baseContent.genre_strings.join(", ")}` : ""}
-    ${baseContent.release_date ? `Release date: ${baseContent.release_date}` : ""}
-
-    SECOND CONTENT:
-    Title: ${comparisonContent.title}
-    Plot: ${comparisonContent.overview || "No plot available"}
-    ${comparisonContent.genre_strings ? `Genres: ${comparisonContent.genre_strings.join(", ")}` : ""}
-    ${comparisonContent.release_date ? `Release date: ${comparisonContent.release_date}` : ""}
-
-    Analyze their similarity in terms of plot, themes, tone, character dynamics, and overall storytelling approach.
-    
-    Return your analysis as a JSON object with the following properties:
-    1. similarityScore: A number between 0 and 1 representing how similar they are (0 = not similar at all, 1 = extremely similar)
-    2. explanation: A brief explanation of why they are similar or different (2-3 sentences)
-    3. commonThemes: An array of common themes or elements shared between them (3-5 items)
-    
-    Example format:
-    {"similarityScore": 0.75, "explanation": "Both films explore...", "commonThemes": ["theme1", "theme2", "theme3"]}
-    
-    Only return the JSON object, no other text.`;
+    const prompt = `Compare these two ${baseContent.media_type === "movie" ? "movies" : "TV shows"} and analyze their similarity:\n\n    FIRST CONTENT:\n    Title: ${baseContent.title}\n    Plot: ${baseContent.overview || "No plot available"}\n    ${baseContent.genre_strings ? `Genres: ${baseContent.genre_strings.join(", ")}` : ""}\n    ${baseContent.release_date ? `Release date: ${baseContent.release_date}` : ""}\n\n    SECOND CONTENT:\n    Title: ${comparisonContent.title}\n    Plot: ${comparisonContent.overview || "No plot available"}\n    ${comparisonContent.genre_strings ? `Genres: ${comparisonContent.genre_strings.join(", ")}` : ""}\n    ${comparisonContent.release_date ? `Release date: ${comparisonContent.release_date}` : ""}\n\n    Analyze their similarity in terms of plot, themes, tone, character dynamics, and overall storytelling approach.\n    \n    Return your analysis as a JSON object with the following properties:\n    1. similarityScore: A number between 0 and 1 representing how similar they are (0 = not similar at all, 1 = extremely similar)\n    2. explanation: A brief explanation of why they are similar or different (2-3 sentences)\n    3. commonThemes: An array of common themes or elements shared between them (3-5 items)\n    \n    Example format:\n    {"similarityScore": 0.75, "explanation": "Both films explore...", "commonThemes": ["theme1", "theme2", "theme3"]}\n    \n    Only return the JSON object, no other text.`;
 
     // Make the API request
     const response = await axios.post(

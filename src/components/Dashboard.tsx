@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from "react";
 import * as omdbClient from "@/lib/omdbClient";
 import { motion } from "framer-motion";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PlayCircle, Search, ListFilter, Loader2, X } from "lucide-react";
+import { PlayCircle, X, Loader2 } from "lucide-react";
 import PreferenceFinder from "./PreferenceQuiz";
-import SimilarContentSearch from "./SimilarContentSearch";
 import RecommendationGrid from "./RecommendationGrid";
 import ContentFilters from "./ContentFilters";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-
 import { ContentItem } from "@/types/omdb";
+
+// Import the new components
+import Discover from "./dashboard/Discover";
+import WhatToWatch from "./dashboard/WhatToWatch";
+import SimilarContent from "./dashboard/SimilarContent";
 
 interface PreferenceResults {
   genres: string[];
@@ -51,13 +52,6 @@ const Dashboard = () => {
     excludedGenres: profile?.preferred_genres ? [] : [],
   });
 
-  // What to Watch feature state
-  const [selectedGenres, setSelectedGenres] = useState<string[]>(
-    profile?.preferred_genres || [],
-  );
-  const [selectedMood, setSelectedMood] = useState<string>("");
-  const [viewingTime, setViewingTime] = useState<number>(120); // Default 2 hours
-
   useEffect(() => {
     // Check if we should use direct API calls or Netlify functions
     const useDirectApiFlag = import.meta.env.VITE_USE_DIRECT_API === "true";
@@ -89,30 +83,33 @@ const Dashboard = () => {
   };
 
   // Handle What to Watch submission
-  const handleWhatToWatchSubmit = async () => {
-    if (selectedGenres.length === 0 || !selectedMood) {
-      return;
-    }
-
+  const handleWhatToWatchSubmit = async (preferences: {
+    genres: string[];
+    mood: string;
+    viewingTime: number;
+    favoriteContent: string[];
+    contentToAvoid: string[];
+    ageRating: string;
+  }) => {
     setIsLoading(true);
     setActiveTab("recommendations");
 
     try {
-      // Create preferences object from selected options
-      const preferences = {
-        genres: selectedGenres,
-        mood: selectedMood,
-        viewingTime: viewingTime,
-        favoriteContent: [],
-        contentToAvoid: [],
-        ageRating: filters.maturityLevel || "PG-13",
-      };
+      // Use Netlify function instead of direct API call
+      const response = await fetch("/.netlify/functions/ai-recommendations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ preferences, limit: 10 }),
+      });
 
-      // Get AI recommendations using the existing aiService
-      const { getPersonalizedRecommendations } = await import(
-        "@/services/aiService"
-      );
-      const aiRecs = await getPersonalizedRecommendations(preferences, 10);
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      const aiRecs = data.recommendations || [];
 
       if (aiRecs && aiRecs.length > 0) {
         console.log("AI recommendations received:", aiRecs);
@@ -167,26 +164,12 @@ const Dashboard = () => {
       console.log(
         "No valid AI recommendations found, falling back to mock data",
       );
-      const mockRecommendations = generateMockRecommendations({
-        genres: selectedGenres,
-        mood: selectedMood,
-        viewingTime: viewingTime,
-        favoriteContent: [],
-        contentToAvoid: [],
-        ageRating: filters.maturityLevel || "PG-13",
-      });
+      const mockRecommendations = generateMockRecommendations(preferences);
       setRecommendations(mockRecommendations);
     } catch (error) {
       console.error("Error processing recommendations:", error);
       // Fallback to mock recommendations
-      const mockRecommendations = generateMockRecommendations({
-        genres: selectedGenres,
-        mood: selectedMood,
-        viewingTime: viewingTime,
-        favoriteContent: [],
-        contentToAvoid: [],
-        ageRating: filters.maturityLevel || "PG-13",
-      });
+      const mockRecommendations = generateMockRecommendations(preferences);
       setRecommendations(mockRecommendations);
     } finally {
       setIsLoading(false);
@@ -561,7 +544,7 @@ const Dashboard = () => {
               variant={activeTab === "quiz" ? "default" : "ghost"}
               onClick={() => setActiveTab("quiz")}
             >
-              What to Watch
+              Preference Quiz
             </Button>
             <Button
               variant={activeTab === "similar" ? "default" : "ghost"}
@@ -586,188 +569,19 @@ const Dashboard = () => {
       {/* Main Content */}
       <main className="container py-8">
         {activeTab === "whattowatch" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="max-w-4xl mx-auto space-y-8"
-          >
-            <div className="text-center space-y-4">
-              <h1 className="text-4xl font-bold tracking-tight">
-                What to Watch Tonight?
-              </h1>
-              <p className="text-xl text-muted-foreground">
-                Tell us what you're in the mood for and we'll find the perfect
-                match
-              </p>
-            </div>
-
-            <div className="bg-muted/40 rounded-lg p-6 space-y-6">
-              <div className="space-y-4">
-                <h2 className="text-2xl font-semibold">Select Genres</h2>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    "Action",
-                    "Adventure",
-                    "Animation",
-                    "Comedy",
-                    "Crime",
-                    "Documentary",
-                    "Drama",
-                    "Fantasy",
-                    "Horror",
-                    "Mystery",
-                    "Romance",
-                    "Sci-Fi",
-                    "Thriller",
-                    "Western",
-                  ].map((genre) => (
-                    <Badge
-                      key={genre}
-                      variant={
-                        selectedGenres.includes(genre) ? "default" : "outline"
-                      }
-                      className="px-3 py-1 text-sm cursor-pointer hover:bg-primary/90 transition-colors"
-                      onClick={() => {
-                        if (selectedGenres.includes(genre)) {
-                          setSelectedGenres(
-                            selectedGenres.filter((g) => g !== genre),
-                          );
-                        } else {
-                          setSelectedGenres([...selectedGenres, genre]);
-                        }
-                      }}
-                    >
-                      {genre}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h2 className="text-2xl font-semibold">What's Your Mood?</h2>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    "Happy",
-                    "Thoughtful",
-                    "Excited",
-                    "Relaxed",
-                    "Nostalgic",
-                    "Curious",
-                    "Inspired",
-                    "Emotional",
-                  ].map((mood) => (
-                    <Badge
-                      key={mood}
-                      variant={selectedMood === mood ? "default" : "outline"}
-                      className="px-3 py-1 text-sm cursor-pointer hover:bg-primary/90 transition-colors"
-                      onClick={() => setSelectedMood(mood)}
-                    >
-                      {mood}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h2 className="text-2xl font-semibold">
-                  How Much Time Do You Have?
-                </h2>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>30 min</span>
-                    <span>1 hour</span>
-                    <span>2 hours</span>
-                    <span>3+ hours</span>
-                  </div>
-                  <Slider
-                    defaultValue={[viewingTime]}
-                    min={30}
-                    max={180}
-                    step={15}
-                    onValueChange={(value) => setViewingTime(value[0])}
-                  />
-                  <div className="text-center text-muted-foreground">
-                    {viewingTime < 60
-                      ? `${viewingTime} minutes`
-                      : `${Math.floor(viewingTime / 60)} hour${viewingTime >= 120 ? "s" : ""}${viewingTime % 60 > 0 ? ` ${viewingTime % 60} minutes` : ""}`}
-                  </div>
-                </div>
-              </div>
-
-              <Button
-                className="w-full mt-4"
-                size="lg"
-                onClick={() => handleWhatToWatchSubmit()}
-                disabled={selectedGenres.length === 0 || !selectedMood}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Finding the perfect match...
-                  </>
-                ) : (
-                  "Find My Perfect Match"
-                )}
-              </Button>
-            </div>
-          </motion.div>
+          <WhatToWatch
+            onSubmit={handleWhatToWatchSubmit}
+            isLoading={isLoading}
+            maturityLevel={filters.maturityLevel}
+            initialGenres={profile?.preferred_genres || []}
+          />
         )}
 
         {activeTab === "discover" && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="max-w-4xl mx-auto space-y-8"
-          >
-            <div className="text-center space-y-4">
-              <h1 className="text-4xl font-bold tracking-tight">
-                Discover your next favorite movie or show
-              </h1>
-              <p className="text-xl text-muted-foreground">
-                Get personalized recommendations based on your preferences and
-                favorites.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8">
-              <div className="bg-muted/40 rounded-lg p-6 text-center space-y-4">
-                <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <ListFilter className="h-8 w-8" />
-                </div>
-                <h2 className="text-2xl font-semibold">What to Watch</h2>
-                <p className="text-muted-foreground">
-                  Answer a few questions about your taste to get personalized
-                  recommendations.
-                </p>
-                <Button
-                  size="lg"
-                  onClick={() => setActiveTab("quiz")}
-                  className="mt-4"
-                >
-                  Get Started
-                </Button>
-              </div>
-
-              <div className="bg-muted/40 rounded-lg p-6 text-center space-y-4">
-                <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  <Search className="h-8 w-8" />
-                </div>
-                <h2 className="text-2xl font-semibold">Find Similar Content</h2>
-                <p className="text-muted-foreground">
-                  Search for a movie or show you love to find similar content
-                  you might enjoy.
-                </p>
-                <Button
-                  size="lg"
-                  onClick={() => setActiveTab("similar")}
-                  className="mt-4"
-                >
-                  Search Now
-                </Button>
-              </div>
-            </div>
-          </motion.div>
+          <Discover
+            onStartQuiz={() => setActiveTab("quiz")}
+            onStartSimilarSearch={() => setActiveTab("similar")}
+          />
         )}
 
         {activeTab === "quiz" && (
@@ -781,12 +595,10 @@ const Dashboard = () => {
         )}
 
         {activeTab === "similar" && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <SimilarContentSearch
-              onSelectItem={handleSimilarContentSelect}
-              useDirectApi={useDirectApi}
-            />
-          </motion.div>
+          <SimilarContent
+            onSelectItem={handleSimilarContentSelect}
+            useDirectApi={useDirectApi}
+          />
         )}
 
         {activeTab === "recommendations" && (
