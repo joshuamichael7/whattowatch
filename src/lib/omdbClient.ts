@@ -1223,18 +1223,20 @@ function useTraditionalSimilarity(
   });
 }
 
-// Function to get trending content using regular Netlify function
+// Function to get trending content - prioritizes Supabase (with curated homepage content) over Netlify function
 export async function getTrendingContent(
   type?: "movie" | "tv",
   limit = 8,
 ): Promise<ContentItem[]> {
   console.log(
-    `[getTrendingContent] Fetching ${type || "all"} content using regular function`,
+    `[getTrendingContent] Fetching ${type || "all"} content, prioritizing curated content`,
   );
 
   // Add detailed logging to troubleshoot
   console.log(`[getTrendingContent] Checking if Supabase is configured`);
-  const { isSupabaseConfigured } = await import("./supabaseClient");
+  const { isSupabaseConfigured, getTrendingContentFromSupabase } = await import(
+    "./supabaseClient"
+  );
   const supabaseConfigured = isSupabaseConfigured();
   console.log(
     `[getTrendingContent] Supabase configured: ${supabaseConfigured}`,
@@ -1242,19 +1244,19 @@ export async function getTrendingContent(
 
   if (supabaseConfigured) {
     try {
-      const { getTrendingContentFromSupabase } = await import(
-        "./supabaseClient"
-      );
       console.log(
         `[getTrendingContent] Calling getTrendingContentFromSupabase with type=${type}, limit=${limit}`,
       );
+      // This will first check homepage_content table for curated content
       const supabaseResults = await getTrendingContentFromSupabase(type, limit);
       console.log(
         `[getTrendingContent] Supabase returned ${supabaseResults?.length || 0} results`,
       );
 
       if (supabaseResults && supabaseResults.length > 0) {
-        console.log(`[getTrendingContent] Using results from Supabase`);
+        console.log(
+          `[getTrendingContent] Using results from Supabase (may include curated content)`,
+        );
         if (supabaseResults.length > 0) {
           console.log(
             `[getTrendingContent] First result: ${supabaseResults[0].id}, ${supabaseResults[0].title}`,

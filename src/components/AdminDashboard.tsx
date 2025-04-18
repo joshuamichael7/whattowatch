@@ -18,10 +18,12 @@ import {
   Users,
   ShieldCheck,
   Check,
+  Layout,
 } from "lucide-react";
 import CsvManagement from "./admin/CsvManagement";
 import AdminPasswordReset from "./admin/AdminPasswordReset";
 import AdminPasswordForm from "./AdminPasswordForm";
+import HomepageContentManager from "./admin/HomepageContentManager";
 
 const AdminDashboard: React.FC = () => {
   const { user, profile, isLoading, isAdmin, isAdminVerified, refreshProfile } =
@@ -126,7 +128,7 @@ const AdminDashboard: React.FC = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="data" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-8">
+            <TabsList className="grid w-full grid-cols-5 mb-8">
               <TabsTrigger value="data" className="flex items-center gap-2">
                 <Database className="h-4 w-4" />
                 Data Management
@@ -134,6 +136,10 @@ const AdminDashboard: React.FC = () => {
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
                 User Management
+              </TabsTrigger>
+              <TabsTrigger value="homepage" className="flex items-center gap-2">
+                <Layout className="h-4 w-4" />
+                Homepage
               </TabsTrigger>
               <TabsTrigger value="import" className="flex items-center gap-2">
                 <Upload className="h-4 w-4" />
@@ -205,6 +211,18 @@ const AdminDashboard: React.FC = () => {
                 <p className="text-sm text-muted-foreground">
                   User management features will be implemented soon.
                 </p>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="homepage" className="space-y-4">
+              <h3 className="text-lg font-medium">
+                Homepage Content Management
+              </h3>
+              <p className="text-muted-foreground">
+                Curate and manage the content displayed on the homepage.
+              </p>
+              <div className="mt-6">
+                <HomepageContentManager />
               </div>
             </TabsContent>
 

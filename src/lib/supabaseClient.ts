@@ -380,16 +380,118 @@ export async function getTrendingContentFromSupabase(
   console.log("[supabaseClient] Supabase key exists:", !!supabaseKey);
 
   try {
+    // First, check if we have curated homepage content
+    console.log("[supabaseClient] Checking for curated homepage content");
+
+    // Convert 'tv' to 'series' for database compatibility if type is provided
+    const mediaType = type ? (type === "tv" ? "series" : type) : undefined;
+
+    // Get content IDs from homepage_content table, ordered by the 'order' column
+    const { data: homepageContentData, error: homepageContentError } =
+      await supabase
+        .from("homepage_content")
+        .select("content_id, order")
+        .order("order", { ascending: true });
+
+    if (homepageContentError) {
+      console.error(
+        "[supabaseClient] Error getting homepage content:",
+        homepageContentError,
+      );
+      // Continue with regular trending content if there's an error with homepage content
+    } else if (homepageContentData && homepageContentData.length > 0) {
+      console.log(
+        `[supabaseClient] Found ${homepageContentData.length} curated homepage items`,
+      );
+
+      // Extract content IDs
+      const contentIds = homepageContentData.map((item) => item.content_id);
+
+      // Fetch the actual content items
+      let contentQuery = supabase
+        .from("content")
+        .select("*")
+        .in("id", contentIds);
+
+      // Apply media type filter if specified
+      if (mediaType) {
+        contentQuery = contentQuery.eq("media_type", mediaType);
+      }
+
+      const { data: curatedContent, error: curatedContentError } =
+        await contentQuery;
+
+      if (curatedContentError) {
+        console.error(
+          "[supabaseClient] Error getting curated content:",
+          curatedContentError,
+        );
+      } else if (curatedContent && curatedContent.length > 0) {
+        console.log(
+          `[supabaseClient] Retrieved ${curatedContent.length} curated content items`,
+        );
+
+        // Sort the content according to the order in homepage_content
+        const orderedContent = curatedContent.sort((a, b) => {
+          const aIndex = homepageContentData.findIndex(
+            (item) => item.content_id === a.id,
+          );
+          const bIndex = homepageContentData.findIndex(
+            (item) => item.content_id === b.id,
+          );
+          return aIndex - bIndex;
+        });
+
+        // If we have enough curated content, return it
+        if (orderedContent.length >= limit) {
+          return orderedContent.slice(0, limit) as ContentItem[];
+        }
+
+        // If we don't have enough curated content, we'll supplement with trending content
+        console.log(
+          `[supabaseClient] Not enough curated content (${orderedContent.length}/${limit}), supplementing with trending content`,
+        );
+
+        // Get additional trending content excluding the curated content IDs
+        const remainingLimit = limit - orderedContent.length;
+        const supplementalContent = await getSupplementalTrendingContent(
+          mediaType,
+          remainingLimit,
+          contentIds,
+        );
+
+        // Combine curated and supplemental content
+        return [...orderedContent, ...supplementalContent] as ContentItem[];
+      }
+    }
+
+    // If we reach here, either there's no homepage content or we encountered an error
+    // Fall back to the original trending content logic
+    return getRegularTrendingContent(mediaType, limit);
+  } catch (error) {
+    console.error("[supabaseClient] Error getting trending content:", error);
+    return [];
+  }
+}
+
+/**
+ * Get regular trending content from Supabase (original implementation)
+ */
+async function getRegularTrendingContent(
+  mediaType?: string,
+  limit: number = 8,
+): Promise<ContentItem[]> {
+  console.log("[supabaseClient] Getting regular trending content");
+
+  try {
     console.log("[supabaseClient] Building query for content table");
     let query = supabase
       .from("content")
       .select("*")
       .order("popularity", { ascending: false });
 
-    if (type) {
-      console.log(`[supabaseClient] Filtering by media_type: ${type}`);
-      // Convert 'tv' to 'series' for database compatibility
-      const mediaType = type === "tv" ? "series" : type;
+    if (mediaType) {
+      console.log(`[supabaseClient] Filtering by media_type: ${mediaType}`);
       query = query.eq("media_type", mediaType);
     }
 
@@ -423,7 +525,64 @@ export async function getTrendingContentFromSupabase(
 
     return data as ContentItem[];
   } catch (error) {
-    console.error("[supabaseClient] Error getting trending content:", error);
+    console.error(
+      "[supabaseClient] Error getting regular trending content:",
+      error,
+    );
+    return [];
+  }
+}
+
+/**
+ * Get supplemental trending content, excluding specified content IDs
+ */
+async function getSupplementalTrendingContent(
+  mediaType?: string,
+  limit: number = 8,
+  excludeIds: string[] = [],
+): Promise<ContentItem[]> {
+  console.log(
+    `[supabaseClient] Getting supplemental trending content, limit: ${limit}`,
+  );
+
+  try {
+    let query = supabase
+      .from("content")
+      .select("*")
+      .order("popularity", { ascending: false });
+
+    if (mediaType) {
+      query = query.eq("media_type", mediaType);
+    }
+
+    // Exclude the content IDs that are already in the curated content
+    if (excludeIds.length > 0) {
+      query = query.not(
+        "id",
+        "in",
+        `(${excludeIds.map((id) => `'${id}'`).join(",")})`,
+      );
+    }
+
+    const { data, error } = await query.limit(limit);
+
+    if (error) {
+      console.error(
+        "[supabaseClient] Error getting supplemental trending content:",
+        error,
+      );
+      return [];
+    }
+
+    console.log(
+      `[supabaseClient] Supplemental query returned ${data?.length || 0} results`,
+    );
+    return data as ContentItem[];
+  } catch (error) {
+    console.error(
+      "[supabaseClient] Error getting supplemental trending content:",
+      error,
+    );
     return [];
   }
 }
