@@ -25,6 +25,8 @@ export async function getSimilarContentTitles(
         overview,
         mediaType,
         limit,
+        apiVersion: "v1beta",
+        modelName: "gemini-2.0-flash",
       },
       {
         headers: {
@@ -76,6 +78,8 @@ export async function getPersonalizedRecommendations(
       {
         preferences,
         limit,
+        apiVersion: "v1beta",
+        modelName: "gemini-2.0-flash",
       },
       {
         headers: {
@@ -124,6 +128,8 @@ export async function analyzeContentSimilarity(
       {
         baseContent,
         comparisonContent,
+        apiVersion: "v1beta",
+        modelName: "gemini-2.0-flash",
       },
       {
         headers: {
