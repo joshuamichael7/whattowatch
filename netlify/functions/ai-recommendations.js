@@ -3,9 +3,8 @@ const axios = require("axios");
 // Configuration for the Gemini API
 const defaultConfig = {
   apiKey: process.env.GEMINI_API_KEY,
-  apiEndpoint:
-    process.env.GEMINI_API_ENDPOINT ||
-    "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent",
+  apiVersion: "v1beta",
+  modelName: "gemini-2.0-flash",
   maxTokens: parseInt(process.env.GEMINI_MAX_TOKENS || "1024"),
   temperature: parseFloat(process.env.GEMINI_TEMPERATURE || "0.7"),
 };
@@ -39,7 +38,12 @@ exports.handler = async (event, context) => {
 
   try {
     // Parse the request body
-    const { preferences, limit = 10 } = JSON.parse(event.body || "{}");
+    const {
+      preferences,
+      limit = 10,
+      apiVersion,
+      modelName,
+    } = JSON.parse(event.body || "{}");
 
     if (!preferences) {
       return {
@@ -48,6 +52,10 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({ error: "Missing preferences in request body" }),
       };
     }
+
+    // Override config with request parameters if provided
+    if (apiVersion) defaultConfig.apiVersion = apiVersion;
+    if (modelName) defaultConfig.modelName = modelName;
 
     // Check if we have a Gemini API key
     if (!defaultConfig.apiKey) {
@@ -92,9 +100,14 @@ exports.handler = async (event, context) => {
     \n
     Only return the JSON array, no other text.`;
 
+    // Construct the API endpoint URL
+    const apiEndpoint = `https://generativelanguage.googleapis.com/${defaultConfig.apiVersion}/models/${defaultConfig.modelName}:generateContent`;
+
+    console.log(`Using Gemini API endpoint: ${apiEndpoint}`);
+
     // Make the API request
     const response = await axios.post(
-      `${defaultConfig.apiEndpoint}?key=${defaultConfig.apiKey}`,
+      `${apiEndpoint}?key=${defaultConfig.apiKey}`,
       {
         contents: [
           {
