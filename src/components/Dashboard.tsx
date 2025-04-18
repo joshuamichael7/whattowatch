@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import * as omdbClient from "@/lib/omdbClient";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PlayCircle, Search, ListFilter, Loader2 } from "lucide-react";
+import { PlayCircle, Search, ListFilter, Loader2, X } from "lucide-react";
 import PreferenceFinder from "./PreferenceQuiz";
 import SimilarContentSearch from "./SimilarContentSearch";
 import RecommendationGrid from "./RecommendationGrid";
@@ -21,6 +22,13 @@ interface PreferenceResults {
   contentToAvoid: string[];
   ageRating: string;
   aiRecommendations?: Array<{ title: string; reason: string }>;
+  isAiRecommendationSuccess?: boolean;
+  aiRecommendationError?: string | null;
+  // For compatibility with the updated PreferenceQuiz component
+  moods?: string[];
+  ageRatings?: string[];
+  languagePreference?: string;
+  releaseYearRange?: { min: number; max: number };
 }
 
 interface ContentFilterOptions {
@@ -190,9 +198,14 @@ const Dashboard = () => {
     setIsLoading(true);
     setActiveTab("recommendations");
 
+    // Track if we're using fallback data
+    let usingFallbackData = false;
+    let errorMessage = "";
+
     try {
-      // Check if we have AI recommendations from the quiz
+      // Check if we have AI recommendations from the quiz and if the AI call was successful
       if (
+        preferences.isAiRecommendationSuccess &&
         preferences.aiRecommendations &&
         preferences.aiRecommendations.length > 0
       ) {
@@ -230,6 +243,7 @@ const Dashboard = () => {
                     ...detailedContent,
                     recommendationReason:
                       rec.reason || "AI recommended based on your preferences",
+                    aiRecommended: true,
                   };
                   return contentItem;
                 }
@@ -258,7 +272,21 @@ const Dashboard = () => {
           setRecommendations(validRecommendations);
           setIsLoading(false);
           return;
+        } else {
+          // If we couldn't find any valid recommendations despite having AI recommendations
+          usingFallbackData = true;
+          errorMessage =
+            "Could not find detailed information for AI recommendations. Using alternative recommendations.";
         }
+      } else if (preferences.aiRecommendationError) {
+        // If there was an error with the AI recommendations
+        usingFallbackData = true;
+        errorMessage = preferences.aiRecommendationError;
+      } else {
+        // If there were no AI recommendations
+        usingFallbackData = true;
+        errorMessage =
+          "No AI recommendations available. Using alternative recommendations.";
       }
 
       console.log(
@@ -266,15 +294,42 @@ const Dashboard = () => {
       );
       // Fallback to mock recommendations if AI recommendations failed or weren't available
       const mockRecommendations = generateMockRecommendations(preferences);
-      setRecommendations(mockRecommendations);
+
+      // Mark these as fallback recommendations
+      const markedRecommendations = mockRecommendations.map((item) => ({
+        ...item,
+        isErrorFallback: true,
+        recommendationReason:
+          item.recommendationReason || "Based on your selected preferences",
+      }));
+
+      setRecommendations(markedRecommendations);
     } catch (error) {
       console.error("Error processing recommendations:", error);
       // Fallback to mock recommendations
       console.log("Error occurred, falling back to mock data");
+      usingFallbackData = true;
+      errorMessage =
+        "An error occurred while processing recommendations. Using alternative recommendations.";
+
       const mockRecommendations = generateMockRecommendations(preferences);
-      setRecommendations(mockRecommendations);
+      // Mark these as error fallback recommendations
+      const markedRecommendations = mockRecommendations.map((item) => ({
+        ...item,
+        isErrorFallback: true,
+        recommendationReason:
+          item.recommendationReason || "Based on your selected preferences",
+      }));
+
+      setRecommendations(markedRecommendations);
     } finally {
       setIsLoading(false);
+
+      // If we're using fallback data, show a toast or notification
+      if (usingFallbackData && errorMessage) {
+        console.warn("Using fallback recommendations:", errorMessage);
+        // Here you could add a toast notification if you have a toast system
+      }
     }
   };
 
@@ -748,20 +803,61 @@ const Dashboard = () => {
                 />
               </div>
               <div className="flex-1">
-                <RecommendationGrid
-                  recommendations={recommendations}
-                  isLoading={isLoading}
-                  onFilterChange={() => {}}
-                  useDirectApi={useDirectApi}
-                  userId={user?.id}
-                  userPreferences={profile}
-                  onFeedbackSubmit={(itemId, isPositive) => {
-                    console.log(
-                      `User ${user?.id} rated ${itemId} as ${isPositive ? "positive" : "negative"}`,
-                    );
-                    // This feedback will be used to improve future recommendations
-                  }}
-                />
+                {isLoading ? (
+                  <div className="flex flex-col items-center justify-center p-12 space-y-4 bg-muted/20 rounded-lg border border-muted">
+                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                    <p className="text-lg font-medium">
+                      Finding the perfect recommendations for you...
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      This may take a few moments as we analyze your preferences
+                    </p>
+                  </div>
+                ) : recommendations.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center p-12 space-y-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                    <X className="h-12 w-12 text-red-500" />
+                    <p className="text-lg font-medium">
+                      Unable to find recommendations
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Please try again with different preferences or check your
+                      connection
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => setActiveTab("quiz")}
+                      className="mt-2"
+                    >
+                      Try Again
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    {recommendations.some((rec) => rec.isErrorFallback) && (
+                      <div className="mb-4 p-4 border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800 rounded-md">
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                          Some recommendations are based on your preferences
+                          rather than AI analysis. This may happen due to API
+                          limitations or connectivity issues.
+                        </p>
+                      </div>
+                    )}
+                    <RecommendationGrid
+                      recommendations={recommendations}
+                      isLoading={false}
+                      onFilterChange={() => {}}
+                      useDirectApi={useDirectApi}
+                      userId={user?.id}
+                      userPreferences={profile}
+                      onFeedbackSubmit={(itemId, isPositive) => {
+                        console.log(
+                          `User ${user?.id} rated ${itemId} as ${isPositive ? "positive" : "negative"}`,
+                        );
+                        // This feedback will be used to improve future recommendations
+                      }}
+                    />
+                  </>
+                )}
               </div>
             </div>
           </motion.div>

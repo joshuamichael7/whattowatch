@@ -599,12 +599,28 @@ export async function getSimilarContent(
 
     // Store the content in the vector database for future queries
     if (useVectorDB) {
-      storeContentVector(content).catch((error) => {
+      try {
+        // Use a non-blocking approach with a timeout to prevent hanging if the service is slow
+        const storePromise = storeContentVector(content);
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("Vector storage timeout")), 5000); // 5 second timeout
+        });
+
+        // Race the storage against the timeout
+        Promise.race([storePromise, timeoutPromise]).catch((error) => {
+          console.error(
+            "[getSimilarContent] Error or timeout storing content vector:",
+            error,
+          );
+          // Continue regardless of vector storage errors
+        });
+      } catch (vectorStoreError) {
         console.error(
-          "[getSimilarContent] Error storing content vector:",
-          error,
+          "[getSimilarContent] Error setting up vector storage:",
+          vectorStoreError,
         );
-      });
+        // Continue regardless of vector storage errors
+      }
     }
 
     // If AI is enabled, try to get similar content titles from the AI service
@@ -613,135 +629,178 @@ export async function getSimilarContent(
         `[getSimilarContent] Using AI to find similar content for "${content.title}"`,
       );
 
-      // Check if Gemini API key is available
-      const geminiApiKey = getEnvVar("GEMINI_API_KEY");
-      if (!geminiApiKey) {
-        console.warn(
-          "[getSimilarContent] Gemini API key not found, skipping AI recommendations",
-        );
-      } else {
-        // Get similar content titles from the AI service
-        const similarTitles = await getSimilarContentTitles(
-          content.title,
-          content.overview,
-          content.media_type,
-          Math.min(20, limit * 2), // Request more titles than needed to account for not finding some
-          { apiKey: geminiApiKey },
-        );
-
-        console.log(
-          `[getSimilarContent] AI returned titles: ${JSON.stringify(similarTitles)}`,
-        ); // Add logging
-
-        if (similarTitles.length > 0) {
-          console.log(
-            `[getSimilarContent] AI returned ${similarTitles.length} similar titles`,
+      try {
+        // Check if Gemini API key is available
+        const geminiApiKey = getEnvVar("GEMINI_API_KEY");
+        if (!geminiApiKey) {
+          console.warn(
+            "[getSimilarContent] Gemini API key not found, skipping AI recommendations",
+          );
+          // Continue with traditional recommendations
+        } else {
+          // Get similar content titles from the AI service
+          const similarTitles = await getSimilarContentTitles(
+            content.title,
+            content.overview,
+            content.media_type,
+            Math.min(20, limit * 2), // Request more titles than needed to account for not finding some
+            { apiKey: geminiApiKey },
           );
 
-          // Search for each title in OMDB
-          const searchPromises = similarTitles.map((title) => {
-            const params = new URLSearchParams({
-              s: title,
-              type: content.media_type === "movie" ? "movie" : "series",
+          console.log(
+            `[getSimilarContent] AI returned titles: ${JSON.stringify(similarTitles)}`,
+          );
+
+          if (similarTitles && similarTitles.length > 0) {
+            console.log(
+              `[getSimilarContent] AI returned ${similarTitles.length} similar titles`,
+            );
+
+            // Search for each title in OMDB
+            const searchPromises = similarTitles.map((title) => {
+              const params = new URLSearchParams({
+                s: title,
+                type: content.media_type === "movie" ? "movie" : "series",
+              });
+              return fetchFromOmdb(params);
             });
-            return fetchFromOmdb(params);
-          });
 
-          // Wait for all search results
-          const searchResults = await Promise.all(searchPromises);
+            // Wait for all search results
+            const searchResults = await Promise.all(searchPromises);
 
-          // Process the results
-          const aiRecommendations = [];
+            // Process the results
+            const aiRecommendations = [];
 
-          searchResults.forEach((result, index) => {
-            if (result && result.Response === "True" && result.Search) {
-              // Take the first result for each title (most relevant match)
-              const item = result.Search[0];
-              if (item && item.imdbID !== contentId) {
-                aiRecommendations.push({
-                  id: item.imdbID,
-                  title: item.Title,
-                  poster_path: item.Poster !== "N/A" ? item.Poster : "",
-                  media_type: item.Type === "movie" ? "movie" : "tv",
-                  release_date: item.Year,
-                  vote_average: 0,
-                  vote_count: 0,
-                  genre_ids: content.genre_ids || [],
-                  genre_strings: content.genre_strings || [],
-                  overview: "",
-                  recommendationReason: `AI recommended based on ${content.title}`,
-                  aiRecommended: true,
-                  aiSimilarityScore: 1 - index / similarTitles.length, // Higher score for earlier results
-                });
+            searchResults.forEach((result, index) => {
+              if (result && result.Response === "True" && result.Search) {
+                // Take the first result for each title (most relevant match)
+                const item = result.Search[0];
+                if (item && item.imdbID !== contentId) {
+                  aiRecommendations.push({
+                    id: item.imdbID,
+                    title: item.Title,
+                    poster_path: item.Poster !== "N/A" ? item.Poster : "",
+                    media_type: item.Type === "movie" ? "movie" : "tv",
+                    release_date: item.Year,
+                    vote_average: 0,
+                    vote_count: 0,
+                    genre_ids: content.genre_ids || [],
+                    genre_strings: content.genre_strings || [],
+                    overview: "",
+                    recommendationReason: `AI recommended based on ${content.title}`,
+                    aiRecommended: true,
+                    aiSimilarityScore: 1 - index / similarTitles.length, // Higher score for earlier results
+                  });
 
-                // Store this content in the vector database for future queries
-                if (useVectorDB) {
-                  getContentById(item.imdbID)
-                    .then((detailedContent) => {
-                      if (detailedContent) {
-                        storeContentVector(detailedContent).catch((error) => {
-                          console.error(
-                            "[getSimilarContent] Error storing AI recommendation vector:",
-                            error,
-                          );
-                        });
-                      }
-                    })
-                    .catch((error) => {
-                      console.error(
-                        "[getSimilarContent] Error getting AI recommendation details:",
-                        error,
-                      );
-                    });
+                  // Store this content in the vector database for future queries
+                  if (useVectorDB) {
+                    getContentById(item.imdbID)
+                      .then((detailedContent) => {
+                        if (detailedContent) {
+                          storeContentVector(detailedContent).catch((error) => {
+                            console.error(
+                              "[getSimilarContent] Error storing AI recommendation vector:",
+                              error,
+                            );
+                          });
+                        }
+                      })
+                      .catch((error) => {
+                        console.error(
+                          "[getSimilarContent] Error getting AI recommendation details:",
+                          error,
+                        );
+                      });
+                  }
                 }
               }
+            });
+
+            if (aiRecommendations.length >= limit) {
+              console.log(
+                `[getSimilarContent] Returning ${limit} AI recommendations`,
+              );
+              // Add a flag to indicate these are AI recommendations
+              return aiRecommendations.slice(0, limit).map((item) => ({
+                ...item,
+                aiRecommended: true,
+              }));
             }
-          });
 
-          if (aiRecommendations.length >= limit) {
             console.log(
-              `[getSimilarContent] Returning ${limit} AI recommendations`,
+              `[getSimilarContent] AI returned only ${aiRecommendations.length} valid recommendations, supplementing with traditional search`,
             );
-            return aiRecommendations.slice(0, limit);
+            // If we don't have enough AI recommendations, continue with traditional search
+            // and combine the results later
+          } else {
+            console.log(
+              `[getSimilarContent] AI returned no valid titles, falling back to traditional recommendations`,
+            );
+            // Continue with traditional recommendations
           }
-
-          console.log(
-            `[getSimilarContent] AI returned only ${aiRecommendations.length} valid recommendations, supplementing with traditional search`,
-          );
-          // If we don't have enough AI recommendations, continue with traditional search
-          // and combine the results later
         }
+      } catch (aiError) {
+        console.error(
+          "[getSimilarContent] Error using AI service for recommendations:",
+          aiError,
+        );
+        console.log(
+          "[getSimilarContent] Falling back to traditional recommendation methods",
+        );
+        // Continue with traditional recommendations - the function will proceed to the next section
       }
     }
 
     // If vector DB is enabled, try to get similar content from the vector database
     let vectorResults = [];
     if (useVectorDB) {
-      // Check if Pinecone API key is available
-      const pineconeApiKey = getEnvVar("PINECONE_API_KEY");
+      try {
+        // Check if Pinecone API key is available
+        const pineconeApiKey = getEnvVar("PINECONE_API_KEY");
 
-      if (!pineconeApiKey) {
-        console.warn(
-          "[getSimilarContent] Pinecone API key not found, skipping vector DB recommendations",
-        );
-      } else {
-        const similarIds = await querySimilarContent(
-          contentId,
-          undefined,
-          limit,
-        );
-        if (similarIds.length > 0) {
-          const detailsPromises = similarIds.map((id) => getContentById(id));
-          const detailedContents = await Promise.all(detailsPromises);
-          vectorResults = detailedContents.filter((item) => item !== null);
+        if (!pineconeApiKey) {
+          console.warn(
+            "[getSimilarContent] Pinecone API key not found, skipping vector DB recommendations",
+          );
+        } else {
+          const similarIds = await querySimilarContent(
+            contentId,
+            undefined,
+            limit,
+          );
+          if (similarIds && similarIds.length > 0) {
+            const detailsPromises = similarIds.map((id) => getContentById(id));
+            const detailedContents = await Promise.all(detailsPromises);
+            vectorResults = detailedContents.filter((item) => item !== null);
 
-          if (vectorResults.length >= limit) {
+            if (vectorResults.length >= limit) {
+              console.log(
+                `[getSimilarContent] Returning ${limit} vector DB recommendations`,
+              );
+              // Add a flag to indicate these are vector DB recommendations
+              return vectorResults.slice(0, limit).map((item) => ({
+                ...item,
+                vectorDbRecommended: true,
+                recommendationReason:
+                  item.recommendationReason ||
+                  `Similar to ${content.title} (vector similarity)`,
+              }));
+            }
+          } else {
             console.log(
-              `[getSimilarContent] Returning ${limit} vector DB recommendations`,
+              `[getSimilarContent] Vector DB returned no results, continuing with traditional methods`,
             );
-            return vectorResults.slice(0, limit);
           }
         }
+      } catch (vectorError) {
+        console.error(
+          "[getSimilarContent] Error using vector database for recommendations:",
+          vectorError,
+        );
+        console.log(
+          "[getSimilarContent] Falling back to traditional recommendation methods",
+        );
+        // Continue with traditional recommendations
       }
     }
 
@@ -1125,25 +1184,52 @@ export async function getSimilarContent(
   } catch (error) {
     console.error("Error getting similar content:", error);
 
+    // Determine if this was an AI-specific error
+    const isAiError =
+      error.message &&
+      (error.message.includes("AI") ||
+        error.message.includes("Gemini") ||
+        error.message.toLowerCase().includes("model") ||
+        error.message.toLowerCase().includes("token"));
+
     // Fallback to trending content in case of any error, if enabled
     if (fallbackToTrending) {
       console.log(
-        "[getSimilarContent] Error occurred, falling back to trending content",
+        `[getSimilarContent] ${isAiError ? "AI service error" : "General error"} occurred, falling back to trending content`,
       );
       try {
         const trendingItems = await getTrendingContent("movie", limit);
         return trendingItems.map((item) => ({
           ...item,
           isErrorFallback: true,
-          recommendationReason:
-            item.recommendationReason || "Recommended while we fix an issue",
+          aiServiceUnavailable: isAiError,
+          recommendationReason: isAiError
+            ? "AI service currently unavailable - showing trending content instead"
+            : item.recommendationReason || "Recommended while we fix an issue",
         }));
       } catch (fallbackError) {
         console.error(
           "Error getting trending content as fallback:",
           fallbackError,
         );
-        return [];
+        // Last resort - return an empty array with an error flag
+        return [
+          {
+            id: "error-fallback",
+            title: "Recommendations Unavailable",
+            poster_path: "",
+            media_type: "movie",
+            release_date: "",
+            vote_average: 0,
+            vote_count: 0,
+            genre_ids: [],
+            overview:
+              "We're having trouble generating recommendations right now. Please try again later.",
+            isErrorFallback: true,
+            aiServiceUnavailable: isAiError,
+            recommendationReason: "Service temporarily unavailable",
+          },
+        ];
       }
     } else {
       console.log(

@@ -65,6 +65,9 @@ const SimilarContentSearch = ({
   );
   const [activeTab, setActiveTab] = useState("all");
   const [error, setError] = useState<string | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [isUsingAi, setIsUsingAi] = useState(false);
 
   // Handle search function using OMDB API
   const handleSearch = async () => {
@@ -101,16 +104,48 @@ const SimilarContentSearch = ({
     setSelectedItem(item);
     setIsSearching(true);
     setError(null);
+    setAiError(null);
+
+    // Check if we have enough information to use AI recommendations
+    const canUseAi = item.overview && item.title;
+    setIsUsingAi(canUseAi);
+
+    if (canUseAi) {
+      setIsAiLoading(true);
+    }
 
     try {
       // Get similar content based on the selected item, using the appropriate API method
       console.log(
         `[SimilarContentSearch] Getting similar content for: ${item.title} (${item.media_type}), ID: ${item.id}`,
       );
-      const similarItems = await getSimilarContent(item.id, useDirectApi);
+
+      console.log(
+        `[SimilarContentSearch] Using AI for recommendations: ${canUseAi}`,
+      );
+
+      const similarItems = await getSimilarContent(
+        item.id,
+        useDirectApi,
+        12, // Increased from default 8 to 12 for more diverse recommendations
+        canUseAi, // Use AI if we have enough information
+        true, // Use vector DB if available
+      );
+
       console.log(
         `[SimilarContentSearch] Found ${similarItems.length} similar items`,
       );
+
+      // Check if we got AI recommendations
+      const aiRecommendations = similarItems.filter(
+        (item) => item.aiRecommended,
+      );
+      if (canUseAi && aiRecommendations.length === 0) {
+        setAiError(
+          "AI recommendations were not available. Showing alternative recommendations.",
+        );
+      }
+
       setSimilarContent(similarItems);
 
       if (similarItems.length === 0) {
@@ -122,8 +157,14 @@ const SimilarContentSearch = ({
       console.error("Error getting similar content:", error);
       setSimilarContent([]);
       setError("Failed to find similar content. Please try again.");
+      if (canUseAi) {
+        setAiError(
+          "AI service is currently unavailable. Please try again later.",
+        );
+      }
     } finally {
       setIsSearching(false);
+      setIsAiLoading(false);
     }
   };
 
@@ -131,12 +172,15 @@ const SimilarContentSearch = ({
     setSearchQuery("");
     setSearchResults([]);
     setError(null);
+    setAiError(null);
   };
 
   const clearSelection = () => {
     setSelectedItem(null);
     setSimilarContent([]);
     setError(null);
+    setAiError(null);
+    setIsUsingAi(false);
   };
 
   const filteredContent =
@@ -331,6 +375,30 @@ const SimilarContentSearch = ({
             </div>
           </Card>
 
+          {/* AI Status Indicator */}
+          {isUsingAi && (
+            <div
+              className={`mb-4 p-3 rounded-md ${aiError ? "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400" : "bg-primary/10 text-primary"}`}
+            >
+              {isAiLoading ? (
+                <div className="flex items-center">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <span>Finding AI-powered recommendations...</span>
+                </div>
+              ) : aiError ? (
+                <div className="flex items-center">
+                  <span>{aiError}</span>
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <span>
+                    Showing AI-powered recommendations based on content analysis
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           {isSearching ? (
             <div className="flex justify-center items-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -410,8 +478,18 @@ const SimilarContentSearch = ({
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-3">
-                          {item.overview}
+                          {item.overview || item.recommendationReason || ""}
                         </p>
+                        {item.aiRecommended && (
+                          <div className="mt-2">
+                            <Badge
+                              variant="outline"
+                              className="bg-primary/10 text-xs"
+                            >
+                              AI Recommended
+                            </Badge>
+                          </div>
+                        )}
                       </CardContent>
                     </Link>
                   </Card>

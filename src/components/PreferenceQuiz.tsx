@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Check, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,12 +21,16 @@ interface PreferenceFinderProps {
 
 interface PreferenceResults {
   genres: string[];
-  mood: string;
+  moods: string[];
   viewingTime: number;
-  favoriteContent: string[];
-  contentToAvoid: string[];
-  ageRating: string;
+  favoriteContent: string;
+  contentToAvoid: string;
+  ageRatings: string[];
   aiRecommendations?: Array<{ title: string; reason: string }>;
+  languagePreference?: string;
+  releaseYearRange?: { min: number; max: number };
+  isAiRecommendationSuccess?: boolean;
+  aiRecommendationError?: string | null;
 }
 
 const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
@@ -35,14 +39,20 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
   const [currentStep, setCurrentStep] = useState(0);
   const [preferences, setPreferences] = useState<PreferenceResults>({
     genres: [],
-    mood: "thoughtful",
+    moods: [],
     viewingTime: 90,
-    favoriteContent: [],
-    contentToAvoid: [],
-    ageRating: "PG-13",
+    favoriteContent: "",
+    contentToAvoid: "",
+    ageRatings: ["PG-13"],
+    languagePreference: "English",
+    releaseYearRange: { min: 1980, max: new Date().getFullYear() },
   });
 
-  const totalSteps = 6;
+  // Add loading and error states for AI recommendations
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const totalSteps = 8;
   const progress = ((currentStep + 1) / totalSteps) * 100;
 
   const handleGenreChange = (genre: string, checked: boolean) => {
@@ -54,34 +64,53 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
     }));
   };
 
-  const handleMoodChange = (mood: string) => {
-    setPreferences((prev) => ({ ...prev, mood }));
+  const handleMoodChange = (mood: string, checked: boolean) => {
+    setPreferences((prev) => ({
+      ...prev,
+      moods: checked
+        ? [...prev.moods, mood]
+        : prev.moods.filter((m) => m !== mood),
+    }));
   };
 
   const handleViewingTimeChange = (value: number[]) => {
     setPreferences((prev) => ({ ...prev, viewingTime: value[0] }));
   };
 
-  const handleFavoriteContentChange = (content: string, checked: boolean) => {
+  const handleFavoriteContentChange = (content: string) => {
     setPreferences((prev) => ({
       ...prev,
-      favoriteContent: checked
-        ? [...prev.favoriteContent, content]
-        : prev.favoriteContent.filter((c) => c !== content),
+      favoriteContent: content,
     }));
   };
 
-  const handleContentToAvoidChange = (content: string, checked: boolean) => {
+  const handleContentToAvoidChange = (content: string) => {
     setPreferences((prev) => ({
       ...prev,
-      contentToAvoid: checked
-        ? [...prev.contentToAvoid, content]
-        : prev.contentToAvoid.filter((c) => c !== content),
+      contentToAvoid: content,
     }));
   };
 
-  const handleAgeRatingChange = (ageRating: string) => {
-    setPreferences((prev) => ({ ...prev, ageRating }));
+  const handleAgeRatingChange = (ageRating: string, checked: boolean) => {
+    setPreferences((prev) => ({
+      ...prev,
+      ageRatings: checked
+        ? [...prev.ageRatings, ageRating]
+        : prev.ageRatings.filter((r) => r !== ageRating),
+    }));
+  };
+
+  const handleLanguageChange = (language: string) => {
+    setPreferences((prev) => ({ ...prev, languagePreference: language }));
+  };
+
+  const handleReleaseYearChange = (values: number[]) => {
+    if (values.length >= 2) {
+      setPreferences((prev) => ({
+        ...prev,
+        releaseYearRange: { min: values[0], max: values[1] },
+      }));
+    }
   };
 
   const nextStep = () => {
@@ -99,32 +128,74 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
   };
 
   const handlePreferenceComplete = async () => {
+    // Reset error state and set loading to true
+    setError(null);
+    setIsLoading(true);
+
     // Try to use enhanced recommendation engine if available
     try {
+      // Convert preferences to the format expected by the AI service
+      const aiServicePreferences = {
+        genres: preferences.genres,
+        mood: preferences.moods.join(", "),
+        viewingTime: preferences.viewingTime,
+        favoriteContent: preferences.favoriteContent
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        contentToAvoid: preferences.contentToAvoid
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        ageRating: preferences.ageRatings[0] || "PG-13", // Use the first selected rating as primary
+      };
+
+      console.log(
+        "Fetching AI recommendations with preferences:",
+        aiServicePreferences,
+      );
+
       const { getPersonalizedRecommendations } = await import(
         "@/services/aiService"
       );
+
       const aiRecommendations = await getPersonalizedRecommendations(
-        preferences,
+        aiServicePreferences,
         10,
       );
 
       // If we got AI recommendations, add them to the preferences object
       if (aiRecommendations && aiRecommendations.length > 0) {
+        console.log("Received AI recommendations:", aiRecommendations);
         const enhancedPreferences = {
           ...preferences,
           aiRecommendations: aiRecommendations,
+          isAiRecommendationSuccess: true,
         };
+        setIsLoading(false);
         onComplete(enhancedPreferences);
         return;
+      } else {
+        console.log("No AI recommendations received, falling back to default");
+        setError(
+          "No recommendations found. Using default recommendations instead.",
+        );
       }
     } catch (error) {
       console.error("Error getting AI recommendations:", error);
+      setError(
+        "Failed to get AI recommendations. Using default recommendations instead.",
+      );
       // Fall back to regular preferences if AI fails
     }
 
     // Default behavior if AI recommendations fail or aren't available
-    onComplete(preferences);
+    setIsLoading(false);
+    onComplete({
+      ...preferences,
+      isAiRecommendationSuccess: false,
+      aiRecommendationError: error,
+    });
   };
 
   const genres = [
@@ -150,6 +221,14 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
     "Emotional",
     "Inspiring",
     "Dark",
+    "Action-packed",
+    "Romantic",
+    "Funny",
+    "Scary",
+    "Mind-bending",
+    "Educational",
+    "Relaxing",
+    "Nostalgic",
   ];
 
   const popularContent = [
@@ -211,25 +290,25 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <>
             <CardHeader>
               <CardTitle className="text-2xl">
-                What mood are you in today?
+                What are you in the mood to watch?
               </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Select all that apply
+              </p>
             </CardHeader>
-            <CardContent>
-              <RadioGroup
-                value={preferences.mood}
-                onValueChange={handleMoodChange}
-                className="grid grid-cols-2 gap-4"
-              >
-                {moods.map((mood) => (
-                  <div key={mood} className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value={mood.toLowerCase()}
-                      id={`mood-${mood}`}
-                    />
-                    <Label htmlFor={`mood-${mood}`}>{mood}</Label>
-                  </div>
-                ))}
-              </RadioGroup>
+            <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {moods.map((mood) => (
+                <div key={mood} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`mood-${mood}`}
+                    checked={preferences.moods.includes(mood.toLowerCase())}
+                    onCheckedChange={(checked) =>
+                      handleMoodChange(mood.toLowerCase(), checked === true)
+                    }
+                  />
+                  <Label htmlFor={`mood-${mood}`}>{mood}</Label>
+                </div>
+              ))}
             </CardContent>
           </>
         );
@@ -246,7 +325,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span>30 min</span>
-                  <span>2+ hours</span>
+                  <span>3+ hours</span>
                 </div>
                 <Slider
                   value={[preferences.viewingTime]}
@@ -259,7 +338,9 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
               <div className="text-center font-medium">
                 {preferences.viewingTime < 60
                   ? `${preferences.viewingTime} minutes`
-                  : `${Math.floor(preferences.viewingTime / 60)} hour${preferences.viewingTime >= 120 ? "s" : ""} ${preferences.viewingTime % 60 > 0 ? `${preferences.viewingTime % 60} minutes` : ""}`}
+                  : preferences.viewingTime >= 180
+                    ? "3+ hours"
+                    : `${Math.floor(preferences.viewingTime / 60)} hour${preferences.viewingTime >= 120 ? "s" : ""} ${preferences.viewingTime % 60 > 0 ? `${preferences.viewingTime % 60} minutes` : ""}`}
               </div>
             </CardContent>
           </>
@@ -272,20 +353,26 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
               <CardTitle className="text-2xl">
                 What content have you enjoyed?
               </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                List movies, TV shows, or genres you've enjoyed (comma
+                separated)
+              </p>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {popularContent.map((content) => (
-                <div key={content} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`favorite-${content}`}
-                    checked={preferences.favoriteContent.includes(content)}
-                    onCheckedChange={(checked) =>
-                      handleFavoriteContentChange(content, checked === true)
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid w-full gap-1.5">
+                  <Label htmlFor="favorite-content">Your favorites</Label>
+                  <textarea
+                    id="favorite-content"
+                    value={preferences.favoriteContent}
+                    onChange={(e) =>
+                      handleFavoriteContentChange(e.target.value)
                     }
+                    placeholder="e.g., Inception, Breaking Bad, sci-fi thrillers, crime documentaries"
+                    className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   />
-                  <Label htmlFor={`favorite-${content}`}>{content}</Label>
                 </div>
-              ))}
+              </div>
             </CardContent>
           </>
         );
@@ -297,20 +384,23 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
               <CardTitle className="text-2xl">
                 What content do you want to avoid?
               </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                List movies, TV shows, or genres you dislike (comma separated)
+              </p>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {popularContent.map((content) => (
-                <div key={content} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`avoid-${content}`}
-                    checked={preferences.contentToAvoid.includes(content)}
-                    onCheckedChange={(checked) =>
-                      handleContentToAvoidChange(content, checked === true)
-                    }
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid w-full gap-1.5">
+                  <Label htmlFor="avoid-content">Content to avoid</Label>
+                  <textarea
+                    id="avoid-content"
+                    value={preferences.contentToAvoid}
+                    onChange={(e) => handleContentToAvoidChange(e.target.value)}
+                    placeholder="e.g., horror movies, reality TV, musicals"
+                    className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   />
-                  <Label htmlFor={`avoid-${content}`}>{content}</Label>
                 </div>
-              ))}
+              </div>
             </CardContent>
           </>
         );
@@ -322,20 +412,92 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
               <CardTitle className="text-2xl">
                 What age ratings are acceptable?
               </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Select all that apply
+              </p>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {ageRatings.map((rating) => (
+                <div key={rating} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`rating-${rating}`}
+                    checked={preferences.ageRatings.includes(rating)}
+                    onCheckedChange={(checked) =>
+                      handleAgeRatingChange(rating, checked === true)
+                    }
+                  />
+                  <Label htmlFor={`rating-${rating}`}>{rating}</Label>
+                </div>
+              ))}
+            </CardContent>
+          </>
+        );
+
+      case 6: // Language Preference
+        return (
+          <>
+            <CardHeader>
+              <CardTitle className="text-2xl">
+                Preferred language for content?
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <RadioGroup
-                value={preferences.ageRating}
-                onValueChange={handleAgeRatingChange}
-                className="grid grid-cols-2 md:grid-cols-4 gap-4"
+                value={preferences.languagePreference}
+                onValueChange={handleLanguageChange}
+                className="grid grid-cols-2 gap-4"
               >
-                {ageRatings.map((rating) => (
-                  <div key={rating} className="flex items-center space-x-2">
-                    <RadioGroupItem value={rating} id={`rating-${rating}`} />
-                    <Label htmlFor={`rating-${rating}`}>{rating}</Label>
+                {[
+                  "English",
+                  "Spanish",
+                  "French",
+                  "Japanese",
+                  "Korean",
+                  "Any",
+                ].map((language) => (
+                  <div key={language} className="flex items-center space-x-2">
+                    <RadioGroupItem
+                      value={language}
+                      id={`language-${language}`}
+                    />
+                    <Label htmlFor={`language-${language}`}>{language}</Label>
                   </div>
                 ))}
               </RadioGroup>
+            </CardContent>
+          </>
+        );
+
+      case 7: // Release Year Range
+        return (
+          <>
+            <CardHeader>
+              <CardTitle className="text-2xl">
+                Release year range preference?
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>1950</span>
+                  <span>{new Date().getFullYear()}</span>
+                </div>
+                <Slider
+                  value={[
+                    preferences.releaseYearRange?.min || 1980,
+                    preferences.releaseYearRange?.max ||
+                      new Date().getFullYear(),
+                  ]}
+                  min={1950}
+                  max={new Date().getFullYear()}
+                  step={5}
+                  onValueChange={handleReleaseYearChange}
+                  minStepsBetweenThumbs={1}
+                />
+              </div>
+              <div className="text-center font-medium">
+                {`${preferences.releaseYearRange?.min || 1980} - ${preferences.releaseYearRange?.max || new Date().getFullYear()}`}
+              </div>
             </CardContent>
           </>
         );
@@ -363,6 +525,9 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           transition={{ duration: 0.3 }}
         >
           {renderStep()}
+          {error && currentStep === totalSteps - 1 && (
+            <div className="px-6 py-2 text-sm text-red-500">{error}</div>
+          )}
         </motion.div>
 
         <CardFooter className="flex justify-between p-6">
@@ -374,12 +539,22 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
             <ChevronLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
-          <Button onClick={nextStep}>
+          <Button
+            onClick={nextStep}
+            disabled={currentStep === totalSteps - 1 && isLoading}
+          >
             {currentStep === totalSteps - 1 ? (
-              <>
-                Complete
-                <Check className="ml-2 h-4 w-4" />
-              </>
+              isLoading ? (
+                <>
+                  Getting recommendations...
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                </>
+              ) : (
+                <>
+                  Complete
+                  <Check className="ml-2 h-4 w-4" />
+                </>
+              )
             ) : (
               <>
                 Next
