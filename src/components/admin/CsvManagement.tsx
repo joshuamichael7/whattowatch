@@ -182,7 +182,9 @@ const CsvManagement: React.FC = () => {
               <li>imdbID - IMDB identifier</li>
               <li>Plot - Brief description</li>
               <li>Rated - Content rating (e.g., PG-13)</li>
-              <li>Runtime - Duration in minutes</li>
+              <li>
+                Runtime - Duration (can include text, e.g., "25S" or "120 min")
+              </li>
               <li>Genre - Comma-separated genres</li>
               <li>Director - Director name(s)</li>
               <li>Actors - Main cast</li>

@@ -15,7 +15,7 @@ export interface ContentItem {
   genre_ids: number[];
   genre_strings?: string[]; // Actual genre names from OMDB
   overview: string;
-  runtime?: number;
+  runtime?: string | number; // Changed to accept both string and number values
   content_rating?: string;
   streaming_providers?: Record<string, any> | null;
   popularity?: number;

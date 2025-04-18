@@ -76,7 +76,7 @@ function processContentItem(item) {
     overview: item.Plot,
     plot: item.Plot,
     content_rating: item.Rated,
-    runtime: item.Runtime ? parseInt(item.Runtime) : null,
+    runtime: item.Runtime || null, // Store runtime as text to handle values like "25S"
     genre_strings: item.Genre ? item.Genre.split(", ") : [],
     director: item.Director,
     actors: item.Actors,
