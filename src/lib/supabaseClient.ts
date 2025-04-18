@@ -360,6 +360,9 @@ export async function getSimilarContentFromSupabase(
 
 /**
  * Get trending content from Supabase
+ * @param type The media type to filter by ("movie" or "tv")
+ * @param limit The maximum number of items to return
+ * @returns A promise that resolves to an array of content items
  */
 export async function getTrendingContentFromSupabase(
   type?: "movie" | "tv",
@@ -387,11 +390,18 @@ export async function getTrendingContentFromSupabase(
     const mediaType = type ? (type === "tv" ? "series" : type) : undefined;
 
     // Get content IDs from homepage_content table, ordered by the 'order' column
+    let homepageQuery = supabase
+      .from("homepage_content")
+      .select("content_id, order, media_type")
+      .order("order", { ascending: true });
+
+    // Apply media type filter if specified
+    if (mediaType) {
+      homepageQuery = homepageQuery.eq("media_type", mediaType);
+    }
+
     const { data: homepageContentData, error: homepageContentError } =
-      await supabase
-        .from("homepage_content")
-        .select("content_id, order")
-        .order("order", { ascending: true });
+      await homepageQuery;
 
     if (homepageContentError) {
       console.error(

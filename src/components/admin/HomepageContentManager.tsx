@@ -35,6 +35,9 @@ const HomepageContentManager: React.FC = () => {
   const [searchResults, setSearchResults] = useState<ContentItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<
+    "all" | "movie" | "series"
+  >("all");
 
   // Fetch homepage content on component mount
   useEffect(() => {
@@ -106,12 +109,19 @@ const HomepageContentManager: React.FC = () => {
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("content")
         .select("*")
         .ilike("title", `%${searchQuery}%`)
         .order("popularity", { ascending: false })
         .limit(10);
+
+      // Apply media type filter if not set to "all"
+      if (mediaTypeFilter !== "all") {
+        query = query.eq("media_type", mediaTypeFilter);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setSearchResults(data);
@@ -121,7 +131,7 @@ const HomepageContentManager: React.FC = () => {
   };
 
   // Add content to homepage
-  const addToHomepage = async (contentId: string) => {
+  const addToHomepage = async (contentId: string, mediaType: string) => {
     try {
       // Get the highest order value
       const maxOrder =
@@ -135,6 +145,7 @@ const HomepageContentManager: React.FC = () => {
         .insert({
           content_id: contentId,
           order: maxOrder + 1,
+          media_type: mediaType,
         })
         .select();
 
@@ -247,6 +258,32 @@ const HomepageContentManager: React.FC = () => {
           <CardDescription>
             Manage the content displayed on the homepage. Drag to reorder.
           </CardDescription>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-sm font-medium">Filter:</span>
+            <div className="flex gap-1">
+              <Button
+                variant={mediaTypeFilter === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setMediaTypeFilter("all")}
+              >
+                All
+              </Button>
+              <Button
+                variant={mediaTypeFilter === "movie" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setMediaTypeFilter("movie")}
+              >
+                Movies
+              </Button>
+              <Button
+                variant={mediaTypeFilter === "series" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setMediaTypeFilter("series")}
+              >
+                TV Shows
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -257,56 +294,62 @@ const HomepageContentManager: React.FC = () => {
             </p>
           ) : (
             <div className="space-y-2">
-              {homepageContent.map((item, index) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between p-3 border rounded-md bg-card"
-                >
-                  <div className="flex items-center gap-3">
-                    {item.content?.poster_path && (
-                      <img
-                        src={item.content.poster_path}
-                        alt={item.content?.title}
-                        className="h-12 w-8 object-cover rounded"
-                      />
-                    )}
-                    <div>
-                      <p className="font-medium">{item.content?.title}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {item.content?.media_type === "movie"
-                          ? "Movie"
-                          : "TV Series"}{" "}
-                        •{item.content?.year || "Unknown year"}
-                      </p>
+              {homepageContent
+                .filter(
+                  (item) =>
+                    mediaTypeFilter === "all" ||
+                    item.content?.media_type === mediaTypeFilter,
+                )
+                .map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between p-3 border rounded-md bg-card"
+                  >
+                    <div className="flex items-center gap-3">
+                      {item.content?.poster_path && (
+                        <img
+                          src={item.content.poster_path}
+                          alt={item.content?.title}
+                          className="h-12 w-8 object-cover rounded"
+                        />
+                      )}
+                      <div>
+                        <p className="font-medium">{item.content?.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.content?.media_type === "movie"
+                            ? "Movie"
+                            : "TV Series"}{" "}
+                          •{item.content?.year || "Unknown year"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => moveUp(index)}
+                        disabled={index === 0}
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => moveDown(index)}
+                        disabled={index === homepageContent.length - 1}
+                      >
+                        <ArrowDown className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => removeFromHomepage(item.id)}
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => moveUp(index)}
-                      disabled={index === 0}
-                    >
-                      <ArrowUp className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => moveDown(index)}
-                      disabled={index === homepageContent.length - 1}
-                    >
-                      <ArrowDown className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => removeFromHomepage(item.id)}
-                    >
-                      <Trash className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))}
             </div>
           )}
         </CardContent>
@@ -318,6 +361,32 @@ const HomepageContentManager: React.FC = () => {
           <CardDescription>
             Search for movies and TV shows to add to the homepage.
           </CardDescription>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-sm font-medium">Filter:</span>
+            <div className="flex gap-1">
+              <Button
+                variant={mediaTypeFilter === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setMediaTypeFilter("all")}
+              >
+                All
+              </Button>
+              <Button
+                variant={mediaTypeFilter === "movie" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setMediaTypeFilter("movie")}
+              >
+                Movies
+              </Button>
+              <Button
+                variant={mediaTypeFilter === "series" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setMediaTypeFilter("series")}
+              >
+                TV Shows
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -362,7 +431,9 @@ const HomepageContentManager: React.FC = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => addToHomepage(content.id)}
+                      onClick={() =>
+                        addToHomepage(content.id, content.media_type)
+                      }
                     >
                       <Plus className="h-4 w-4 mr-2" /> Add
                     </Button>

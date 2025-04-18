@@ -50,13 +50,26 @@ async function verifyAdminUser(token) {
 
 // Helper function to process CSV data and format it for Supabase
 function processContentItem(item) {
+  // Determine media_type with better fallback handling
+  let mediaType = "movie"; // Default to movie if not specified
+  if (item.Type) {
+    // If Type is explicitly provided in the CSV
+    mediaType =
+      item.Type.toLowerCase() === "series" || item.Type.toLowerCase() === "tv"
+        ? "tv"
+        : "movie";
+  } else if (item.media_type) {
+    // If media_type is explicitly provided in the CSV
+    mediaType = item.media_type.toLowerCase();
+  }
+
   // Convert string values to appropriate types
   return {
     id:
       item.id ||
       `${item.imdbID || item.Title.replace(/\s+/g, "-").toLowerCase()}-${item.Year}`,
     title: item.Title,
-    media_type: item.Type === "movie" ? "movie" : "tv",
+    media_type: mediaType,
     year: item.Year,
     poster_path: item.Poster,
     imdb_id: item.imdbID,
@@ -165,11 +178,16 @@ exports.handler = async (event) => {
           // If the item already exists, skip it
           if (existingData === true) {
             console.log(
-              `Skipping duplicate item: ${item.title} (${item.imdb_id})`,
+              `Skipping duplicate item: ${item.title} (${item.imdb_id}) with media_type: ${item.media_type}`,
             );
             batchResults.skipped++;
             continue;
           }
+
+          // Log the media_type for debugging
+          console.log(
+            `Inserting ${item.title} with media_type: ${item.media_type}`,
+          );
 
           // Insert the item using our custom function
           const { data, error } = await supabase.rpc("upsert_content", {
