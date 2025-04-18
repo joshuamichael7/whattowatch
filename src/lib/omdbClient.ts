@@ -112,15 +112,18 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
 
     // Map genres from string to array of IDs (using a simple hash function)
     const genreStrings = data.Genre ? data.Genre.split(", ") : [];
-    const genreIds = genreStrings.map((genre: string) => {
-      // Simple hash function to generate consistent IDs for genres
-      let hash = 0;
-      for (let i = 0; i < genre.length; i++) {
-        hash = (hash << 5) - hash + genre.charCodeAt(i);
-        hash |= 0; // Convert to 32bit integer
-      }
-      return Math.abs(hash % 100); // Keep it positive and under 100
-    });
+    const genreIds =
+      genreStrings.length > 0
+        ? genreStrings.map((genre: string) => {
+            // Simple hash function to generate consistent IDs for genres
+            let hash = 0;
+            for (let i = 0; i < genre.length; i++) {
+              hash = (hash << 5) - hash + genre.charCodeAt(i);
+              hash |= 0; // Convert to 32bit integer
+            }
+            return Math.abs(hash % 100); // Keep it positive and under 100
+          })
+        : [];
 
     // Transform OMDB data to match our application's expected format
     const contentItem = {

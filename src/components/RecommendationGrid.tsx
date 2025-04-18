@@ -300,16 +300,24 @@ const RecommendationGrid = ({
 
                 <CardContent className="p-3 pt-2 flex-grow">
                   <div className="flex flex-wrap gap-1 mb-2">
-                    {item.genres.slice(0, 2).map((genre) => (
-                      <Badge key={genre} variant="outline" className="text-xs">
-                        {genre}
-                      </Badge>
-                    ))}
-                    {item.genres.length > 2 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{item.genres.length - 2}
-                      </Badge>
-                    )}
+                    {item.genres &&
+                      Array.isArray(item.genres) &&
+                      item.genres.slice(0, 2).map((genre) => (
+                        <Badge
+                          key={genre}
+                          variant="outline"
+                          className="text-xs"
+                        >
+                          {genre}
+                        </Badge>
+                      ))}
+                    {item.genres &&
+                      Array.isArray(item.genres) &&
+                      item.genres.length > 2 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{item.genres.length - 2}
+                        </Badge>
+                      )}
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">
                     {item.synopsis}
@@ -417,26 +425,29 @@ const RecommendationGrid = ({
                             <div>
                               <h4 className="font-medium mb-1">Genres</h4>
                               <div className="flex flex-wrap gap-1">
-                                {selectedItem.genres.map((genre) => (
-                                  <Badge key={genre} variant="outline">
-                                    {genre}
-                                  </Badge>
-                                ))}
+                                {selectedItem.genres &&
+                                  Array.isArray(selectedItem.genres) &&
+                                  selectedItem.genres.map((genre) => (
+                                    <Badge key={genre} variant="outline">
+                                      {genre}
+                                    </Badge>
+                                  ))}
                               </div>
                             </div>
 
-                            {selectedItem.streamingOn.length > 0 && (
-                              <div>
-                                <h4 className="font-medium mb-1">
-                                  Available on
-                                </h4>
-                                <div className="flex flex-wrap gap-1">
-                                  {selectedItem.streamingOn.map((service) => (
-                                    <Badge key={service}>{service}</Badge>
-                                  ))}
+                            {selectedItem.streamingOn &&
+                              selectedItem.streamingOn.length > 0 && (
+                                <div>
+                                  <h4 className="font-medium mb-1">
+                                    Available on
+                                  </h4>
+                                  <div className="flex flex-wrap gap-1">
+                                    {selectedItem.streamingOn.map((service) => (
+                                      <Badge key={service}>{service}</Badge>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              )}
 
                             <div>
                               <h4 className="font-medium mb-1">

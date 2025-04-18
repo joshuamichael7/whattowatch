@@ -266,6 +266,20 @@ export async function addContentToSupabase(
   }
 
   try {
+    // Ensure media_type is valid (must be 'movie' or 'series' for the database constraint)
+    const mediaType =
+      content.media_type === "tv" ? "series" : content.media_type;
+
+    // Ensure genre_ids and genre_strings are arrays
+    const safeContent = {
+      ...content,
+      media_type: mediaType,
+      genre_ids: Array.isArray(content.genre_ids) ? content.genre_ids : [],
+      genre_strings: Array.isArray(content.genre_strings)
+        ? content.genre_strings
+        : [],
+    };
+
     // Check if content already exists
     const { data: existingContent } = await supabase
       .from("content")
@@ -277,7 +291,7 @@ export async function addContentToSupabase(
       // Content already exists, update it
       const { error: updateError } = await supabase
         .from("content")
-        .update(content)
+        .update(safeContent)
         .eq("id", content.id);
 
       if (updateError) {
@@ -290,7 +304,7 @@ export async function addContentToSupabase(
       // Content doesn't exist, insert it
       const { error: insertError } = await supabase
         .from("content")
-        .insert(content);
+        .insert(safeContent);
 
       if (insertError) {
         console.error("[supabaseClient] Error inserting content:", insertError);

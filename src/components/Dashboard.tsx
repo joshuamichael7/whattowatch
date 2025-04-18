@@ -45,6 +45,7 @@ const Dashboard = () => {
   const [recommendations, setRecommendations] = useState<ContentItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [useDirectApi, setUseDirectApi] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
   const [filters, setFilters] = useState<ContentFilterOptions>({
     maturityLevel: profile?.content_rating_limit || "PG",
     familyFriendly: false,
@@ -150,7 +151,7 @@ const Dashboard = () => {
 
         // Filter out null results
         const validRecommendations = aiBasedRecommendations.filter(
-          Boolean,
+          (item) => item !== null,
         ) as ContentItem[];
 
         if (validRecommendations.length > 0) {
@@ -244,7 +245,7 @@ const Dashboard = () => {
 
         // Filter out null results and limit to reasonable number
         const validRecommendations = aiBasedRecommendations.filter(
-          Boolean,
+          (item) => item !== null,
         ) as ContentItem[];
 
         console.log(
@@ -316,6 +317,11 @@ const Dashboard = () => {
     }
   };
 
+  // Handle search input change
+  const handleSearchChange = (value: string) => {
+    setSearchValue(value);
+  };
+
   // Handle similar content selection
   const handleSimilarContentSelect = (item: any) => {
     setIsLoading(true);
@@ -370,6 +376,9 @@ const Dashboard = () => {
 
           // Filter by excluded genres
           if (
+            newFilters.excludedGenres.length > 0 &&
+            item.genres &&
+            Array.isArray(item.genres) &&
             newFilters.excludedGenres.some((genre) =>
               item.genres.includes(genre),
             )
@@ -480,7 +489,12 @@ const Dashboard = () => {
     // Filter based on preferences
     return baseRecommendations.filter((item) => {
       // Filter by genre preferences
-      if (preferences.genres && preferences.genres.length > 0) {
+      if (
+        preferences.genres &&
+        preferences.genres.length > 0 &&
+        item.genres &&
+        Array.isArray(item.genres)
+      ) {
         if (!item.genres.some((genre) => preferences.genres?.includes(genre))) {
           return false;
         }
