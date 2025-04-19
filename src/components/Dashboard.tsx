@@ -9,6 +9,7 @@ import ContentFilters from "./ContentFilters";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ContentItem } from "@/types/omdb";
+import Header from "./layout/Header";
 
 // Import the new components
 import Discover from "./dashboard/Discover";
@@ -619,7 +620,10 @@ const Dashboard = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Dashboard header */}
+      {/* Use the reusable Header component */}
+      <Header title="What to Watch" />
+
+      {/* Dashboard tabs */}
       <div className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
