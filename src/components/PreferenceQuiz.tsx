@@ -148,6 +148,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           .map((item) => item.trim())
           .filter(Boolean),
         ageRating: preferences.ageRatings[0] || "PG-13", // Use the first selected rating as primary
+        ageRatings: preferences.ageRatings, // Pass all selected age ratings
       };
 
       console.log(

@@ -50,6 +50,7 @@ interface RecommendationItem {
   type: "movie" | "tv";
   year: string;
   poster: string;
+  poster_path?: string;
   rating: number;
   genres: string[];
   synopsis: string;
@@ -57,6 +58,7 @@ interface RecommendationItem {
   recommendationReason: string;
   runtime?: string;
   contentRating?: string;
+  content_rating?: string;
 }
 
 interface RecommendationGridProps {
@@ -131,6 +133,23 @@ const RecommendationGrid = ({
       type: typeFilter,
     });
     setFilterVisible(false);
+  };
+
+  // Helper function to get the best available poster image
+  const getPosterImage = (item: RecommendationItem) => {
+    // Try all possible poster sources in order of preference
+    if (item.poster && item.poster !== "N/A" && !item.poster.includes("null")) {
+      return item.poster;
+    }
+    if (
+      item.poster_path &&
+      item.poster_path !== "N/A" &&
+      !item.poster_path.includes("null")
+    ) {
+      return item.poster_path;
+    }
+    // Return a default placeholder if no valid poster is found
+    return "https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=800&q=80";
   };
 
   if (isLoading) {
@@ -261,9 +280,13 @@ const RecommendationGrid = ({
               >
                 <div className="relative aspect-[2/3] overflow-hidden bg-muted">
                   <img
-                    src={item.poster}
+                    src={getPosterImage(item)}
                     alt={`${item.title} poster`}
                     className="object-cover w-full h-full"
+                    onError={(e) => {
+                      e.currentTarget.src =
+                        "https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=800&q=80";
+                    }}
                   />
                   <div className="absolute top-2 right-2">
                     <Badge
@@ -382,9 +405,11 @@ const RecommendationGrid = ({
                           </DialogTitle>
                           <DialogDescription className="flex items-center gap-3">
                             <span>{selectedItem.year}</span>
-                            {selectedItem.contentRating && (
+                            {(selectedItem.contentRating ||
+                              selectedItem.content_rating) && (
                               <Badge variant="outline">
-                                {selectedItem.contentRating}
+                                {selectedItem.contentRating ||
+                                  selectedItem.content_rating}
                               </Badge>
                             )}
                             {selectedItem.runtime && (
@@ -408,9 +433,13 @@ const RecommendationGrid = ({
                         <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 mt-4">
                           <div className="aspect-[2/3] overflow-hidden rounded-md bg-muted">
                             <img
-                              src={selectedItem.poster}
+                              src={getPosterImage(selectedItem)}
                               alt={`${selectedItem.title} poster`}
                               className="object-cover w-full h-full"
+                              onError={(e) => {
+                                e.currentTarget.src =
+                                  "https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=800&q=80";
+                              }}
                             />
                           </div>
 

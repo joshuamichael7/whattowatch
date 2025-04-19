@@ -26,6 +26,7 @@ export interface ContentFilterOptions {
   familyFriendly: boolean;
   contentWarnings: string[];
   excludedGenres: string[];
+  acceptedRatings?: string[];
 }
 
 const ContentFilters: React.FC<ContentFiltersProps> = ({
@@ -35,6 +36,7 @@ const ContentFilters: React.FC<ContentFiltersProps> = ({
     familyFriendly: false,
     contentWarnings: [],
     excludedGenres: [],
+    acceptedRatings: ["G", "PG"],
   },
 }) => {
   const [filters, setFilters] = useState<ContentFilterOptions>(initialFilters);
@@ -77,6 +79,7 @@ const ContentFilters: React.FC<ContentFiltersProps> = ({
       familyFriendly: false,
       contentWarnings: [],
       excludedGenres: [],
+      acceptedRatings: ["G", "PG"],
     };
     setFilters(defaultFilters);
     onFilterChange(defaultFilters);
@@ -128,7 +131,7 @@ const ContentFilters: React.FC<ContentFiltersProps> = ({
             <div className="space-y-4">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <Label>Maturity Level</Label>
+                  <Label>Maximum Maturity Level</Label>
                   <Badge variant="outline">{filters.maturityLevel}</Badge>
                 </div>
                 <div className="pt-2">
@@ -150,6 +153,47 @@ const ContentFilters: React.FC<ContentFiltersProps> = ({
                       <TabsTrigger value="R">R</TabsTrigger>
                     </TabsList>
                   </Tabs>
+                </div>
+
+                <div className="mt-4">
+                  <Label className="mb-2 block">Accepted Ratings</Label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      "G",
+                      "PG",
+                      "PG-13",
+                      "R",
+                      "TV-Y",
+                      "TV-PG",
+                      "TV-14",
+                      "TV-MA",
+                    ].map((rating) => (
+                      <div key={rating} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`rating-${rating}`}
+                          checked={
+                            filters.acceptedRatings?.includes(rating) || false
+                          }
+                          onCheckedChange={(checked) => {
+                            const newAcceptedRatings = checked
+                              ? [...(filters.acceptedRatings || []), rating]
+                              : (filters.acceptedRatings || []).filter(
+                                  (r) => r !== rating,
+                                );
+                            const newFilters = {
+                              ...filters,
+                              acceptedRatings: newAcceptedRatings,
+                            };
+                            setFilters(newFilters);
+                            onFilterChange(newFilters);
+                          }}
+                        />
+                        <Label htmlFor={`rating-${rating}`} className="text-sm">
+                          {rating}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 

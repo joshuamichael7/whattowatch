@@ -51,6 +51,7 @@ const Dashboard = () => {
     familyFriendly: false,
     contentWarnings: [],
     excludedGenres: profile?.preferred_genres ? [] : [],
+    acceptedRatings: [profile?.content_rating_limit || "PG", "G"], // Default to include G and the user's limit
   });
 
   useEffect(() => {
@@ -181,6 +182,15 @@ const Dashboard = () => {
   const handleQuizComplete = async (preferences: PreferenceResults) => {
     setIsLoading(true);
     setActiveTab("recommendations");
+
+    // Update filters with age ratings from quiz
+    if (preferences.ageRatings && preferences.ageRatings.length > 0) {
+      setFilters((prevFilters) => ({
+        ...prevFilters,
+        maturityLevel: preferences.ageRatings[0] || "PG-13",
+        acceptedRatings: preferences.ageRatings,
+      }));
+    }
 
     // Track if we're using fallback data
     let usingFallbackData = false;
