@@ -3,7 +3,7 @@ import * as omdbClient from "@/lib/omdbClient";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { PlayCircle, X, Loader2 } from "lucide-react";
-import PreferenceFinder from "./PreferenceQuiz";
+import WhatToWatch from "./dashboard/WhatToWatch";
 import RecommendationGrid from "./RecommendationGrid";
 import ContentFilters from "./ContentFilters";
 import { Link } from "react-router-dom";
@@ -12,7 +12,6 @@ import { ContentItem } from "@/types/omdb";
 
 // Import the new components
 import Discover from "./dashboard/Discover";
-import WhatToWatch from "./dashboard/WhatToWatch";
 import SimilarContent from "./dashboard/SimilarContent";
 
 // Add a global preferences variable to store the latest quiz preferences
@@ -24,17 +23,16 @@ declare global {
 
 interface PreferenceResults {
   genres: string[];
-  mood: string;
+  mood?: string;
+  moods?: string[];
   viewingTime: number;
-  favoriteContent: string[];
-  contentToAvoid: string[];
-  ageRating: string;
+  favoriteContent: string | string[];
+  contentToAvoid: string | string[];
+  ageRating?: string;
+  ageRatings?: string[];
   aiRecommendations?: Array<{ title: string; reason: string; year?: string }>;
   isAiRecommendationSuccess?: boolean;
   aiRecommendationError?: string | null;
-  // For compatibility with the updated PreferenceQuiz component
-  moods?: string[];
-  ageRatings?: string[];
   languagePreference?: string;
   releaseYearRange?: { min: number; max: number };
 }
@@ -692,6 +690,7 @@ const Dashboard = () => {
             onSubmit={handleWhatToWatchSubmit}
             isLoading={isLoading}
             maturityLevel={filters.maturityLevel}
+            initialGenres={profile?.preferred_genres || []}
           />
         )}
 
