@@ -48,20 +48,14 @@ const Dashboard = () => {
   const [useDirectApi, setUseDirectApi] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [filters, setFilters] = useState<ContentFilterOptions>({
-    maturityLevel: profile?.content_rating_limit || "PG",
+    maturityLevel: profile?.content_rating_limit || "PG-13",
     familyFriendly: false,
     contentWarnings: [],
     excludedGenres: profile?.preferred_genres ? [] : [],
-    acceptedRatings: [
-      "G",
-      "PG",
-      "PG-13",
-      "R",
-      "TV-Y",
-      "TV-PG",
-      "TV-14",
-      "TV-MA",
-    ], // Default to include all ratings
+    // Initialize with ratings up to the user's preferred maturity level or PG-13 by default
+    acceptedRatings: getRatingsUpToLevel(
+      profile?.content_rating_limit || "PG-13",
+    ),
   });
 
   useEffect(() => {
@@ -87,6 +81,25 @@ const Dashboard = () => {
     try {
       console.log(`Getting content details for ID: ${id}`);
       const response = await omdbClient.getContentById(id);
+
+      // Process content ratings for consistency
+      if (response) {
+        // Normalize content rating field
+        if (response.Rated && !response.content_rating) {
+          response.content_rating = response.Rated;
+        }
+
+        // Ensure we have a contentRating field for UI consistency
+        if (response.content_rating && !response.contentRating) {
+          response.contentRating = response.content_rating;
+        }
+
+        // If we have a content_rating but no Rated, set Rated
+        if (response.content_rating && !response.Rated) {
+          response.Rated = response.content_rating;
+        }
+      }
+
       return response;
     } catch (error) {
       console.error(`Error getting content details for ID: ${id}`, error);
@@ -105,6 +118,26 @@ const Dashboard = () => {
   }) => {
     setIsLoading(true);
     setActiveTab("recommendations");
+
+    // Update filters with the selected age rating
+    if (preferences.ageRating) {
+      const selectedAgeRating = preferences.ageRating;
+      console.log(
+        "Setting maturity level from What to Watch:",
+        selectedAgeRating,
+      );
+
+      // Get appropriate ratings based on the selected age rating
+      const acceptedRatings = getRatingsUpToLevel(selectedAgeRating);
+      console.log("Accepted ratings from What to Watch:", acceptedRatings);
+
+      // Update filters with the selected ratings
+      setFilters((prevFilters) => ({
+        ...prevFilters,
+        maturityLevel: selectedAgeRating,
+        acceptedRatings: acceptedRatings,
+      }));
+    }
 
     try {
       // Use Netlify function instead of direct API call
@@ -222,34 +255,85 @@ const Dashboard = () => {
     }
   };
 
+  // Helper function to get ratings up to a certain level
+  const getRatingsUpToLevel = (maxLevel: string) => {
+    const movieRatings = ["G", "PG", "PG-13", "R"];
+    const tvRatings = ["TV-Y", "TV-PG", "TV-14", "TV-MA"];
+
+    // Find the index of the max level in movie ratings
+    const movieIndex = movieRatings.indexOf(maxLevel);
+    // Find the index of the max level in TV ratings
+    const tvIndex = tvRatings.indexOf(maxLevel);
+
+    let selectedRatings: string[] = [];
+
+    // If it's a movie rating
+    if (movieIndex >= 0) {
+      selectedRatings = [...movieRatings.slice(0, movieIndex + 1)];
+      // Add TV ratings based on approximate equivalence
+      if (maxLevel === "G") selectedRatings.push("TV-Y");
+      if (maxLevel === "PG" || maxLevel === "G") selectedRatings.push("TV-PG");
+      if (maxLevel === "PG-13" || maxLevel === "PG" || maxLevel === "G")
+        selectedRatings.push("TV-14");
+      if (maxLevel === "R")
+        selectedRatings = [...selectedRatings, ...tvRatings];
+    }
+    // If it's a TV rating
+    else if (tvIndex >= 0) {
+      selectedRatings = [...tvRatings.slice(0, tvIndex + 1)];
+      // Add movie ratings based on approximate equivalence
+      if (maxLevel === "TV-Y") selectedRatings.push("G");
+      if (maxLevel === "TV-PG") selectedRatings.push(...["G", "PG"]);
+      if (maxLevel === "TV-14") selectedRatings.push(...["G", "PG", "PG-13"]);
+      if (maxLevel === "TV-MA")
+        selectedRatings = [...selectedRatings, ...movieRatings];
+    }
+
+    console.log(`Generated ratings for ${maxLevel}:`, selectedRatings);
+    return selectedRatings;
+  };
+
   // Handle quiz completion
   const handleQuizComplete = async (preferences: PreferenceResults) => {
     setIsLoading(true);
     setActiveTab("recommendations");
 
-    // Update filters with age ratings from quiz, but keep all ratings accepted by default
+    // Update filters with age ratings from quiz
     if (preferences.ageRatings && preferences.ageRatings.length > 0) {
-      setFilters((prevFilters) => {
-        console.log(
-          "Setting maturity level from quiz:",
-          preferences.ageRatings[0],
-        );
-        return {
-          ...prevFilters,
-          maturityLevel: preferences.ageRatings[0] || "PG-13",
-          // Keep all ratings accepted by default
-          acceptedRatings: [
-            "G",
-            "PG",
-            "PG-13",
-            "R",
-            "TV-Y",
-            "TV-PG",
-            "TV-14",
-            "TV-MA",
-          ],
-        };
-      });
+      const selectedAgeRating = preferences.ageRatings[0] || "PG-13";
+      console.log("Setting maturity level from quiz:", selectedAgeRating);
+
+      // Get appropriate ratings based on the selected age rating
+      const acceptedRatings = getRatingsUpToLevel(selectedAgeRating);
+      console.log("Accepted ratings from quiz:", acceptedRatings);
+
+      // Update filters with the selected ratings
+      setFilters((prevFilters) => ({
+        ...prevFilters,
+        maturityLevel: selectedAgeRating,
+        acceptedRatings: acceptedRatings,
+      }));
+    } else if (preferences.ageRating) {
+      // Handle legacy format where ageRating is a single string
+      const selectedAgeRating = preferences.ageRating || "PG-13";
+      console.log(
+        "Setting maturity level from quiz (legacy format):",
+        selectedAgeRating,
+      );
+
+      // Get appropriate ratings based on the selected age rating
+      const acceptedRatings = getRatingsUpToLevel(selectedAgeRating);
+      console.log(
+        "Accepted ratings from quiz (legacy format):",
+        acceptedRatings,
+      );
+
+      // Update filters with the selected ratings
+      setFilters((prevFilters) => ({
+        ...prevFilters,
+        maturityLevel: selectedAgeRating,
+        acceptedRatings: acceptedRatings,
+      }));
     }
 
     // Track if we're using fallback data
@@ -462,19 +546,19 @@ const Dashboard = () => {
     console.log("Filter change requested:", newFilters);
     setFilters(newFilters);
 
-    // In a real app, this would trigger a re-fetch of recommendations
-    // with the new filters applied
+    // Apply filters to existing recommendations
     if (recommendations.length > 0) {
       setIsLoading(true);
       setTimeout(() => {
         // Apply filters to existing recommendations
         const filteredRecommendations = recommendations.filter((item) => {
-          // Filter by maturity level
-          if (newFilters.maturityLevel === "G" && item.contentRating !== "G") {
-            console.log(
-              `Filtering out ${item.title} due to maturity level: ${item.contentRating} != G`,
-            );
-            return false;
+          // Get the item's content rating
+          const itemRating = item.contentRating || item.content_rating || "";
+
+          // Skip filtering if the item has no rating
+          if (!itemRating) {
+            console.log(`Item ${item.title} has no rating, including it`);
+            return true;
           }
 
           // Filter by accepted ratings
@@ -482,33 +566,64 @@ const Dashboard = () => {
             newFilters.acceptedRatings &&
             newFilters.acceptedRatings.length > 0
           ) {
-            const itemRating = item.contentRating || item.content_rating || "";
             console.log(
               `Checking if ${itemRating} is in accepted ratings:`,
               newFilters.acceptedRatings,
             );
-            if (
-              itemRating &&
-              !newFilters.acceptedRatings.includes(itemRating)
-            ) {
+            if (!newFilters.acceptedRatings.includes(itemRating)) {
               console.log(
-                `Filtering out ${item.title} due to rating: ${itemRating}`,
+                `Filtering out ${item.title} due to rating: ${itemRating} not in accepted ratings`,
               );
               return false;
             }
           }
 
           // Filter by excluded genres
-          if (
-            newFilters.excludedGenres.length > 0 &&
-            item.genres &&
-            Array.isArray(item.genres) &&
-            newFilters.excludedGenres.some((genre) =>
-              item.genres.includes(genre),
-            )
-          ) {
-            console.log(`Filtering out ${item.title} due to excluded genre`);
-            return false;
+          if (newFilters.excludedGenres.length > 0) {
+            // Check if item has genres as an array
+            if (item.genres && Array.isArray(item.genres)) {
+              if (
+                newFilters.excludedGenres.some((genre) =>
+                  item.genres.includes(genre),
+                )
+              ) {
+                console.log(
+                  `Filtering out ${item.title} due to excluded genre in item.genres`,
+                );
+                return false;
+              }
+            }
+
+            // Check if item has genre_strings array
+            if (item.genre_strings && Array.isArray(item.genre_strings)) {
+              if (
+                newFilters.excludedGenres.some((genre) =>
+                  item.genre_strings.includes(genre),
+                )
+              ) {
+                console.log(
+                  `Filtering out ${item.title} due to excluded genre in item.genre_strings`,
+                );
+                return false;
+              }
+            }
+
+            // Check if item has Genre string that contains excluded genres
+            if (item.Genre && typeof item.Genre === "string") {
+              const genreArray = item.Genre.split(", ");
+              if (
+                newFilters.excludedGenres.some((genre) =>
+                  genreArray.some(
+                    (g) => g.toLowerCase() === genre.toLowerCase(),
+                  ),
+                )
+              ) {
+                console.log(
+                  `Filtering out ${item.title} due to excluded genre in item.Genre`,
+                );
+                return false;
+              }
+            }
           }
 
           return true;
@@ -754,6 +869,7 @@ const Dashboard = () => {
                 <ContentFilters
                   onFilterChange={handleFilterChange}
                   initialFilters={filters}
+                  key={JSON.stringify(filters.acceptedRatings)} // Force re-render when acceptedRatings change
                 />
               </div>
               <div className="flex-1">

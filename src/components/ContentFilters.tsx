@@ -36,24 +36,46 @@ const ContentFilters: React.FC<ContentFiltersProps> = ({
     familyFriendly: false,
     contentWarnings: [],
     excludedGenres: [],
-    acceptedRatings: [
-      "G",
-      "PG",
-      "PG-13",
-      "R",
-      "TV-Y",
-      "TV-PG",
-      "TV-14",
-      "TV-MA",
-    ],
+    acceptedRatings: ["G", "PG", "PG-13", "TV-Y", "TV-PG", "TV-14"],
   },
 }) => {
   const [filters, setFilters] = useState<ContentFilterOptions>(initialFilters);
 
-  const handleMaturityChange = (value: string) => {
-    const newFilters = { ...filters, maturityLevel: value };
-    setFilters(newFilters);
-    onFilterChange(newFilters);
+  // Helper function to get ratings up to a certain level
+  const getRatingsUpToLevel = (maxLevel: string) => {
+    const movieRatings = ["G", "PG", "PG-13", "R"];
+    const tvRatings = ["TV-Y", "TV-PG", "TV-14", "TV-MA"];
+
+    // Find the index of the max level in movie ratings
+    const movieIndex = movieRatings.indexOf(maxLevel);
+    // Find the index of the max level in TV ratings
+    const tvIndex = tvRatings.indexOf(maxLevel);
+
+    let selectedRatings: string[] = [];
+
+    // If it's a movie rating
+    if (movieIndex >= 0) {
+      selectedRatings = [...movieRatings.slice(0, movieIndex + 1)];
+      // Add TV ratings based on approximate equivalence
+      if (maxLevel === "G") selectedRatings.push("TV-Y");
+      if (maxLevel === "PG" || maxLevel === "G") selectedRatings.push("TV-PG");
+      if (maxLevel === "PG-13" || maxLevel === "PG" || maxLevel === "G")
+        selectedRatings.push("TV-14");
+      if (maxLevel === "R")
+        selectedRatings = [...selectedRatings, ...tvRatings];
+    }
+    // If it's a TV rating
+    else if (tvIndex >= 0) {
+      selectedRatings = [...tvRatings.slice(0, tvIndex + 1)];
+      // Add movie ratings based on approximate equivalence
+      if (maxLevel === "TV-Y") selectedRatings.push("G");
+      if (maxLevel === "TV-PG") selectedRatings.push(...["G", "PG"]);
+      if (maxLevel === "TV-14") selectedRatings.push(...["G", "PG", "PG-13"]);
+      if (maxLevel === "TV-MA")
+        selectedRatings = [...selectedRatings, ...movieRatings];
+    }
+
+    return selectedRatings;
   };
 
   const handleFamilyFriendlyChange = (checked: boolean) => {
@@ -88,16 +110,7 @@ const ContentFilters: React.FC<ContentFiltersProps> = ({
       familyFriendly: false,
       contentWarnings: [],
       excludedGenres: [],
-      acceptedRatings: [
-        "G",
-        "PG",
-        "PG-13",
-        "R",
-        "TV-Y",
-        "TV-PG",
-        "TV-14",
-        "TV-MA",
-      ],
+      acceptedRatings: ["G", "PG", "PG-13", "TV-Y", "TV-PG", "TV-14"],
     };
     setFilters(defaultFilters);
     onFilterChange(defaultFilters);
@@ -149,49 +162,21 @@ const ContentFilters: React.FC<ContentFiltersProps> = ({
             <div className="space-y-4">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <Label>Maximum Maturity Level</Label>
-                  <Badge variant="outline">{filters.maturityLevel}</Badge>
+                  <Label>Content Ratings</Label>
+                  <Badge variant="outline">
+                    {filters.acceptedRatings?.length || 0} selected
+                  </Badge>
                 </div>
-                <div className="pt-2">
-                  <div className="flex justify-between text-xs text-muted-foreground mb-2">
-                    <span>G</span>
-                    <span>PG</span>
-                    <span>PG-13</span>
-                    <span>R</span>
-                  </div>
-                  <Tabs
-                    value={filters.maturityLevel}
-                    onValueChange={handleMaturityChange}
-                    className="w-full"
-                  >
-                    <TabsList className="grid w-full grid-cols-4">
-                      <TabsTrigger value="G">G</TabsTrigger>
-                      <TabsTrigger value="PG">PG</TabsTrigger>
-                      <TabsTrigger value="PG-13">PG-13</TabsTrigger>
-                      <TabsTrigger value="R">R</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
-
-                <div className="mt-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <Label>Accepted Ratings</Label>
-                    <Badge variant="outline">
-                      {filters.acceptedRatings?.length || 0} selected
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[
-                      "G",
-                      "PG",
-                      "PG-13",
-                      "R",
-                      "TV-Y",
-                      "TV-PG",
-                      "TV-14",
-                      "TV-MA",
-                    ].map((rating) => (
-                      <div key={rating} className="flex items-center space-x-2">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="col-span-2 text-sm font-medium mb-1">
+                      Movies
+                    </div>
+                    {["G", "PG", "PG-13", "R"].map((rating) => (
+                      <div
+                        key={rating}
+                        className="flex items-center space-x-2 border rounded-md p-2"
+                      >
                         <Checkbox
                           id={`rating-${rating}`}
                           checked={
@@ -211,11 +196,93 @@ const ContentFilters: React.FC<ContentFiltersProps> = ({
                             onFilterChange(newFilters);
                           }}
                         />
-                        <Label htmlFor={`rating-${rating}`} className="text-sm">
+                        <Label
+                          htmlFor={`rating-${rating}`}
+                          className="text-sm font-medium"
+                        >
                           {rating}
                         </Label>
                       </div>
                     ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="col-span-2 text-sm font-medium mb-1">
+                      TV Shows
+                    </div>
+                    {["TV-Y", "TV-PG", "TV-14", "TV-MA"].map((rating) => (
+                      <div
+                        key={rating}
+                        className="flex items-center space-x-2 border rounded-md p-2"
+                      >
+                        <Checkbox
+                          id={`rating-${rating}`}
+                          checked={
+                            filters.acceptedRatings?.includes(rating) || false
+                          }
+                          onCheckedChange={(checked) => {
+                            const newAcceptedRatings = checked
+                              ? [...(filters.acceptedRatings || []), rating]
+                              : (filters.acceptedRatings || []).filter(
+                                  (r) => r !== rating,
+                                );
+                            const newFilters = {
+                              ...filters,
+                              acceptedRatings: newAcceptedRatings,
+                            };
+                            setFilters(newFilters);
+                            onFilterChange(newFilters);
+                          }}
+                        />
+                        <Label
+                          htmlFor={`rating-${rating}`}
+                          className="text-sm font-medium"
+                        >
+                          {rating}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-between">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const allRatings = [
+                          "G",
+                          "PG",
+                          "PG-13",
+                          "R",
+                          "TV-Y",
+                          "TV-PG",
+                          "TV-14",
+                          "TV-MA",
+                        ];
+                        const newFilters = {
+                          ...filters,
+                          acceptedRatings: allRatings,
+                        };
+                        setFilters(newFilters);
+                        onFilterChange(newFilters);
+                      }}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newFilters = {
+                          ...filters,
+                          acceptedRatings: [],
+                        };
+                        setFilters(newFilters);
+                        onFilterChange(newFilters);
+                      }}
+                    >
+                      Clear All
+                    </Button>
                   </div>
                 </div>
               </div>
