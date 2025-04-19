@@ -306,15 +306,30 @@ export async function addContentToSupabase(
     const mediaType =
       content.media_type === "tv" ? "series" : content.media_type;
 
-    // Ensure genre_ids and genre_strings are arrays
-    const safeContent = {
+    // Map OMDB fields to our database schema
+    const mappedContent = {
       ...content,
       media_type: mediaType,
+      // Map OMDB specific fields to our schema
+      content_rating: content.content_rating || content.Rated,
+      released: content.Released,
+      language: content.Language,
+      country: content.Country,
+      awards: content.Awards,
+      ratings: content.Ratings,
+      metascore: content.Metascore,
+      imdb_votes: content.imdbVotes,
+      total_seasons: content.totalSeasons,
+      writer: content.Writer,
+      // Ensure these are arrays
       genre_ids: Array.isArray(content.genre_ids) ? content.genre_ids : [],
       genre_strings: Array.isArray(content.genre_strings)
         ? content.genre_strings
         : [],
     };
+
+    // Use our mapped content with all fields properly aligned to the schema
+    const safeContent = mappedContent;
 
     // Check if content already exists by imdb_id
     const { data: existingContent, error: checkError } = await supabase
@@ -360,27 +375,62 @@ export async function addContentToSupabase(
       };
 
       // Remove any fields that aren't in the database schema
-      delete contentToInsert.ratings;
-      delete contentToInsert.aiRecommended;
-      delete contentToInsert.aiSimilarityScore;
-      delete contentToInsert.recommendationReason;
-      delete contentToInsert.isErrorFallback;
-      delete contentToInsert.isTrendingFallback;
-      delete contentToInsert.aiServiceUnavailable;
-      delete contentToInsert.vectorDbRecommended;
-      delete contentToInsert.plotSimilarity;
-      delete contentToInsert.keywordSimilarity;
-      delete contentToInsert.textSimilarity;
-      delete contentToInsert.titleSimilarity;
-      delete contentToInsert.combinedSimilarity;
-      delete contentToInsert.keywords;
-      delete contentToInsert.contentRating; // Use content_rating instead
-      delete contentToInsert.poster; // Use poster_path instead
-      delete contentToInsert.imdbID; // Use imdb_id instead
+      const allowedFields = [
+        "id",
+        "title",
+        "media_type",
+        "poster_path",
+        "backdrop_path",
+        "release_date",
+        "first_air_date",
+        "vote_average",
+        "vote_count",
+        "genre_ids",
+        "genre_strings",
+        "overview",
+        "runtime",
+        "content_rating",
+        "streaming_providers",
+        "popularity",
+        "imdb_id",
+        "year",
+        "plot",
+        "director",
+        "actors",
+        "imdb_rating",
+        "keywords",
+        "created_at",
+        "updated_at",
+        // Added missing OMDB fields
+        "released",
+        "language",
+        "country",
+        "awards",
+        "ratings",
+        "metascore",
+        "imdb_votes",
+        "total_seasons",
+        "writer",
+      ];
+
+      // Create a new object with only the allowed fields
+      const cleanedContent: any = {};
+      for (const field of allowedFields) {
+        if (contentToInsert[field] !== undefined) {
+          cleanedContent[field] = contentToInsert[field];
+        }
+      }
+
+      // Make sure we have the required fields
+      cleanedContent.id = cleanedContent.id || contentToInsert.id;
+      cleanedContent.created_at =
+        cleanedContent.created_at || contentToInsert.created_at;
+      cleanedContent.updated_at =
+        cleanedContent.updated_at || contentToInsert.updated_at;
 
       const { error: insertError } = await supabase
         .from("content")
-        .insert(contentToInsert);
+        .insert(cleanedContent);
 
       if (insertError) {
         console.error("[supabaseClient] Error inserting content:", insertError);
