@@ -190,19 +190,16 @@ const Dashboard = () => {
 
               if (searchResults && searchResults.length > 0) {
                 // Find exact title match with year if available - no fuzzy matching
-                const exactMatch = searchResults.find((item) => {
+                const exactMatch = searchResults.find(item => {
                   // Basic title match (case-insensitive)
-                  const titleMatches =
-                    item.title.toLowerCase() === rec.title.toLowerCase();
-
+                  const titleMatches = item.title.toLowerCase() === rec.title.toLowerCase();
+                  
                   // If we have a year from the AI recommendation, use it for additional filtering
                   if (rec.year && titleMatches) {
-                    const itemYear = item.release_date
-                      ? parseInt(item.release_date.substring(0, 4))
-                      : null;
+                    const itemYear = item.release_date ? parseInt(item.release_date.substring(0, 4)) : null;
                     return titleMatches && itemYear === parseInt(rec.year);
                   }
-
+                  
                   return titleMatches;
                 });
 
@@ -427,19 +424,16 @@ const Dashboard = () => {
                   `Found ${searchResults.length} search results for "${rec.title}"`,
                 );
                 // Find exact title match with year if available - no fuzzy matching
-                const exactMatch = searchResults.find((item) => {
+                const exactMatch = searchResults.find(item => {
                   // Basic title match (case-insensitive)
-                  const titleMatches =
-                    item.title.toLowerCase() === rec.title.toLowerCase();
-
+                  const titleMatches = item.title.toLowerCase() === rec.title.toLowerCase();
+                  
                   // If we have a year from the AI recommendation, use it for additional filtering
                   if (rec.year && titleMatches) {
-                    const itemYear = item.release_date
-                      ? parseInt(item.release_date.substring(0, 4))
-                      : null;
+                    const itemYear = item.release_date ? parseInt(item.release_date.substring(0, 4)) : null;
                     return titleMatches && itemYear === parseInt(rec.year);
                   }
-
+                  
                   return titleMatches;
                 });
 
@@ -597,168 +591,15 @@ const Dashboard = () => {
     const filteredItems = items.filter((item) => {
       // Get the content rating
       const contentRating = item.content_rating || item.Rated || "";
-
+      
       // Check if the content rating is in the accepted ratings
-      const isAcceptedRating =
-        !currentFilters.acceptedRatings ||
+      const isAcceptedRating = !currentFilters.acceptedRatings || 
         currentFilters.acceptedRatings.includes(contentRating);
-
+      
       // Return true if the content rating is accepted
       return isAcceptedRating;
     });
-
+    
     console.log("Number of items after filtering:", filteredItems.length);
     return filteredItems;
   };
-
-  // Mock function to generate recommendations when AI fails
-  const generateMockRecommendations = (preferences: any): ContentItem[] => {
-    // This is a placeholder function that would normally generate mock recommendations
-    // based on the user's preferences when AI recommendations fail
-    console.log(
-      "Generating mock recommendations based on preferences:",
-      preferences,
-    );
-
-    // Return an empty array for now - in a real implementation, this would return
-    // a set of fallback recommendations based on the user's preferences
-    return [];
-  };
-
-  return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
-      {/* Dashboard header */}
-      <header className="bg-white shadow-sm p-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Your Dashboard</h1>
-          <div className="flex space-x-2">
-            {user ? (
-              <Link to="/profile">
-                <Button variant="outline">Profile</Button>
-              </Link>
-            ) : (
-              <Link to="/login">
-                <Button>Sign In</Button>
-              </Link>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* Main content */}
-      <main className="flex-grow p-4">
-        <div className="max-w-7xl mx-auto">
-          {/* Tabs */}
-          <div className="flex border-b mb-6">
-            <button
-              className={`px-4 py-2 font-medium ${activeTab === "discover" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"}`}
-              onClick={() => setActiveTab("discover")}
-            >
-              Discover
-            </button>
-            <button
-              className={`px-4 py-2 font-medium ${activeTab === "what-to-watch" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"}`}
-              onClick={() => setActiveTab("what-to-watch")}
-            >
-              What to Watch
-            </button>
-            <button
-              className={`px-4 py-2 font-medium ${activeTab === "similar-content" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"}`}
-              onClick={() => setActiveTab("similar-content")}
-            >
-              Similar Content
-            </button>
-            <button
-              className={`px-4 py-2 font-medium ${activeTab === "recommendations" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"}`}
-              onClick={() => setActiveTab("recommendations")}
-            >
-              Recommendations
-            </button>
-          </div>
-
-          {/* Tab content */}
-          <div className="mt-4">
-            {activeTab === "discover" && (
-              <Discover
-                onStartQuiz={() => setActiveTab("what-to-watch")}
-                onStartSimilarSearch={() => setActiveTab("similar-content")}
-              />
-            )}
-            {activeTab === "what-to-watch" && (
-              <WhatToWatch
-                onSubmit={handleWhatToWatchSubmit}
-                isLoading={isLoading}
-                maturityLevel={filters.maturityLevel}
-                initialGenres={[]}
-              />
-            )}
-            {activeTab === "similar-content" && (
-              <SimilarContent
-                onSelectItem={() => {}}
-                useDirectApi={useDirectApi}
-              />
-            )}
-            {activeTab === "recommendations" && (
-              <div>
-                {isLoading ? (
-                  <div className="flex flex-col items-center justify-center p-12">
-                    <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
-                    <p className="text-lg text-gray-600">
-                      Finding the perfect content for you...
-                    </p>
-                  </div>
-                ) : recommendations.length > 0 ? (
-                  <div>
-                    <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-xl font-semibold">
-                        Your Recommendations
-                      </h2>
-                      <ContentFilters
-                        filters={filters}
-                        setFilters={(newFilters) => {
-                          setFilters(newFilters);
-                          // Apply the new filters to all recommendations
-                          const filteredRecommendations =
-                            applyFiltersToRecommendations(
-                              allRecommendations,
-                              newFilters,
-                            );
-                          setRecommendations(filteredRecommendations);
-                        }}
-                      />
-                    </div>
-                    <RecommendationGrid items={recommendations} />
-                  </div>
-                ) : (
-                  <div className="text-center p-12 bg-white rounded-lg shadow">
-                    <p className="text-lg text-gray-600 mb-4">
-                      No recommendations found based on your preferences.
-                    </p>
-                    <p className="text-gray-500 mb-6">
-                      Try adjusting your preferences or explore our trending
-                      content.
-                    </p>
-                    <Button
-                      onClick={() => setActiveTab("what-to-watch")}
-                      className="mr-4"
-                    >
-                      Update Preferences
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setActiveTab("discover")}
-                    >
-                      Explore Trending
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-};
-
-export default Dashboard;

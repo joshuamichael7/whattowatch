@@ -4,13 +4,13 @@ import { Button } from "@/components/ui/button";
 import { ListFilter, Search } from "lucide-react";
 
 interface DiscoverProps {
-  onStartQuiz?: () => void;
-  onStartSimilarSearch?: () => void;
+  onStartQuiz: () => void;
+  onStartSimilarSearch: () => void;
 }
 
 const Discover: React.FC<DiscoverProps> = ({
-  onStartQuiz = () => {},
-  onStartSimilarSearch = () => {},
+  onStartQuiz,
+  onStartSimilarSearch,
 }) => {
   return (
     <motion.div
