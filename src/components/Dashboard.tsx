@@ -37,6 +37,7 @@ interface ContentFilterOptions {
   familyFriendly: boolean;
   contentWarnings: string[];
   excludedGenres: string[];
+  acceptedRatings?: string[];
 }
 
 const Dashboard = () => {
@@ -131,8 +132,42 @@ const Dashboard = () => {
                 const detailedContent = await getContentById(firstResult.id);
 
                 if (detailedContent) {
+                  // Log detailed content for debugging
+                  console.log(`Got detailed content for "${rec.title}":`, {
+                    id: detailedContent.id,
+                    title: detailedContent.title,
+                    contentRating: detailedContent.content_rating,
+                    poster: detailedContent.Poster,
+                    poster_path: detailedContent.poster_path,
+                  });
+
+                  // Fix poster path if it's missing
+                  let posterPath = detailedContent.poster_path;
+                  if (
+                    !posterPath &&
+                    detailedContent.Poster &&
+                    detailedContent.Poster !== "N/A"
+                  ) {
+                    posterPath = detailedContent.Poster;
+                    console.log(`Using Poster as poster_path: ${posterPath}`);
+                  }
+
+                  // Check if the content rating is allowed based on user preferences
+                  const contentRating = detailedContent.content_rating || "";
+                  if (
+                    contentRating &&
+                    filters.acceptedRatings &&
+                    !filters.acceptedRatings.includes(contentRating)
+                  ) {
+                    console.log(
+                      `Skipping "${rec.title}" due to content rating: ${contentRating}`,
+                    );
+                    return null;
+                  }
+
                   const contentItem: ContentItem = {
                     ...detailedContent,
+                    poster_path: posterPath,
                     recommendationReason:
                       rec.reason || "AI recommended based on your preferences",
                   };
@@ -185,11 +220,17 @@ const Dashboard = () => {
 
     // Update filters with age ratings from quiz
     if (preferences.ageRatings && preferences.ageRatings.length > 0) {
-      setFilters((prevFilters) => ({
-        ...prevFilters,
-        maturityLevel: preferences.ageRatings[0] || "PG-13",
-        acceptedRatings: preferences.ageRatings,
-      }));
+      setFilters((prevFilters) => {
+        console.log(
+          "Setting accepted ratings from quiz:",
+          preferences.ageRatings,
+        );
+        return {
+          ...prevFilters,
+          maturityLevel: preferences.ageRatings[0] || "PG-13",
+          acceptedRatings: preferences.ageRatings,
+        };
+      });
     }
 
     // Track if we're using fallback data
@@ -231,10 +272,38 @@ const Dashboard = () => {
                     id: detailedContent.id,
                     title: detailedContent.title,
                     type: detailedContent.media_type,
+                    contentRating: detailedContent.content_rating,
+                    poster: detailedContent.Poster,
+                    poster_path: detailedContent.poster_path,
                   });
+
+                  // Fix poster path if it's missing
+                  let posterPath = detailedContent.poster_path;
+                  if (
+                    !posterPath &&
+                    detailedContent.Poster &&
+                    detailedContent.Poster !== "N/A"
+                  ) {
+                    posterPath = detailedContent.Poster;
+                    console.log(`Using Poster as poster_path: ${posterPath}`);
+                  }
+
+                  // Check if the content rating is allowed based on user preferences
+                  const contentRating = detailedContent.content_rating || "";
+                  if (
+                    contentRating &&
+                    filters.acceptedRatings &&
+                    !filters.acceptedRatings.includes(contentRating)
+                  ) {
+                    console.log(
+                      `Skipping "${rec.title}" due to content rating: ${contentRating}`,
+                    );
+                    return null;
+                  }
 
                   const contentItem: ContentItem = {
                     ...detailedContent,
+                    poster_path: posterPath,
                     recommendationReason:
                       rec.reason || "AI recommended based on your preferences",
                     aiRecommended: true,
@@ -330,6 +399,7 @@ const Dashboard = () => {
   // Handle search input change
   const handleSearchChange = (value: string) => {
     setSearchValue(value);
+    console.log(`Search value changed to: ${value}`);
   };
 
   // Handle similar content selection
@@ -370,6 +440,7 @@ const Dashboard = () => {
 
   // Handle filter changes
   const handleFilterChange = (newFilters: ContentFilterOptions) => {
+    console.log("Filter change requested:", newFilters);
     setFilters(newFilters);
 
     // In a real app, this would trigger a re-fetch of recommendations
@@ -381,7 +452,31 @@ const Dashboard = () => {
         const filteredRecommendations = recommendations.filter((item) => {
           // Filter by maturity level
           if (newFilters.maturityLevel === "G" && item.contentRating !== "G") {
+            console.log(
+              `Filtering out ${item.title} due to maturity level: ${item.contentRating} != G`,
+            );
             return false;
+          }
+
+          // Filter by accepted ratings
+          if (
+            newFilters.acceptedRatings &&
+            newFilters.acceptedRatings.length > 0
+          ) {
+            const itemRating = item.contentRating || item.content_rating || "";
+            console.log(
+              `Checking if ${itemRating} is in accepted ratings:`,
+              newFilters.acceptedRatings,
+            );
+            if (
+              itemRating &&
+              !newFilters.acceptedRatings.includes(itemRating)
+            ) {
+              console.log(
+                `Filtering out ${item.title} due to rating: ${itemRating}`,
+              );
+              return false;
+            }
           }
 
           // Filter by excluded genres
@@ -393,12 +488,16 @@ const Dashboard = () => {
               item.genres.includes(genre),
             )
           ) {
+            console.log(`Filtering out ${item.title} due to excluded genre`);
             return false;
           }
 
           return true;
         });
 
+        console.log(
+          `Filtered from ${recommendations.length} to ${filteredRecommendations.length} items`,
+        );
         setRecommendations(filteredRecommendations);
         setIsLoading(false);
       }, 1000);

@@ -49,8 +49,9 @@ interface RecommendationItem {
   title: string;
   type: "movie" | "tv";
   year: string;
-  poster: string;
+  poster?: string;
   poster_path?: string;
+  Poster?: string; // Added for OMDB API compatibility
   rating: number;
   genres: string[];
   synopsis: string;
@@ -137,8 +138,14 @@ const RecommendationGrid = ({
 
   // Helper function to get the best available poster image
   const getPosterImage = (item: RecommendationItem) => {
+    console.log(`Getting poster for ${item.title}:`, {
+      poster: item.poster,
+      poster_path: item.poster_path,
+    });
+
     // Try all possible poster sources in order of preference
     if (item.poster && item.poster !== "N/A" && !item.poster.includes("null")) {
+      console.log(`Using poster: ${item.poster}`);
       return item.poster;
     }
     if (
@@ -146,9 +153,12 @@ const RecommendationGrid = ({
       item.poster_path !== "N/A" &&
       !item.poster_path.includes("null")
     ) {
+      console.log(`Using poster_path: ${item.poster_path}`);
       return item.poster_path;
     }
+
     // Return a default placeholder if no valid poster is found
+    console.log(`No valid poster found for ${item.title}, using placeholder`);
     return "https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=800&q=80";
   };
 
