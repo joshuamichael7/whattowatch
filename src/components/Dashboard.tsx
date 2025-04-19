@@ -47,16 +47,28 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [useDirectApi, setUseDirectApi] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  // Define default ratings
+  const defaultRatings = ["G", "PG", "PG-13", "TV-Y", "TV-PG", "TV-14"];
+
   const [filters, setFilters] = useState<ContentFilterOptions>({
     maturityLevel: profile?.content_rating_limit || "PG-13",
     familyFriendly: false,
     contentWarnings: [],
     excludedGenres: profile?.preferred_genres ? [] : [],
-    // Initialize with ratings up to the user's preferred maturity level or PG-13 by default
-    acceptedRatings: getRatingsUpToLevel(
-      profile?.content_rating_limit || "PG-13",
-    ),
+    // Initialize with default ratings
+    acceptedRatings: defaultRatings,
   });
+
+  // Update filters with proper ratings after component mounts
+  useEffect(() => {
+    if (profile?.content_rating_limit) {
+      const ratings = getRatingsUpToLevel(profile.content_rating_limit);
+      setFilters((prev) => ({
+        ...prev,
+        acceptedRatings: ratings,
+      }));
+    }
+  }, [profile]);
 
   useEffect(() => {
     // Check if we should use direct API calls or Netlify functions
@@ -260,6 +272,11 @@ const Dashboard = () => {
     const movieRatings = ["G", "PG", "PG-13", "R"];
     const tvRatings = ["TV-Y", "TV-PG", "TV-14", "TV-MA"];
 
+    // Default ratings if no valid maxLevel is provided
+    if (!maxLevel) {
+      return ["G", "PG", "PG-13", "TV-Y", "TV-PG", "TV-14"];
+    }
+
     // Find the index of the max level in movie ratings
     const movieIndex = movieRatings.indexOf(maxLevel);
     // Find the index of the max level in TV ratings
@@ -287,6 +304,10 @@ const Dashboard = () => {
       if (maxLevel === "TV-14") selectedRatings.push(...["G", "PG", "PG-13"]);
       if (maxLevel === "TV-MA")
         selectedRatings = [...selectedRatings, ...movieRatings];
+    }
+    // If it's not a recognized rating, return default ratings
+    else {
+      selectedRatings = ["G", "PG", "PG-13", "TV-Y", "TV-PG", "TV-14"];
     }
 
     console.log(`Generated ratings for ${maxLevel}:`, selectedRatings);
