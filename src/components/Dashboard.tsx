@@ -679,15 +679,29 @@ const Dashboard = () => {
         )}
 
         {/* Discover tab */}
-        {activeTab === "discover" && <Discover />}
+        {activeTab === "discover" && (
+          <Discover
+            onStartQuiz={() => setActiveTab("what-to-watch")}
+            onStartSimilarSearch={() => setActiveTab("similar")}
+          />
+        )}
 
         {/* What to Watch tab */}
         {activeTab === "what-to-watch" && (
-          <WhatToWatch onSubmit={handleWhatToWatchSubmit} />
+          <WhatToWatch
+            onSubmit={handleWhatToWatchSubmit}
+            isLoading={isLoading}
+            maturityLevel={filters.maturityLevel}
+          />
         )}
 
         {/* Similar Content tab */}
-        {activeTab === "similar" && <SimilarContent />}
+        {activeTab === "similar" && (
+          <SimilarContent
+            onSelectItem={(item) => console.log("Selected item:", item)}
+            useDirectApi={useDirectApi}
+          />
+        )}
 
         {/* Recommendations tab */}
         {activeTab === "recommendations" && recommendations.length > 0 && (
