@@ -57,6 +57,23 @@ export async function searchContent(
       console.log(
         `[omdbClient] Found ${supabaseResults.length} results in Supabase for "${query}"`,
       );
+
+      // Check for exact title match (case-insensitive)
+      const exactMatch = supabaseResults.find(
+        (item) => item.title.toLowerCase() === query.toLowerCase(),
+      );
+
+      // If we have an exact match, prioritize it by putting it first
+      if (exactMatch) {
+        console.log(
+          `[omdbClient] Found exact match for "${query}": ${exactMatch.title}`,
+        );
+        const otherResults = supabaseResults.filter(
+          (item) => item.id !== exactMatch.id,
+        );
+        return [exactMatch, ...otherResults];
+      }
+
       return supabaseResults;
     }
 
@@ -64,6 +81,77 @@ export async function searchContent(
     console.log(
       `[omdbClient] No results found in Supabase for "${query}", falling back to OMDB API`,
     );
+
+    // First try an exact title search using the 't' parameter
+    const exactParams = new URLSearchParams({
+      t: query,
+    });
+
+    if (type && type !== "all") {
+      exactParams.append("type", type);
+    }
+
+    const exactData = await fetchFromOmdb(exactParams);
+
+    // If we found an exact match, use it and then supplement with regular search results
+    if (exactData && exactData.Response === "True" && exactData.Title) {
+      console.log(
+        `[omdbClient] Found exact match for "${query}": ${exactData.Title}`,
+      );
+
+      // Now do a regular search to get additional results
+      const params = new URLSearchParams({
+        s: query,
+      });
+
+      if (type && type !== "all") {
+        params.append("type", type);
+      }
+
+      const searchData = await fetchFromOmdb(params);
+
+      // Create the exact match item
+      const exactItem = {
+        id: exactData.imdbID,
+        title: exactData.Title,
+        poster_path: exactData.Poster !== "N/A" ? exactData.Poster : "",
+        media_type: exactData.Type === "movie" ? "movie" : "tv",
+        release_date: exactData.Year,
+        vote_average:
+          exactData.imdbRating !== "N/A" ? parseFloat(exactData.imdbRating) : 0,
+        vote_count:
+          exactData.imdbVotes !== "N/A"
+            ? parseInt(exactData.imdbVotes.replace(/,/g, ""))
+            : 0,
+        genre_ids: [],
+        overview: exactData.Plot !== "N/A" ? exactData.Plot : "",
+        content_rating: exactData.Rated !== "N/A" ? exactData.Rated : undefined,
+      };
+
+      // If we have additional search results, add them (excluding the exact match)
+      if (searchData && searchData.Response === "True" && searchData.Search) {
+        const additionalItems = searchData.Search.filter(
+          (item: any) => item.imdbID !== exactData.imdbID,
+        ).map((item: any) => ({
+          id: item.imdbID,
+          title: item.Title,
+          poster_path: item.Poster !== "N/A" ? item.Poster : "",
+          media_type: item.Type === "movie" ? "movie" : "tv",
+          release_date: item.Year,
+          vote_average: 0,
+          vote_count: 0,
+          genre_ids: [],
+          overview: "",
+        }));
+
+        return [exactItem, ...additionalItems];
+      }
+
+      // If no additional results, just return the exact match
+      return [exactItem];
+    }
+
+    // If no exact match, fall back to regular search
     const params = new URLSearchParams({
       s: query,
     });
@@ -82,17 +170,37 @@ export async function searchContent(
     console.log(
       `[omdbClient] Found ${data.Search?.length || 0} results for "${query}" in OMDB API`,
     );
-    return data.Search.map((item: any) => ({
+
+    // Check for case-insensitive exact match in search results
+    const searchResults = data.Search.map((item: any) => ({
       id: item.imdbID,
       title: item.Title,
       poster_path: item.Poster !== "N/A" ? item.Poster : "",
       media_type: item.Type === "movie" ? "movie" : "tv",
       release_date: item.Year,
-      vote_average: 0, // OMDB search doesn't provide ratings in search results
+      vote_average: 0,
       vote_count: 0,
-      genre_ids: [], // OMDB search doesn't provide genres in search results
-      overview: "", // OMDB search doesn't provide overview in search results
+      genre_ids: [],
+      overview: "",
     }));
+
+    // Find exact title match (case-insensitive)
+    const exactMatch = searchResults.find(
+      (item) => item.title.toLowerCase() === query.toLowerCase(),
+    );
+
+    // If we have an exact match, prioritize it
+    if (exactMatch) {
+      console.log(
+        `[omdbClient] Found exact match in search results for "${query}": ${exactMatch.title}`,
+      );
+      const otherResults = searchResults.filter(
+        (item) => item.id !== exactMatch.id,
+      );
+      return [exactMatch, ...otherResults];
+    }
+
+    return searchResults;
   } catch (error) {
     console.error(
       `[omdbClient] Error searching content for "${query}":`,

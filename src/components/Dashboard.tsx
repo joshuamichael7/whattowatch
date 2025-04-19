@@ -44,6 +44,9 @@ const Dashboard = () => {
   const { user, profile } = useAuth();
   const [activeTab, setActiveTab] = useState("discover");
   const [recommendations, setRecommendations] = useState<ContentItem[]>([]);
+  const [allRecommendations, setAllRecommendations] = useState<ContentItem[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [useDirectApi, setUseDirectApi] = useState(false);
   const [searchValue, setSearchValue] = useState("");
@@ -153,12 +156,13 @@ const Dashboard = () => {
 
     try {
       // Use Netlify function instead of direct API call
+      // Request more recommendations to ensure we have enough after filtering
       const response = await fetch("/.netlify/functions/ai-recommendations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ preferences, limit: 10 }),
+        body: JSON.stringify({ preferences, limit: 20 }),
       });
 
       if (!response.ok) {
@@ -245,7 +249,14 @@ const Dashboard = () => {
         ) as ContentItem[];
 
         if (validRecommendations.length > 0) {
-          setRecommendations(validRecommendations);
+          // Store all recommendations in state
+          setAllRecommendations(validRecommendations);
+          // Apply current filters to the recommendations
+          const filteredRecommendations = applyFiltersToRecommendations(
+            validRecommendations,
+            filters,
+          );
+          setRecommendations(filteredRecommendations);
           setIsLoading(false);
           return;
         }
@@ -256,11 +267,13 @@ const Dashboard = () => {
         "No valid AI recommendations found, falling back to mock data",
       );
       const mockRecommendations = generateMockRecommendations(preferences);
+      setAllRecommendations(mockRecommendations);
       setRecommendations(mockRecommendations);
     } catch (error) {
       console.error("Error processing recommendations:", error);
       // Fallback to mock recommendations
       const mockRecommendations = generateMockRecommendations(preferences);
+      setAllRecommendations(mockRecommendations);
       setRecommendations(mockRecommendations);
     } finally {
       setIsLoading(false);
@@ -356,6 +369,9 @@ const Dashboard = () => {
         acceptedRatings: acceptedRatings,
       }));
     }
+
+    // Log the current filters for debugging
+    console.log("Current filters after updating from quiz:", filters);
 
     // Track if we're using fallback data
     let usingFallbackData = false;
@@ -456,7 +472,14 @@ const Dashboard = () => {
         );
 
         if (validRecommendations.length > 0) {
-          setRecommendations(validRecommendations);
+          // Store all recommendations in state
+          setAllRecommendations(validRecommendations);
+          // Apply current filters to the recommendations
+          const filteredRecommendations = applyFiltersToRecommendations(
+            validRecommendations,
+            filters,
+          );
+          setRecommendations(filteredRecommendations);
           setIsLoading(false);
           return;
         } else {
@@ -490,6 +513,7 @@ const Dashboard = () => {
           item.recommendationReason || "Based on your selected preferences",
       }));
 
+      setAllRecommendations(markedRecommendations);
       setRecommendations(markedRecommendations);
     } catch (error) {
       console.error("Error processing recommendations:", error);
@@ -508,6 +532,7 @@ const Dashboard = () => {
           item.recommendationReason || "Based on your selected preferences",
       }));
 
+      setAllRecommendations(markedRecommendations);
       setRecommendations(markedRecommendations);
     } finally {
       setIsLoading(false);
@@ -518,6 +543,96 @@ const Dashboard = () => {
         // Here you could add a toast notification if you have a toast system
       }
     }
+  };
+
+  // Helper function to apply filters to recommendations
+  const applyFiltersToRecommendations = (
+    items: ContentItem[],
+    currentFilters: ContentFilterOptions,
+  ) => {
+    console.log("Applying filters to recommendations:", currentFilters);
+    console.log("Number of items before filtering:", items.length);
+
+    const filteredItems = items.filter((item) => {
+      // Get the item's content rating
+      const itemRating = item.contentRating || item.content_rating || "";
+
+      // Skip filtering if the item has no rating
+      if (!itemRating) {
+        console.log(`Item ${item.title} has no rating, including it`);
+        return true;
+      }
+
+      // Filter by accepted ratings
+      if (
+        currentFilters.acceptedRatings &&
+        currentFilters.acceptedRatings.length > 0
+      ) {
+        console.log(
+          `Checking if ${itemRating} is in accepted ratings:`,
+          currentFilters.acceptedRatings,
+        );
+        if (!currentFilters.acceptedRatings.includes(itemRating)) {
+          console.log(
+            `Filtering out ${item.title} due to rating: ${itemRating} not in accepted ratings`,
+          );
+          return false;
+        }
+      }
+
+      // Filter by excluded genres
+      if (currentFilters.excludedGenres.length > 0) {
+        // Check if item has genres as an array
+        if (item.genres && Array.isArray(item.genres)) {
+          if (
+            currentFilters.excludedGenres.some((genre) =>
+              item.genres.includes(genre),
+            )
+          ) {
+            console.log(
+              `Filtering out ${item.title} due to excluded genre in item.genres`,
+            );
+            return false;
+          }
+        }
+
+        // Check if item has genre_strings array
+        if (item.genre_strings && Array.isArray(item.genre_strings)) {
+          if (
+            currentFilters.excludedGenres.some((genre) =>
+              item.genre_strings.includes(genre),
+            )
+          ) {
+            console.log(
+              `Filtering out ${item.title} due to excluded genre in item.genre_strings`,
+            );
+            return false;
+          }
+        }
+
+        // Check if item has Genre string that contains excluded genres
+        if (item.Genre && typeof item.Genre === "string") {
+          const genreArray = item.Genre.split(", ");
+          if (
+            currentFilters.excludedGenres.some((genre) =>
+              genreArray.some((g) => g.toLowerCase() === genre.toLowerCase()),
+            )
+          ) {
+            console.log(
+              `Filtering out ${item.title} due to excluded genre in item.Genre`,
+            );
+            return false;
+          }
+        }
+      }
+
+      return true;
+    });
+
+    console.log(
+      `Filtered from ${items.length} to ${filteredItems.length} items`,
+    );
+    return filteredItems;
   };
 
   // Handle search input change
@@ -557,6 +672,7 @@ const Dashboard = () => {
         contentToAvoid: [],
         ageRating: "PG-13",
       });
+      setAllRecommendations(mockRecommendations);
       setRecommendations(mockRecommendations);
       setIsLoading(false);
     }, 2000);
@@ -567,91 +683,14 @@ const Dashboard = () => {
     console.log("Filter change requested:", newFilters);
     setFilters(newFilters);
 
-    // Apply filters to existing recommendations
-    if (recommendations.length > 0) {
+    // Apply filters to all stored recommendations
+    if (allRecommendations.length > 0) {
       setIsLoading(true);
       setTimeout(() => {
-        // Apply filters to existing recommendations
-        const filteredRecommendations = recommendations.filter((item) => {
-          // Get the item's content rating
-          const itemRating = item.contentRating || item.content_rating || "";
-
-          // Skip filtering if the item has no rating
-          if (!itemRating) {
-            console.log(`Item ${item.title} has no rating, including it`);
-            return true;
-          }
-
-          // Filter by accepted ratings
-          if (
-            newFilters.acceptedRatings &&
-            newFilters.acceptedRatings.length > 0
-          ) {
-            console.log(
-              `Checking if ${itemRating} is in accepted ratings:`,
-              newFilters.acceptedRatings,
-            );
-            if (!newFilters.acceptedRatings.includes(itemRating)) {
-              console.log(
-                `Filtering out ${item.title} due to rating: ${itemRating} not in accepted ratings`,
-              );
-              return false;
-            }
-          }
-
-          // Filter by excluded genres
-          if (newFilters.excludedGenres.length > 0) {
-            // Check if item has genres as an array
-            if (item.genres && Array.isArray(item.genres)) {
-              if (
-                newFilters.excludedGenres.some((genre) =>
-                  item.genres.includes(genre),
-                )
-              ) {
-                console.log(
-                  `Filtering out ${item.title} due to excluded genre in item.genres`,
-                );
-                return false;
-              }
-            }
-
-            // Check if item has genre_strings array
-            if (item.genre_strings && Array.isArray(item.genre_strings)) {
-              if (
-                newFilters.excludedGenres.some((genre) =>
-                  item.genre_strings.includes(genre),
-                )
-              ) {
-                console.log(
-                  `Filtering out ${item.title} due to excluded genre in item.genre_strings`,
-                );
-                return false;
-              }
-            }
-
-            // Check if item has Genre string that contains excluded genres
-            if (item.Genre && typeof item.Genre === "string") {
-              const genreArray = item.Genre.split(", ");
-              if (
-                newFilters.excludedGenres.some((genre) =>
-                  genreArray.some(
-                    (g) => g.toLowerCase() === genre.toLowerCase(),
-                  ),
-                )
-              ) {
-                console.log(
-                  `Filtering out ${item.title} due to excluded genre in item.Genre`,
-                );
-                return false;
-              }
-            }
-          }
-
-          return true;
-        });
-
-        console.log(
-          `Filtered from ${recommendations.length} to ${filteredRecommendations.length} items`,
+        // Apply new filters to all recommendations
+        const filteredRecommendations = applyFiltersToRecommendations(
+          allRecommendations,
+          newFilters,
         );
         setRecommendations(filteredRecommendations);
         setIsLoading(false);
