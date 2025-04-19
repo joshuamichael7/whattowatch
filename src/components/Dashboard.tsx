@@ -15,6 +15,13 @@ import Discover from "./dashboard/Discover";
 import WhatToWatch from "./dashboard/WhatToWatch";
 import SimilarContent from "./dashboard/SimilarContent";
 
+// Add a global preferences variable to store the latest quiz preferences
+declare global {
+  interface Window {
+    preferences?: PreferenceResults;
+  }
+}
+
 interface PreferenceResults {
   genres: string[];
   mood: string;
@@ -49,7 +56,6 @@ const Dashboard = () => {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [useDirectApi, setUseDirectApi] = useState(false);
-  const [searchValue, setSearchValue] = useState("");
   // Define default ratings
   const defaultRatings = ["G", "PG", "PG-13", "TV-Y", "TV-PG", "TV-14"];
 
@@ -183,8 +189,17 @@ const Dashboard = () => {
               const searchResults = await searchContent(rec.title, "all");
 
               if (searchResults && searchResults.length > 0) {
-                // Get the first result (most relevant)
-                const firstResult = searchResults[0];
+                // Find exact title match first
+                const exactMatch = searchResults.find(
+                  (item) =>
+                    item.title.toLowerCase() === rec.title.toLowerCase(),
+                );
+
+                // Use exact match if found, otherwise use first result
+                const firstResult = exactMatch || searchResults[0];
+                console.log(
+                  `Using ${exactMatch ? "exact match" : "first result"} for "${rec.title}": ${firstResult.title}`,
+                );
 
                 // Get detailed content
                 const detailedContent = await getContentById(firstResult.id);
@@ -210,17 +225,13 @@ const Dashboard = () => {
                     console.log(`Using Poster as poster_path: ${posterPath}`);
                   }
 
-                  // Check if the content rating is allowed based on user preferences
+                  // Store the content regardless of rating - we'll filter it later
+                  // This ensures we have R-rated content available when the user changes filters
                   const contentRating = detailedContent.content_rating || "";
-                  if (
-                    contentRating &&
-                    filters.acceptedRatings &&
-                    !filters.acceptedRatings.includes(contentRating)
-                  ) {
+                  if (contentRating) {
                     console.log(
-                      `Skipping "${rec.title}" due to content rating: ${contentRating}`,
+                      `Content rating for "${rec.title}": ${contentRating}`,
                     );
-                    return null;
                   }
 
                   const contentItem: ContentItem = {
@@ -332,6 +343,9 @@ const Dashboard = () => {
     setIsLoading(true);
     setActiveTab("recommendations");
 
+    // Store preferences for later use when changing filters
+    window.preferences = preferences;
+
     // Update filters with age ratings from quiz
     if (preferences.ageRatings && preferences.ageRatings.length > 0) {
       const selectedAgeRating = preferences.ageRatings[0] || "PG-13";
@@ -401,8 +415,17 @@ const Dashboard = () => {
                 console.log(
                   `Found ${searchResults.length} search results for "${rec.title}"`,
                 );
-                // Get the first result (most relevant)
-                const firstResult = searchResults[0];
+                // Find exact title match first
+                const exactMatch = searchResults.find(
+                  (item) =>
+                    item.title.toLowerCase() === rec.title.toLowerCase(),
+                );
+
+                // Use exact match if found, otherwise use first result
+                const firstResult = exactMatch || searchResults[0];
+                console.log(
+                  `Using ${exactMatch ? "exact match" : "first result"} for "${rec.title}": ${firstResult.title}`,
+                );
 
                 // Get detailed content
                 const detailedContent = await getContentById(firstResult.id);
@@ -428,17 +451,13 @@ const Dashboard = () => {
                     console.log(`Using Poster as poster_path: ${posterPath}`);
                   }
 
-                  // Check if the content rating is allowed based on user preferences
+                  // Store the content regardless of rating - we'll filter it later
+                  // This ensures we have R-rated content available when the user changes filters
                   const contentRating = detailedContent.content_rating || "";
-                  if (
-                    contentRating &&
-                    filters.acceptedRatings &&
-                    !filters.acceptedRatings.includes(contentRating)
-                  ) {
+                  if (contentRating) {
                     console.log(
-                      `Skipping "${rec.title}" due to content rating: ${contentRating}`,
+                      `Content rating for "${rec.title}": ${contentRating}`,
                     );
-                    return null;
                   }
 
                   const contentItem: ContentItem = {
@@ -635,12 +654,6 @@ const Dashboard = () => {
     return filteredItems;
   };
 
-  // Handle search input change
-  const handleSearchChange = (value: string) => {
-    setSearchValue(value);
-    console.log(`Search value changed to: ${value}`);
-  };
-
   // Handle similar content selection
   const handleSimilarContentSelect = (item: any) => {
     setIsLoading(true);
@@ -687,13 +700,122 @@ const Dashboard = () => {
     if (allRecommendations.length > 0) {
       setIsLoading(true);
       setTimeout(() => {
-        // Apply new filters to all recommendations
-        const filteredRecommendations = applyFiltersToRecommendations(
-          allRecommendations,
-          newFilters,
-        );
-        setRecommendations(filteredRecommendations);
-        setIsLoading(false);
+        // If R rating is now included but wasn't before, we need to re-fetch R-rated content
+        const hasRRating = newFilters.acceptedRatings?.includes("R") || false;
+        const hadRRating = filters.acceptedRatings?.includes("R") || false;
+
+        if (
+          hasRRating &&
+          !hadRRating &&
+          window.preferences?.aiRecommendations
+        ) {
+          console.log(
+            "R rating added, re-processing recommendations to include R-rated content",
+          );
+
+          // Re-process the AI recommendations to include R-rated content
+          Promise.all(
+            window.preferences.aiRecommendations.map(async (rec) => {
+              try {
+                // Search for the title
+                const searchResults = await searchContent(rec.title, "all");
+
+                if (searchResults && searchResults.length > 0) {
+                  // Find exact title match first
+                  const exactMatch = searchResults.find(
+                    (item) =>
+                      item.title.toLowerCase() === rec.title.toLowerCase(),
+                  );
+
+                  // Use exact match if found, otherwise use first result
+                  const firstResult = exactMatch || searchResults[0];
+                  console.log(
+                    `Using ${exactMatch ? "exact match" : "first result"} for "${rec.title}": ${firstResult.title}`,
+                  );
+
+                  // Get detailed content
+                  const detailedContent = await getContentById(firstResult.id);
+
+                  if (detailedContent) {
+                    // Fix poster path if it's missing
+                    let posterPath = detailedContent.poster_path;
+                    if (
+                      !posterPath &&
+                      detailedContent.Poster &&
+                      detailedContent.Poster !== "N/A"
+                    ) {
+                      posterPath = detailedContent.Poster;
+                    }
+
+                    const contentItem: ContentItem = {
+                      ...detailedContent,
+                      poster_path: posterPath,
+                      recommendationReason:
+                        rec.reason ||
+                        "AI recommended based on your preferences",
+                      aiRecommended: true,
+                    };
+                    return contentItem;
+                  }
+                }
+                return null;
+              } catch (err) {
+                console.error(
+                  `Error processing AI recommendation "${rec.title}":`,
+                  err,
+                );
+                return null;
+              }
+            }),
+          ).then((results) => {
+            // Filter out null results
+            const validResults = results.filter(
+              (item) => item !== null,
+            ) as ContentItem[];
+
+            if (validResults.length > 0) {
+              // Update all recommendations with the new results
+              const newAllRecommendations = [...allRecommendations];
+
+              // Add any new items that weren't in the list before
+              validResults.forEach((item) => {
+                if (
+                  !newAllRecommendations.some(
+                    (existing) => existing.id === item.id,
+                  )
+                ) {
+                  newAllRecommendations.push(item);
+                }
+              });
+
+              setAllRecommendations(newAllRecommendations);
+
+              // Apply filters to the updated recommendations
+              const filteredRecommendations = applyFiltersToRecommendations(
+                newAllRecommendations,
+                newFilters,
+              );
+              setRecommendations(filteredRecommendations);
+            } else {
+              // Just apply the new filters to existing recommendations
+              const filteredRecommendations = applyFiltersToRecommendations(
+                allRecommendations,
+                newFilters,
+              );
+              setRecommendations(filteredRecommendations);
+            }
+
+            setIsLoading(false);
+          });
+        } else {
+          // Just apply the new filters to existing recommendations
+          const filteredRecommendations = applyFiltersToRecommendations(
+            allRecommendations,
+            newFilters,
+          );
+          setRecommendations(filteredRecommendations);
+          setIsLoading(false);
+        }
       }, 1000);
     }
   };

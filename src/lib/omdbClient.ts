@@ -63,15 +63,36 @@ export async function searchContent(
         (item) => item.title.toLowerCase() === query.toLowerCase(),
       );
 
-      // If we have an exact match, prioritize it by putting it first
-      if (exactMatch) {
+      // Improved exact title matching - prioritize exact case-insensitive matches
+      // This ensures "Spy" matches only "Spy" and not "Balkan Spy" or other variations
+      const exactTitleMatch = supabaseResults.find(
+        (item) => item.title.toLowerCase() === query.toLowerCase(),
+      );
+
+      if (exactTitleMatch) {
         console.log(
-          `[omdbClient] Found exact match for "${query}": ${exactMatch.title}`,
+          `[omdbClient] Found exact title match for "${query}": ${exactTitleMatch.title}`,
         );
         const otherResults = supabaseResults.filter(
-          (item) => item.id !== exactMatch.id,
+          (item) => item.id !== exactTitleMatch.id,
         );
-        return [exactMatch, ...otherResults];
+        return [exactTitleMatch, ...otherResults];
+      }
+
+      // If we don't have an exact title match, try partial match with title beginning
+      // This helps with cases where the title might be part of a longer title
+      const titleStartsWithMatch = supabaseResults.find((item) =>
+        item.title.toLowerCase().startsWith(query.toLowerCase() + " "),
+      );
+
+      if (titleStartsWithMatch) {
+        console.log(
+          `[omdbClient] Found title starts with match for "${query}": ${titleStartsWithMatch.title}`,
+        );
+        const otherResults = supabaseResults.filter(
+          (item) => item.id !== titleStartsWithMatch.id,
+        );
+        return [titleStartsWithMatch, ...otherResults];
       }
 
       return supabaseResults;
