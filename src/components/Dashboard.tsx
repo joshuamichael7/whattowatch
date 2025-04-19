@@ -29,7 +29,7 @@ interface PreferenceResults {
   favoriteContent: string[];
   contentToAvoid: string[];
   ageRating: string;
-  aiRecommendations?: Array<{ title: string; reason: string }>;
+  aiRecommendations?: Array<{ title: string; reason: string; year?: string }>;
   isAiRecommendationSuccess?: boolean;
   aiRecommendationError?: string | null;
   // For compatibility with the updated PreferenceQuiz component
@@ -189,11 +189,22 @@ const Dashboard = () => {
               const searchResults = await searchContent(rec.title, "all");
 
               if (searchResults && searchResults.length > 0) {
-                // Find exact title match first
-                const exactMatch = searchResults.find(
-                  (item) =>
-                    item.title.toLowerCase() === rec.title.toLowerCase(),
-                );
+                // Find exact title match with year if available - no fuzzy matching
+                const exactMatch = searchResults.find((item) => {
+                  // Basic title match (case-insensitive)
+                  const titleMatches =
+                    item.title.toLowerCase() === rec.title.toLowerCase();
+
+                  // If we have a year from the AI recommendation, use it for additional filtering
+                  if (rec.year && titleMatches) {
+                    const itemYear = item.release_date
+                      ? parseInt(item.release_date.substring(0, 4))
+                      : null;
+                    return titleMatches && itemYear === parseInt(rec.year);
+                  }
+
+                  return titleMatches;
+                });
 
                 // Use exact match if found, otherwise use first result
                 const firstResult = exactMatch || searchResults[0];
@@ -415,11 +426,22 @@ const Dashboard = () => {
                 console.log(
                   `Found ${searchResults.length} search results for "${rec.title}"`,
                 );
-                // Find exact title match first
-                const exactMatch = searchResults.find(
-                  (item) =>
-                    item.title.toLowerCase() === rec.title.toLowerCase(),
-                );
+                // Find exact title match with year if available - no fuzzy matching
+                const exactMatch = searchResults.find((item) => {
+                  // Basic title match (case-insensitive)
+                  const titleMatches =
+                    item.title.toLowerCase() === rec.title.toLowerCase();
+
+                  // If we have a year from the AI recommendation, use it for additional filtering
+                  if (rec.year && titleMatches) {
+                    const itemYear = item.release_date
+                      ? parseInt(item.release_date.substring(0, 4))
+                      : null;
+                    return titleMatches && itemYear === parseInt(rec.year);
+                  }
+
+                  return titleMatches;
+                });
 
                 // Use exact match if found, otherwise use first result
                 const firstResult = exactMatch || searchResults[0];
@@ -573,547 +595,152 @@ const Dashboard = () => {
     console.log("Number of items before filtering:", items.length);
 
     const filteredItems = items.filter((item) => {
-      // Get the item's content rating
-      const itemRating = item.contentRating || item.content_rating || "";
+      // Get the content rating
+      const contentRating = item.content_rating || item.Rated || "";
 
-      // Skip filtering if the item has no rating
-      if (!itemRating) {
-        console.log(`Item ${item.title} has no rating, including it`);
-        return true;
-      }
+      // Check if the content rating is in the accepted ratings
+      const isAcceptedRating =
+        !currentFilters.acceptedRatings ||
+        currentFilters.acceptedRatings.includes(contentRating);
 
-      // Filter by accepted ratings
-      if (
-        currentFilters.acceptedRatings &&
-        currentFilters.acceptedRatings.length > 0
-      ) {
-        console.log(
-          `Checking if ${itemRating} is in accepted ratings:`,
-          currentFilters.acceptedRatings,
-        );
-        if (!currentFilters.acceptedRatings.includes(itemRating)) {
-          console.log(
-            `Filtering out ${item.title} due to rating: ${itemRating} not in accepted ratings`,
-          );
-          return false;
-        }
-      }
-
-      // Filter by excluded genres
-      if (currentFilters.excludedGenres.length > 0) {
-        // Check if item has genres as an array
-        if (item.genres && Array.isArray(item.genres)) {
-          if (
-            currentFilters.excludedGenres.some((genre) =>
-              item.genres.includes(genre),
-            )
-          ) {
-            console.log(
-              `Filtering out ${item.title} due to excluded genre in item.genres`,
-            );
-            return false;
-          }
-        }
-
-        // Check if item has genre_strings array
-        if (item.genre_strings && Array.isArray(item.genre_strings)) {
-          if (
-            currentFilters.excludedGenres.some((genre) =>
-              item.genre_strings.includes(genre),
-            )
-          ) {
-            console.log(
-              `Filtering out ${item.title} due to excluded genre in item.genre_strings`,
-            );
-            return false;
-          }
-        }
-
-        // Check if item has Genre string that contains excluded genres
-        if (item.Genre && typeof item.Genre === "string") {
-          const genreArray = item.Genre.split(", ");
-          if (
-            currentFilters.excludedGenres.some((genre) =>
-              genreArray.some((g) => g.toLowerCase() === genre.toLowerCase()),
-            )
-          ) {
-            console.log(
-              `Filtering out ${item.title} due to excluded genre in item.Genre`,
-            );
-            return false;
-          }
-        }
-      }
-
-      return true;
+      // Return true if the content rating is accepted
+      return isAcceptedRating;
     });
 
-    console.log(
-      `Filtered from ${items.length} to ${filteredItems.length} items`,
-    );
+    console.log("Number of items after filtering:", filteredItems.length);
     return filteredItems;
   };
 
-  // Handle similar content selection
-  const handleSimilarContentSelect = (item: any) => {
-    setIsLoading(true);
-    setActiveTab("recommendations");
+  // Mock function to generate recommendations when AI fails
+  const generateMockRecommendations = (preferences: any): ContentItem[] => {
+    // This is a placeholder function that would normally generate mock recommendations
+    // based on the user's preferences when AI recommendations fail
+    console.log(
+      "Generating mock recommendations based on preferences:",
+      preferences,
+    );
 
-    // Simulate API call to get recommendations based on selected item
-    setTimeout(() => {
-      // In a real app, this would be an API call that uses the selected item
-      // to find similar content
-      const mockRecommendations = generateMockRecommendations({
-        genres: item.genre_ids.map((id: number) => {
-          const genreMap: Record<number, string> = {
-            28: "Action",
-            12: "Adventure",
-            16: "Animation",
-            35: "Comedy",
-            80: "Crime",
-            99: "Documentary",
-            18: "Drama",
-            10751: "Family",
-            14: "Fantasy",
-            27: "Horror",
-          };
-          return genreMap[id] || "Drama";
-        }),
-        mood: "thoughtful",
-        viewingTime: 120,
-        favoriteContent: [item.title],
-        contentToAvoid: [],
-        ageRating: "PG-13",
-      });
-      setAllRecommendations(mockRecommendations);
-      setRecommendations(mockRecommendations);
-      setIsLoading(false);
-    }, 2000);
-  };
-
-  // Handle filter changes
-  const handleFilterChange = (newFilters: ContentFilterOptions) => {
-    console.log("Filter change requested:", newFilters);
-    setFilters(newFilters);
-
-    // Apply filters to all stored recommendations
-    if (allRecommendations.length > 0) {
-      setIsLoading(true);
-      setTimeout(() => {
-        // If R rating is now included but wasn't before, we need to re-fetch R-rated content
-        const hasRRating = newFilters.acceptedRatings?.includes("R") || false;
-        const hadRRating = filters.acceptedRatings?.includes("R") || false;
-
-        if (
-          hasRRating &&
-          !hadRRating &&
-          window.preferences?.aiRecommendations
-        ) {
-          console.log(
-            "R rating added, re-processing recommendations to include R-rated content",
-          );
-
-          // Re-process the AI recommendations to include R-rated content
-          Promise.all(
-            window.preferences.aiRecommendations.map(async (rec) => {
-              try {
-                // Search for the title
-                const searchResults = await searchContent(rec.title, "all");
-
-                if (searchResults && searchResults.length > 0) {
-                  // Find exact title match first
-                  const exactMatch = searchResults.find(
-                    (item) =>
-                      item.title.toLowerCase() === rec.title.toLowerCase(),
-                  );
-
-                  // Use exact match if found, otherwise use first result
-                  const firstResult = exactMatch || searchResults[0];
-                  console.log(
-                    `Using ${exactMatch ? "exact match" : "first result"} for "${rec.title}": ${firstResult.title}`,
-                  );
-
-                  // Get detailed content
-                  const detailedContent = await getContentById(firstResult.id);
-
-                  if (detailedContent) {
-                    // Fix poster path if it's missing
-                    let posterPath = detailedContent.poster_path;
-                    if (
-                      !posterPath &&
-                      detailedContent.Poster &&
-                      detailedContent.Poster !== "N/A"
-                    ) {
-                      posterPath = detailedContent.Poster;
-                    }
-
-                    const contentItem: ContentItem = {
-                      ...detailedContent,
-                      poster_path: posterPath,
-                      recommendationReason:
-                        rec.reason ||
-                        "AI recommended based on your preferences",
-                      aiRecommended: true,
-                    };
-                    return contentItem;
-                  }
-                }
-                return null;
-              } catch (err) {
-                console.error(
-                  `Error processing AI recommendation "${rec.title}":`,
-                  err,
-                );
-                return null;
-              }
-            }),
-          ).then((results) => {
-            // Filter out null results
-            const validResults = results.filter(
-              (item) => item !== null,
-            ) as ContentItem[];
-
-            if (validResults.length > 0) {
-              // Update all recommendations with the new results
-              const newAllRecommendations = [...allRecommendations];
-
-              // Add any new items that weren't in the list before
-              validResults.forEach((item) => {
-                if (
-                  !newAllRecommendations.some(
-                    (existing) => existing.id === item.id,
-                  )
-                ) {
-                  newAllRecommendations.push(item);
-                }
-              });
-
-              setAllRecommendations(newAllRecommendations);
-
-              // Apply filters to the updated recommendations
-              const filteredRecommendations = applyFiltersToRecommendations(
-                newAllRecommendations,
-                newFilters,
-              );
-              setRecommendations(filteredRecommendations);
-            } else {
-              // Just apply the new filters to existing recommendations
-              const filteredRecommendations = applyFiltersToRecommendations(
-                allRecommendations,
-                newFilters,
-              );
-              setRecommendations(filteredRecommendations);
-            }
-
-            setIsLoading(false);
-          });
-        } else {
-          // Just apply the new filters to existing recommendations
-          const filteredRecommendations = applyFiltersToRecommendations(
-            allRecommendations,
-            newFilters,
-          );
-          setRecommendations(filteredRecommendations);
-          setIsLoading(false);
-        }
-      }, 1000);
-    }
-  };
-
-  // Mock function to generate recommendations based on preferences
-  const generateMockRecommendations = (
-    preferences: Partial<PreferenceResults>,
-  ): ContentItem[] => {
-    // This would be replaced with actual recommendation logic or API call
-    const baseRecommendations = [
-      {
-        id: "1",
-        title: "Inception",
-        type: "movie",
-        year: "2010",
-        poster:
-          "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80",
-        rating: 8.8,
-        genres: ["Sci-Fi", "Action", "Thriller"],
-        synopsis:
-          "A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.",
-        streamingOn: ["Netflix", "HBO Max"],
-        recommendationReason:
-          "Because you enjoyed mind-bending sci-fi movies with complex plots",
-        runtime: "2h 28m",
-        contentRating: "PG-13",
-      },
-      {
-        id: "2",
-        title: "Stranger Things",
-        type: "tv",
-        year: "2016",
-        poster:
-          "https://images.unsplash.com/photo-1560759226-14da22a643ef?w=800&q=80",
-        rating: 8.7,
-        genres: ["Drama", "Fantasy", "Horror"],
-        synopsis:
-          "When a young boy disappears, his mother, a police chief, and his friends must confront terrifying supernatural forces in order to get him back.",
-        streamingOn: ["Netflix"],
-        recommendationReason:
-          "Based on your interest in supernatural themes and 80s nostalgia",
-        contentRating: "TV-14",
-      },
-      {
-        id: "3",
-        title: "The Shawshank Redemption",
-        type: "movie",
-        year: "1994",
-        poster:
-          "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&q=80",
-        rating: 9.3,
-        genres: ["Drama"],
-        synopsis:
-          "Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.",
-        streamingOn: ["Amazon Prime", "HBO Max"],
-        recommendationReason:
-          "Matches your preference for powerful character-driven dramas",
-        runtime: "2h 22m",
-        contentRating: "R",
-      },
-      {
-        id: "4",
-        title: "Breaking Bad",
-        type: "tv",
-        year: "2008",
-        poster:
-          "https://images.unsplash.com/photo-1504593811423-6dd665756598?w=800&q=80",
-        rating: 9.5,
-        genres: ["Crime", "Drama", "Thriller"],
-        synopsis:
-          "A high school chemistry teacher diagnosed with inoperable lung cancer turns to manufacturing and selling methamphetamine in order to secure his family's future.",
-        streamingOn: ["Netflix", "AMC+"],
-        recommendationReason:
-          "Based on your interest in complex characters and crime dramas",
-        contentRating: "TV-MA",
-      },
-      {
-        id: "5",
-        title: "Parasite",
-        type: "movie",
-        year: "2019",
-        poster:
-          "https://images.unsplash.com/photo-1611523658822-385aa008324c?w=800&q=80",
-        rating: 8.6,
-        genres: ["Drama", "Thriller", "Comedy"],
-        synopsis:
-          "Greed and class discrimination threaten the newly formed symbiotic relationship between the wealthy Park family and the destitute Kim clan.",
-        streamingOn: ["Hulu"],
-        recommendationReason:
-          "Matches your interest in thought-provoking international films",
-        runtime: "2h 12m",
-        contentRating: "R",
-      },
-    ];
-
-    // Filter based on preferences
-    return baseRecommendations.filter((item) => {
-      // Filter by genre preferences
-      if (
-        preferences.genres &&
-        preferences.genres.length > 0 &&
-        item.genres &&
-        Array.isArray(item.genres)
-      ) {
-        if (!item.genres.some((genre) => preferences.genres?.includes(genre))) {
-          return false;
-        }
-      }
-
-      // Filter by content to avoid
-      if (
-        preferences.contentToAvoid &&
-        preferences.contentToAvoid.includes(item.title)
-      ) {
-        return false;
-      }
-
-      // Filter by age rating
-      if (preferences.ageRating) {
-        const ratingOrder = [
-          "G",
-          "PG",
-          "PG-13",
-          "R",
-          "TV-Y",
-          "TV-PG",
-          "TV-14",
-          "TV-MA",
-        ];
-        const preferredIndex = ratingOrder.indexOf(preferences.ageRating);
-        const itemIndex = ratingOrder.indexOf(item.contentRating || "PG-13");
-
-        if (itemIndex > preferredIndex) {
-          return false;
-        }
-      }
-
-      return true;
-    });
+    // Return an empty array for now - in a real implementation, this would return
+    // a set of fallback recommendations based on the user's preferences
+    return [];
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-10 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center">
-          <div className="mr-4 flex items-center">
-            <PlayCircle className="h-6 w-6 text-primary mr-2" />
-            <h1 className="text-xl font-bold">MovieMatch</h1>
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      {/* Dashboard header */}
+      <header className="bg-white shadow-sm p-4">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-900">Your Dashboard</h1>
+          <div className="flex space-x-2">
+            {user ? (
+              <Link to="/profile">
+                <Button variant="outline">Profile</Button>
+              </Link>
+            ) : (
+              <Link to="/login">
+                <Button>Sign In</Button>
+              </Link>
+            )}
           </div>
-          <nav className="flex flex-1 items-center justify-end space-x-4">
-            <Button
-              variant={activeTab === "discover" ? "default" : "ghost"}
-              onClick={() => setActiveTab("discover")}
-            >
-              Discover
-            </Button>
-            <Button
-              variant={activeTab === "whattowatch" ? "default" : "ghost"}
-              onClick={() => setActiveTab("whattowatch")}
-            >
-              What to Watch
-            </Button>
-            <Button
-              variant={activeTab === "quiz" ? "default" : "ghost"}
-              onClick={() => setActiveTab("quiz")}
-            >
-              Preference Quiz
-            </Button>
-            <Button
-              variant={activeTab === "similar" ? "default" : "ghost"}
-              onClick={() => setActiveTab("similar")}
-            >
-              Find Similar
-            </Button>
-            <Button
-              variant={activeTab === "recommendations" ? "default" : "ghost"}
-              onClick={() => setActiveTab("recommendations")}
-              disabled={recommendations.length === 0}
-            >
-              Recommendations
-            </Button>
-            <Button variant="ghost" asChild>
-              <Link to="/plot-similarity-test">Plot Similarity Test</Link>
-            </Button>
-          </nav>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container py-8">
-        {activeTab === "whattowatch" && (
-          <WhatToWatch
-            onSubmit={handleWhatToWatchSubmit}
-            isLoading={isLoading}
-            maturityLevel={filters.maturityLevel}
-            initialGenres={profile?.preferred_genres || []}
-          />
-        )}
+      {/* Main content */}
+      <main className="flex-grow p-4">
+        <div className="max-w-7xl mx-auto">
+          {/* Tabs */}
+          <div className="flex border-b mb-6">
+            <button
+              className={`px-4 py-2 font-medium ${activeTab === "discover" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"}`}
+              onClick={() => setActiveTab("discover")}
+            >
+              Discover
+            </button>
+            <button
+              className={`px-4 py-2 font-medium ${activeTab === "what-to-watch" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"}`}
+              onClick={() => setActiveTab("what-to-watch")}
+            >
+              What to Watch
+            </button>
+            <button
+              className={`px-4 py-2 font-medium ${activeTab === "similar-content" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"}`}
+              onClick={() => setActiveTab("similar-content")}
+            >
+              Similar Content
+            </button>
+            <button
+              className={`px-4 py-2 font-medium ${activeTab === "recommendations" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"}`}
+              onClick={() => setActiveTab("recommendations")}
+            >
+              Recommendations
+            </button>
+          </div>
 
-        {activeTab === "discover" && (
-          <Discover
-            onStartQuiz={() => setActiveTab("quiz")}
-            onStartSimilarSearch={() => setActiveTab("similar")}
-          />
-        )}
-
-        {activeTab === "quiz" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="max-w-4xl mx-auto"
-          >
-            <PreferenceFinder onComplete={handleQuizComplete} />
-          </motion.div>
-        )}
-
-        {activeTab === "similar" && (
-          <SimilarContent
-            onSelectItem={handleSimilarContentSelect}
-            useDirectApi={useDirectApi}
-          />
-        )}
-
-        {activeTab === "recommendations" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="space-y-6"
-          >
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="md:w-1/3 lg:w-1/4">
-                <ContentFilters
-                  onFilterChange={handleFilterChange}
-                  initialFilters={filters}
-                  key={JSON.stringify(filters.acceptedRatings)} // Force re-render when acceptedRatings change
-                />
-              </div>
-              <div className="flex-1">
+          {/* Tab content */}
+          <div className="mt-4">
+            {activeTab === "discover" && <Discover />}
+            {activeTab === "what-to-watch" && (
+              <WhatToWatch onSubmit={handleWhatToWatchSubmit} />
+            )}
+            {activeTab === "similar-content" && <SimilarContent />}
+            {activeTab === "recommendations" && (
+              <div>
                 {isLoading ? (
-                  <div className="flex flex-col items-center justify-center p-12 space-y-4 bg-muted/20 rounded-lg border border-muted">
-                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                    <p className="text-lg font-medium">
-                      Finding the perfect recommendations for you...
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      This may take a few moments as we analyze your preferences
+                  <div className="flex flex-col items-center justify-center p-12">
+                    <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
+                    <p className="text-lg text-gray-600">
+                      Finding the perfect content for you...
                     </p>
                   </div>
-                ) : recommendations.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center p-12 space-y-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                    <X className="h-12 w-12 text-red-500" />
-                    <p className="text-lg font-medium">
-                      Unable to find recommendations
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Please try again with different preferences or check your
-                      connection
-                    </p>
-                    <Button
-                      variant="outline"
-                      onClick={() => setActiveTab("quiz")}
-                      className="mt-2"
-                    >
-                      Try Again
-                    </Button>
+                ) : recommendations.length > 0 ? (
+                  <div>
+                    <div className="flex justify-between items-center mb-6">
+                      <h2 className="text-xl font-semibold">
+                        Your Recommendations
+                      </h2>
+                      <ContentFilters
+                        filters={filters}
+                        setFilters={(newFilters) => {
+                          setFilters(newFilters);
+                          // Apply the new filters to all recommendations
+                          const filteredRecommendations =
+                            applyFiltersToRecommendations(
+                              allRecommendations,
+                              newFilters,
+                            );
+                          setRecommendations(filteredRecommendations);
+                        }}
+                      />
+                    </div>
+                    <RecommendationGrid items={recommendations} />
                   </div>
                 ) : (
-                  <>
-                    {recommendations.some((rec) => rec.isErrorFallback) && (
-                      <div className="mb-4 p-4 border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800 rounded-md">
-                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                          Some recommendations are based on your preferences
-                          rather than AI analysis. This may happen due to API
-                          limitations or connectivity issues.
-                        </p>
-                      </div>
-                    )}
-                    <RecommendationGrid
-                      recommendations={recommendations}
-                      isLoading={false}
-                      onFilterChange={() => {}}
-                      useDirectApi={useDirectApi}
-                      userId={user?.id}
-                      userPreferences={profile}
-                      onFeedbackSubmit={(itemId, isPositive) => {
-                        console.log(
-                          `User ${user?.id} rated ${itemId} as ${isPositive ? "positive" : "negative"}`,
-                        );
-                        // This feedback will be used to improve future recommendations
-                      }}
-                    />
-                  </>
+                  <div className="text-center p-12 bg-white rounded-lg shadow">
+                    <p className="text-lg text-gray-600 mb-4">
+                      No recommendations found based on your preferences.
+                    </p>
+                    <p className="text-gray-500 mb-6">
+                      Try adjusting your preferences or explore our trending
+                      content.
+                    </p>
+                    <Button
+                      onClick={() => setActiveTab("what-to-watch")}
+                      className="mr-4"
+                    >
+                      Update Preferences
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setActiveTab("discover")}
+                    >
+                      Explore Trending
+                    </Button>
+                  </div>
                 )}
               </div>
-            </div>
-          </motion.div>
-        )}
+            )}
+          </div>
+        </div>
       </main>
     </div>
   );

@@ -79,10 +79,12 @@ exports.handler = async (event, context) => {
     Please provide exactly ${limit} titles of movies AND TV shows that are similar in plot, themes, tone, and style. 
     Consider factors like genre, setting, character dynamics, and emotional impact.
     
-    Return ONLY the titles as a numbered list without any additional text, explanation, or commentary.
+    Return ONLY the EXACT titles as they appear in IMDB, FOLLOWED BY THE YEAR in parentheses, as a numbered list without any additional text, explanation, or commentary.
+    // IMPORTANT: Use the EXACT title spelling and formatting as it appears in IMDB to ensure proper matching.
+    // CRITICAL: Include the year in parentheses after each title to distinguish between movies/shows with the same title.
     For example:
-    1. Title One
-    2. Title Two
+    1. Title One (2020)
+    2. Title Two (1995)
     etc.`;
 
     // Construct the API endpoint URL
@@ -114,12 +116,26 @@ exports.handler = async (event, context) => {
     // Parse the response to extract just the titles
     const responseText = response.data.candidates[0].content.parts[0].text;
 
-    // Extract numbered list items (1. Title, 2. Title, etc.)
+    // Extract numbered list items (1. Title (Year), 2. Title (Year), etc.)
     const titles = responseText
       .split("\n")
       .map((line) => line.trim())
       .filter((line) => /^\d+\.\s+.+/.test(line)) // Match lines starting with numbers followed by period
-      .map((line) => line.replace(/^\d+\.\s+/, "").trim()); // Remove the numbering
+      .map((line) => {
+        // Extract the full title with year
+        const fullTitle = line.replace(/^\d+\.\s+/, "").trim();
+        // Check if the title has a year in parentheses
+        const match = fullTitle.match(/(.+)\s+\((\d{4})\)$/);
+        if (match) {
+          // Return both title and year
+          return {
+            title: match[1].trim(),
+            year: match[2],
+          };
+        }
+        // If no year found, just return the title
+        return { title: fullTitle, year: null };
+      });
 
     console.log(`Generated ${titles.length} similar titles for "${title}"`);
 

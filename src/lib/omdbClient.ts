@@ -63,11 +63,30 @@ export async function searchContent(
         (item) => item.title.toLowerCase() === query.toLowerCase(),
       );
 
-      // Improved exact title matching - prioritize exact case-insensitive matches
-      // This ensures "Spy" matches only "Spy" and not "Balkan Spy" or other variations
-      const exactTitleMatch = supabaseResults.find(
-        (item) => item.title.toLowerCase() === query.toLowerCase(),
-      );
+      // Exact title matching with year consideration
+      // This ensures "Spy" only matches "Spy" and not "Spy x Family Code: White" or any other variation
+      // If a year is provided in the query (e.g., "Spy 2015"), use it for additional filtering
+      const queryParts = query.toLowerCase().match(/(.+?)(?:\s+(\d{4}))?$/i);
+      const queryTitle = queryParts
+        ? queryParts[1].trim()
+        : query.toLowerCase();
+      const queryYear =
+        queryParts && queryParts[2] ? parseInt(queryParts[2]) : null;
+
+      const exactTitleMatch = supabaseResults.find((item) => {
+        // First check for exact title match (case-insensitive)
+        const titleMatches = item.title.toLowerCase() === queryTitle;
+
+        // If a year was specified in the query, also check if it matches
+        if (queryYear && titleMatches) {
+          const itemYear = item.release_date
+            ? parseInt(item.release_date.substring(0, 4))
+            : null;
+          return titleMatches && itemYear === queryYear;
+        }
+
+        return titleMatches;
+      });
 
       if (exactTitleMatch) {
         console.log(
@@ -79,11 +98,9 @@ export async function searchContent(
         return [exactTitleMatch, ...otherResults];
       }
 
-      // If we don't have an exact title match, try partial match with title beginning
-      // This helps with cases where the title might be part of a longer title
-      const titleStartsWithMatch = supabaseResults.find((item) =>
-        item.title.toLowerCase().startsWith(query.toLowerCase() + " "),
-      );
+      // We're no longer doing partial matching since it can cause confusion
+      // Only use exact title matches to ensure accuracy
+      const titleStartsWithMatch = null;
 
       if (titleStartsWithMatch) {
         console.log(
@@ -205,10 +222,26 @@ export async function searchContent(
       overview: "",
     }));
 
-    // Find exact title match (case-insensitive)
-    const exactMatch = searchResults.find(
-      (item) => item.title.toLowerCase() === query.toLowerCase(),
-    );
+    // Find exact title match (case-insensitive) with year consideration
+    const queryParts = query.toLowerCase().match(/(.+?)(?:\s+(\d{4}))?$/i);
+    const queryTitle = queryParts ? queryParts[1].trim() : query.toLowerCase();
+    const queryYear =
+      queryParts && queryParts[2] ? parseInt(queryParts[2]) : null;
+
+    const exactMatch = searchResults.find((item) => {
+      // First check for exact title match (case-insensitive)
+      const titleMatches = item.title.toLowerCase() === queryTitle;
+
+      // If a year was specified in the query, also check if it matches
+      if (queryYear && titleMatches) {
+        const itemYear = item.release_date
+          ? parseInt(item.release_date.substring(0, 4))
+          : null;
+        return titleMatches && itemYear === queryYear;
+      }
+
+      return titleMatches;
+    });
 
     // If we have an exact match, prioritize it
     if (exactMatch) {
