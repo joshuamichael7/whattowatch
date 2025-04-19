@@ -36,7 +36,16 @@ const ContentFilters: React.FC<ContentFiltersProps> = ({
     familyFriendly: false,
     contentWarnings: [],
     excludedGenres: [],
-    acceptedRatings: ["G", "PG"],
+    acceptedRatings: [
+      "G",
+      "PG",
+      "PG-13",
+      "R",
+      "TV-Y",
+      "TV-PG",
+      "TV-14",
+      "TV-MA",
+    ],
   },
 }) => {
   const [filters, setFilters] = useState<ContentFilterOptions>(initialFilters);
@@ -79,7 +88,16 @@ const ContentFilters: React.FC<ContentFiltersProps> = ({
       familyFriendly: false,
       contentWarnings: [],
       excludedGenres: [],
-      acceptedRatings: ["G", "PG"],
+      acceptedRatings: [
+        "G",
+        "PG",
+        "PG-13",
+        "R",
+        "TV-Y",
+        "TV-PG",
+        "TV-14",
+        "TV-MA",
+      ],
     };
     setFilters(defaultFilters);
     onFilterChange(defaultFilters);
@@ -156,7 +174,12 @@ const ContentFilters: React.FC<ContentFiltersProps> = ({
                 </div>
 
                 <div className="mt-4">
-                  <Label className="mb-2 block">Accepted Ratings</Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Accepted Ratings</Label>
+                    <Badge variant="outline">
+                      {filters.acceptedRatings?.length || 0} selected
+                    </Badge>
+                  </div>
                   <div className="grid grid-cols-4 gap-2">
                     {[
                       "G",

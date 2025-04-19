@@ -13,6 +13,11 @@ async function fetchFromOmdb(params: URLSearchParams) {
     // Remove any API key from params as it's handled server-side
     params.delete("apikey");
 
+    // Log the search query for debugging
+    if (params.has("s")) {
+      console.log(`[omdbClient] Search query: ${params.get("s")}`);
+    }
+
     const response = await fetch(`${API_ENDPOINT}?${params.toString()}`);
     const data = await response.json();
 
@@ -34,9 +39,15 @@ export async function searchContent(
   type?: "movie" | "series" | "all",
 ): Promise<ContentItem[]> {
   try {
+    // Add more detailed logging for the search query
     console.log(
-      `[omdbClient] Searching for content with query: ${query}, type: ${type || "all"}`,
+      `[omdbClient] Searching for content with query: "${query}", type: ${type || "all"}`,
     );
+
+    if (!query || query.trim() === "") {
+      console.warn("[omdbClient] Empty search query provided");
+      return [];
+    }
 
     // First, try to search in Supabase
     const supabaseResults = await searchContentInSupabase(query, type);
@@ -44,14 +55,14 @@ export async function searchContent(
     // If we have results from Supabase, return them
     if (supabaseResults && supabaseResults.length > 0) {
       console.log(
-        `[omdbClient] Found ${supabaseResults.length} results in Supabase`,
+        `[omdbClient] Found ${supabaseResults.length} results in Supabase for "${query}"`,
       );
       return supabaseResults;
     }
 
     // If no results from Supabase, fall back to OMDB API
     console.log(
-      `[omdbClient] No results found in Supabase, falling back to OMDB API`,
+      `[omdbClient] No results found in Supabase for "${query}", falling back to OMDB API`,
     );
     const params = new URLSearchParams({
       s: query,
@@ -62,9 +73,15 @@ export async function searchContent(
     }
 
     const data = await fetchFromOmdb(params);
-    if (!data) return [];
+    if (!data) {
+      console.log(`[omdbClient] No results found for "${query}" in OMDB API`);
+      return [];
+    }
 
     // Transform OMDB data to match our application's expected format
+    console.log(
+      `[omdbClient] Found ${data.Search?.length || 0} results for "${query}" in OMDB API`,
+    );
     return data.Search.map((item: any) => ({
       id: item.imdbID,
       title: item.Title,
@@ -77,7 +94,10 @@ export async function searchContent(
       overview: "", // OMDB search doesn't provide overview in search results
     }));
   } catch (error) {
-    console.error("Error searching content:", error);
+    console.error(
+      `[omdbClient] Error searching content for "${query}":`,
+      error,
+    );
     return [];
   }
 }

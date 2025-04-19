@@ -52,7 +52,16 @@ const Dashboard = () => {
     familyFriendly: false,
     contentWarnings: [],
     excludedGenres: profile?.preferred_genres ? [] : [],
-    acceptedRatings: [profile?.content_rating_limit || "PG", "G"], // Default to include G and the user's limit
+    acceptedRatings: [
+      "G",
+      "PG",
+      "PG-13",
+      "R",
+      "TV-Y",
+      "TV-PG",
+      "TV-14",
+      "TV-MA",
+    ], // Default to include all ratings
   });
 
   useEffect(() => {
@@ -218,17 +227,27 @@ const Dashboard = () => {
     setIsLoading(true);
     setActiveTab("recommendations");
 
-    // Update filters with age ratings from quiz
+    // Update filters with age ratings from quiz, but keep all ratings accepted by default
     if (preferences.ageRatings && preferences.ageRatings.length > 0) {
       setFilters((prevFilters) => {
         console.log(
-          "Setting accepted ratings from quiz:",
-          preferences.ageRatings,
+          "Setting maturity level from quiz:",
+          preferences.ageRatings[0],
         );
         return {
           ...prevFilters,
           maturityLevel: preferences.ageRatings[0] || "PG-13",
-          acceptedRatings: preferences.ageRatings,
+          // Keep all ratings accepted by default
+          acceptedRatings: [
+            "G",
+            "PG",
+            "PG-13",
+            "R",
+            "TV-Y",
+            "TV-PG",
+            "TV-14",
+            "TV-MA",
+          ],
         };
       });
     }
