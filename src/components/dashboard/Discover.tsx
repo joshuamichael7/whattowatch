@@ -91,14 +91,7 @@ const Discover: React.FC<DiscoverProps> = ({
           </div>
         </div>
 
-        <div className="text-center pt-8">
-          <p className="text-muted-foreground mb-4">
-            Want to see your personalized dashboard?
-          </p>
-          <Button asChild variant="outline">
-            <Link to="/user-dashboard">Go to My Dashboard</Link>
-          </Button>
-        </div>
+        {/* Dashboard link removed from here as it's now in the header */}
       </motion.div>
     </div>
   );

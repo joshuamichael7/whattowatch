@@ -1,15 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Search as SearchIcon,
   Film,
   ListFilter,
-  PlayCircle,
   Loader2,
   RefreshCw,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import UserProfileButton from "./UserProfileButton";
+import Header from "./layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 
 // Import the custom hook for trending content
 import { useTrendingContent } from "@/hooks/useTrendingContent";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Define interfaces for OMDB API responses
 interface OmdbSearchResponse {
@@ -43,10 +43,21 @@ const HomePage = () => {
   const [searchResults, setSearchResults] = useState<OmdbMovie[]>([]);
   const [searchIsLoading, setSearchIsLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [hasPreferences, setHasPreferences] = useState(false);
 
   // Use the custom hook to fetch trending content
   const { trendingMovies, popularTVShows, isLoading, error, refetch } =
     useTrendingContent();
+
+  // Get user auth context
+  const { user, profile, isAuthenticated } = useAuth();
+
+  // Check if user has preferences
+  useEffect(() => {
+    if (profile?.preferences) {
+      setHasPreferences(true);
+    }
+  }, [profile]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,21 +92,7 @@ const HomePage = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-10 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center">
-          <div className="mr-4 flex items-center">
-            <PlayCircle className="h-6 w-6 text-primary mr-2" />
-            <h1 className="text-xl font-bold">MovieMatch</h1>
-          </div>
-          <nav className="flex flex-1 items-center justify-end space-x-4">
-            <Button variant="ghost">Home</Button>
-            <Button variant="ghost" asChild>
-              <Link to="/dashboard">Discover</Link>
-            </Button>
-            <UserProfileButton />
-          </nav>
-        </div>
-      </header>
+      <Header />
 
       {/* Hero Section */}
       <section className="relative">
@@ -129,6 +126,30 @@ const HomePage = () => {
                 Find Similar Content
               </Button>
             </div>
+
+            {/* Preference Builder Prompt for users without preferences */}
+            {isAuthenticated && !hasPreferences && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="mt-8 p-6 bg-card border border-border rounded-lg shadow-md"
+              >
+                <h3 className="text-xl font-semibold mb-2">
+                  Personalize Your Experience
+                </h3>
+                <p className="text-muted-foreground mb-4">
+                  Take our quick preference quiz to get recommendations tailored
+                  just for you.
+                </p>
+                <Button
+                  onClick={() => (window.location.href = "/dashboard")}
+                  className="w-full sm:w-auto"
+                >
+                  Take the Quiz
+                </Button>
+              </motion.div>
+            )}
           </motion.div>
         </div>
       </section>
