@@ -678,11 +678,26 @@ const Dashboard = () => {
 
           {/* Tab content */}
           <div className="mt-4">
-            {activeTab === "discover" && <Discover />}
-            {activeTab === "what-to-watch" && (
-              <WhatToWatch onSubmit={handleWhatToWatchSubmit} />
+            {activeTab === "discover" && (
+              <Discover
+                onStartQuiz={() => setActiveTab("what-to-watch")}
+                onStartSimilarSearch={() => setActiveTab("similar-content")}
+              />
             )}
-            {activeTab === "similar-content" && <SimilarContent />}
+            {activeTab === "what-to-watch" && (
+              <WhatToWatch
+                onSubmit={handleWhatToWatchSubmit}
+                isLoading={isLoading}
+                maturityLevel={filters.maturityLevel}
+                initialGenres={[]}
+              />
+            )}
+            {activeTab === "similar-content" && (
+              <SimilarContent
+                onSelectItem={() => {}}
+                useDirectApi={useDirectApi}
+              />
+            )}
             {activeTab === "recommendations" && (
               <div>
                 {isLoading ? (
