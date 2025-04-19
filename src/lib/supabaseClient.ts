@@ -351,13 +351,32 @@ export async function addContentToSupabase(
         media_type: safeContent.media_type,
       });
 
-      // Make sure we have all required fields
+      // Make sure we have all required fields and remove any fields that might cause issues
       const contentToInsert = {
         ...safeContent,
         id: safeContent.id || generateUUID(),
         created_at: safeContent.created_at || new Date().toISOString(),
         updated_at: safeContent.updated_at || new Date().toISOString(),
       };
+
+      // Remove any fields that aren't in the database schema
+      delete contentToInsert.ratings;
+      delete contentToInsert.aiRecommended;
+      delete contentToInsert.aiSimilarityScore;
+      delete contentToInsert.recommendationReason;
+      delete contentToInsert.isErrorFallback;
+      delete contentToInsert.isTrendingFallback;
+      delete contentToInsert.aiServiceUnavailable;
+      delete contentToInsert.vectorDbRecommended;
+      delete contentToInsert.plotSimilarity;
+      delete contentToInsert.keywordSimilarity;
+      delete contentToInsert.textSimilarity;
+      delete contentToInsert.titleSimilarity;
+      delete contentToInsert.combinedSimilarity;
+      delete contentToInsert.keywords;
+      delete contentToInsert.contentRating; // Use content_rating instead
+      delete contentToInsert.poster; // Use poster_path instead
+      delete contentToInsert.imdbID; // Use imdb_id instead
 
       const { error: insertError } = await supabase
         .from("content")

@@ -33,6 +33,75 @@ async function fetchFromOmdb(params: URLSearchParams) {
   }
 }
 
+// Transform OMDB search results to ContentItem format
+function transformSearchResults(results: any[]): ContentItem[] {
+  return results.map((item) => ({
+    id: item.imdbID,
+    title: item.Title,
+    poster_path: item.Poster !== "N/A" ? item.Poster : "",
+    media_type: item.Type === "movie" ? "movie" : "tv",
+    release_date: item.Year,
+    vote_average: 0,
+    vote_count: 0,
+    genre_ids: [],
+    overview: "",
+  }));
+}
+
+// Transform exact match OMDB data to ContentItem format
+function transformExactMatchData(data: any): ContentItem {
+  return {
+    id: data.imdbID,
+    title: data.Title,
+    poster_path: data.Poster !== "N/A" ? data.Poster : "",
+    media_type: data.Type === "movie" ? "movie" : "tv",
+    release_date: data.Year,
+    vote_average: data.imdbRating !== "N/A" ? parseFloat(data.imdbRating) : 0,
+    vote_count:
+      data.imdbVotes !== "N/A" ? parseInt(data.imdbVotes.replace(/,/g, "")) : 0,
+    genre_ids: [],
+    overview: data.Plot !== "N/A" ? data.Plot : "",
+    content_rating: data.Rated !== "N/A" ? data.Rated : undefined,
+  };
+}
+
+// Extract query title and year from search query
+function extractQueryTitleAndYear(query: string): {
+  queryTitle: string;
+  queryYear: number | null;
+} {
+  const queryParts = query.toLowerCase().match(/(.+?)(?:\s+(\d{4}))?$/i);
+  const queryTitle = queryParts ? queryParts[1].trim() : query.toLowerCase();
+  const queryYear =
+    queryParts && queryParts[2] ? parseInt(queryParts[2]) : null;
+
+  return { queryTitle, queryYear };
+}
+
+// Find exact title match in results
+function findExactTitleMatch(
+  results: ContentItem[],
+  queryTitle: string,
+  queryYear: number | null,
+): ContentItem | null {
+  return (
+    results.find((item) => {
+      // First check for exact title match (case-insensitive)
+      const titleMatches = item.title.toLowerCase() === queryTitle;
+
+      // If a year was specified in the query, also check if it matches
+      if (queryYear && titleMatches) {
+        const itemYear = item.release_date
+          ? parseInt(item.release_date.substring(0, 4))
+          : null;
+        return titleMatches && itemYear === queryYear;
+      }
+
+      return titleMatches;
+    }) || null
+  );
+}
+
 // Helper function to search for movies and TV shows
 export async function searchContent(
   query: string,
@@ -58,35 +127,15 @@ export async function searchContent(
         `[omdbClient] Found ${supabaseResults.length} results in Supabase for "${query}"`,
       );
 
-      // Check for exact title match (case-insensitive)
-      const exactMatch = supabaseResults.find(
-        (item) => item.title.toLowerCase() === query.toLowerCase(),
+      // Extract title and year from query
+      const { queryTitle, queryYear } = extractQueryTitleAndYear(query);
+
+      // Find exact title match
+      const exactTitleMatch = findExactTitleMatch(
+        supabaseResults,
+        queryTitle,
+        queryYear,
       );
-
-      // Exact title matching with year consideration
-      // This ensures "Spy" only matches "Spy" and not "Spy x Family Code: White" or any other variation
-      // If a year is provided in the query (e.g., "Spy 2015"), use it for additional filtering
-      const queryParts = query.toLowerCase().match(/(.+?)(?:\s+(\d{4}))?$/i);
-      const queryTitle = queryParts
-        ? queryParts[1].trim()
-        : query.toLowerCase();
-      const queryYear =
-        queryParts && queryParts[2] ? parseInt(queryParts[2]) : null;
-
-      const exactTitleMatch = supabaseResults.find((item) => {
-        // First check for exact title match (case-insensitive)
-        const titleMatches = item.title.toLowerCase() === queryTitle;
-
-        // If a year was specified in the query, also check if it matches
-        if (queryYear && titleMatches) {
-          const itemYear = item.release_date
-            ? parseInt(item.release_date.substring(0, 4))
-            : null;
-          return titleMatches && itemYear === queryYear;
-        }
-
-        return titleMatches;
-      });
 
       if (exactTitleMatch) {
         console.log(
@@ -100,18 +149,6 @@ export async function searchContent(
 
       // We're no longer doing partial matching since it can cause confusion
       // Only use exact title matches to ensure accuracy
-      const titleStartsWithMatch = null;
-
-      if (titleStartsWithMatch) {
-        console.log(
-          `[omdbClient] Found title starts with match for "${query}": ${titleStartsWithMatch.title}`,
-        );
-        const otherResults = supabaseResults.filter(
-          (item) => item.id !== titleStartsWithMatch.id,
-        );
-        return [titleStartsWithMatch, ...otherResults];
-      }
-
       return supabaseResults;
     }
 
@@ -120,76 +157,39 @@ export async function searchContent(
       `[omdbClient] No results found in Supabase for "${query}", falling back to OMDB API`,
     );
 
-    // First try an exact title search using the 't' parameter
-    const exactParams = new URLSearchParams({
-      t: query,
-    });
+    return await searchFromOmdb(query, type);
+  } catch (error) {
+    console.error(
+      `[omdbClient] Error searching content for "${query}":`,
+      error,
+    );
+    return [];
+  }
+}
 
-    if (type && type !== "all") {
-      exactParams.append("type", type);
-    }
+// Search content from OMDB API
+async function searchFromOmdb(
+  query: string,
+  type?: "movie" | "series" | "all",
+): Promise<ContentItem[]> {
+  // First try an exact title search using the 't' parameter
+  const exactParams = new URLSearchParams({
+    t: query,
+  });
 
-    const exactData = await fetchFromOmdb(exactParams);
+  if (type && type !== "all") {
+    exactParams.append("type", type);
+  }
 
-    // If we found an exact match, use it and then supplement with regular search results
-    if (exactData && exactData.Response === "True" && exactData.Title) {
-      console.log(
-        `[omdbClient] Found exact match for "${query}": ${exactData.Title}`,
-      );
+  const exactData = await fetchFromOmdb(exactParams);
 
-      // Now do a regular search to get additional results
-      const params = new URLSearchParams({
-        s: query,
-      });
+  // If we found an exact match, use it and then supplement with regular search results
+  if (exactData && exactData.Response === "True" && exactData.Title) {
+    console.log(
+      `[omdbClient] Found exact match for "${query}": ${exactData.Title}`,
+    );
 
-      if (type && type !== "all") {
-        params.append("type", type);
-      }
-
-      const searchData = await fetchFromOmdb(params);
-
-      // Create the exact match item
-      const exactItem = {
-        id: exactData.imdbID,
-        title: exactData.Title,
-        poster_path: exactData.Poster !== "N/A" ? exactData.Poster : "",
-        media_type: exactData.Type === "movie" ? "movie" : "tv",
-        release_date: exactData.Year,
-        vote_average:
-          exactData.imdbRating !== "N/A" ? parseFloat(exactData.imdbRating) : 0,
-        vote_count:
-          exactData.imdbVotes !== "N/A"
-            ? parseInt(exactData.imdbVotes.replace(/,/g, ""))
-            : 0,
-        genre_ids: [],
-        overview: exactData.Plot !== "N/A" ? exactData.Plot : "",
-        content_rating: exactData.Rated !== "N/A" ? exactData.Rated : undefined,
-      };
-
-      // If we have additional search results, add them (excluding the exact match)
-      if (searchData && searchData.Response === "True" && searchData.Search) {
-        const additionalItems = searchData.Search.filter(
-          (item: any) => item.imdbID !== exactData.imdbID,
-        ).map((item: any) => ({
-          id: item.imdbID,
-          title: item.Title,
-          poster_path: item.Poster !== "N/A" ? item.Poster : "",
-          media_type: item.Type === "movie" ? "movie" : "tv",
-          release_date: item.Year,
-          vote_average: 0,
-          vote_count: 0,
-          genre_ids: [],
-          overview: "",
-        }));
-
-        return [exactItem, ...additionalItems];
-      }
-
-      // If no additional results, just return the exact match
-      return [exactItem];
-    }
-
-    // If no exact match, fall back to regular search
+    // Now do a regular search to get additional results
     const params = new URLSearchParams({
       s: query,
     });
@@ -198,70 +198,144 @@ export async function searchContent(
       params.append("type", type);
     }
 
-    const data = await fetchFromOmdb(params);
-    if (!data) {
-      console.log(`[omdbClient] No results found for "${query}" in OMDB API`);
-      return [];
+    const searchData = await fetchFromOmdb(params);
+
+    // Create the exact match item
+    const exactItem = transformExactMatchData(exactData);
+
+    // If we have additional search results, add them (excluding the exact match)
+    if (searchData && searchData.Response === "True" && searchData.Search) {
+      const additionalItems = searchData.Search.filter(
+        (item: any) => item.imdbID !== exactData.imdbID,
+      ).map((item: any) => ({
+        id: item.imdbID,
+        title: item.Title,
+        poster_path: item.Poster !== "N/A" ? item.Poster : "",
+        media_type: item.Type === "movie" ? "movie" : "tv",
+        release_date: item.Year,
+        vote_average: 0,
+        vote_count: 0,
+        genre_ids: [],
+        overview: "",
+      }));
+
+      return [exactItem, ...additionalItems];
     }
 
-    // Transform OMDB data to match our application's expected format
-    console.log(
-      `[omdbClient] Found ${data.Search?.length || 0} results for "${query}" in OMDB API`,
-    );
+    // If no additional results, just return the exact match
+    return [exactItem];
+  }
 
-    // Check for case-insensitive exact match in search results
-    const searchResults = data.Search.map((item: any) => ({
-      id: item.imdbID,
-      title: item.Title,
-      poster_path: item.Poster !== "N/A" ? item.Poster : "",
-      media_type: item.Type === "movie" ? "movie" : "tv",
-      release_date: item.Year,
-      vote_average: 0,
-      vote_count: 0,
-      genre_ids: [],
-      overview: "",
-    }));
+  // If no exact match, fall back to regular search
+  const params = new URLSearchParams({
+    s: query,
+  });
 
-    // Find exact title match (case-insensitive) with year consideration
-    const queryParts = query.toLowerCase().match(/(.+?)(?:\s+(\d{4}))?$/i);
-    const queryTitle = queryParts ? queryParts[1].trim() : query.toLowerCase();
-    const queryYear =
-      queryParts && queryParts[2] ? parseInt(queryParts[2]) : null;
+  if (type && type !== "all") {
+    params.append("type", type);
+  }
 
-    const exactMatch = searchResults.find((item) => {
-      // First check for exact title match (case-insensitive)
-      const titleMatches = item.title.toLowerCase() === queryTitle;
-
-      // If a year was specified in the query, also check if it matches
-      if (queryYear && titleMatches) {
-        const itemYear = item.release_date
-          ? parseInt(item.release_date.substring(0, 4))
-          : null;
-        return titleMatches && itemYear === queryYear;
-      }
-
-      return titleMatches;
-    });
-
-    // If we have an exact match, prioritize it
-    if (exactMatch) {
-      console.log(
-        `[omdbClient] Found exact match in search results for "${query}": ${exactMatch.title}`,
-      );
-      const otherResults = searchResults.filter(
-        (item) => item.id !== exactMatch.id,
-      );
-      return [exactMatch, ...otherResults];
-    }
-
-    return searchResults;
-  } catch (error) {
-    console.error(
-      `[omdbClient] Error searching content for "${query}":`,
-      error,
-    );
+  const data = await fetchFromOmdb(params);
+  if (!data) {
+    console.log(`[omdbClient] No results found for "${query}" in OMDB API`);
     return [];
   }
+
+  // Transform OMDB data to match our application's expected format
+  console.log(
+    `[omdbClient] Found ${data.Search?.length || 0} results for "${query}" in OMDB API`,
+  );
+
+  // Transform search results
+  const searchResults = transformSearchResults(data.Search);
+
+  // Extract title and year from query
+  const { queryTitle, queryYear } = extractQueryTitleAndYear(query);
+
+  // Find exact title match
+  const exactMatch = findExactTitleMatch(searchResults, queryTitle, queryYear);
+
+  // If we have an exact match, prioritize it
+  if (exactMatch) {
+    console.log(
+      `[omdbClient] Found exact match in search results for "${query}": ${exactMatch.title}`,
+    );
+    const otherResults = searchResults.filter(
+      (item) => item.id !== exactMatch.id,
+    );
+    return [exactMatch, ...otherResults];
+  }
+
+  return searchResults;
+}
+
+// Generate a UUID for the id field
+function generateUUID(): string {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0,
+      v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+// Convert OMDB data to our format
+function formatOMDBData(data: any): ContentItem {
+  // Extract genres as an array
+  const genreStrings = data.Genre ? data.Genre.split(", ") : [];
+
+  // Generate genre IDs using a simple hash
+  const genreIds =
+    genreStrings.length > 0
+      ? genreStrings.map((genre: string) => {
+          let hash = 0;
+          for (let i = 0; i < genre.length; i++) {
+            hash = (hash << 5) - hash + genre.charCodeAt(i);
+            hash |= 0;
+          }
+          return Math.abs(hash % 100);
+        })
+      : [];
+
+  return {
+    id: generateUUID(),
+    imdb_id: data.imdbID,
+    title: data.Title,
+    poster_path: data.Poster !== "N/A" ? data.Poster : "",
+    backdrop_path: data.Poster !== "N/A" ? data.Poster : "",
+    media_type: data.Type === "movie" ? "movie" : "tv",
+    release_date: data.Released !== "N/A" ? data.Released : data.Year,
+    first_air_date:
+      data.Type === "series"
+        ? data.Released !== "N/A"
+          ? data.Released
+          : data.Year
+        : null,
+    vote_average: data.imdbRating !== "N/A" ? parseFloat(data.imdbRating) : 0,
+    vote_count:
+      data.imdbVotes !== "N/A" ? parseInt(data.imdbVotes.replace(/,/g, "")) : 0,
+    genre_ids: genreIds,
+    genre_strings: genreStrings,
+    overview: data.Plot !== "N/A" ? data.Plot : "",
+    runtime: data.Runtime !== "N/A" ? data.Runtime : "0",
+    content_rating: data.Rated !== "N/A" ? data.Rated : null,
+    streaming_providers: null,
+    popularity: 0,
+    year: data.Year,
+    plot: data.Plot !== "N/A" ? data.Plot : "",
+    director: data.Director !== "N/A" ? data.Director : "",
+    actors: data.Actors !== "N/A" ? data.Actors : "",
+    writer: data.Writer !== "N/A" ? data.Writer : "",
+    language: data.Language !== "N/A" ? data.Language : "",
+    country: data.Country !== "N/A" ? data.Country : "",
+    awards: data.Awards !== "N/A" ? data.Awards : "",
+    metascore: data.Metascore !== "N/A" ? data.Metascore : "",
+    production: data.Production !== "N/A" ? data.Production : "",
+    website: data.Website !== "N/A" ? data.Website : "",
+    boxOffice: data.BoxOffice !== "N/A" ? data.BoxOffice : "",
+    imdb_rating: data.imdbRating !== "N/A" ? data.imdbRating : "",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
 }
 
 // Helper function to get content details by ID
@@ -292,79 +366,13 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     const data = await fetchFromOmdb(params);
     if (!data) return null;
 
-    // Map genres from string to array of IDs (using a simple hash function)
-    const genreStrings = data.Genre ? data.Genre.split(", ") : [];
-    const genreIds =
-      genreStrings.length > 0
-        ? genreStrings.map((genre: string) => {
-            // Simple hash function to generate consistent IDs for genres
-            let hash = 0;
-            for (let i = 0; i < genre.length; i++) {
-              hash = (hash << 5) - hash + genre.charCodeAt(i);
-              hash |= 0; // Convert to 32bit integer
-            }
-            return Math.abs(hash % 100); // Keep it positive and under 100
-          })
-        : [];
+    // Use the helper function to format OMDB data
+    const contentItem = formatOMDBData(data);
 
-    // Generate a UUID for the id field
-    const generateUUID = () => {
-      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
-        /[xy]/g,
-        function (c) {
-          const r = (Math.random() * 16) | 0,
-            v = c === "x" ? r : (r & 0x3) | 0x8;
-          return v.toString(16);
-        },
-      );
-    };
-
-    // Transform OMDB data to match our application's expected format
-    const contentItem = {
-      id: generateUUID(), // Generate a UUID for the id field
-      imdb_id: data.imdbID, // Store imdbID in the correct column
-      title: data.Title,
-      poster_path: data.Poster !== "N/A" ? data.Poster : "",
-      backdrop_path: data.Poster !== "N/A" ? data.Poster : "", // OMDB doesn't provide backdrop
-      media_type: data.Type === "movie" ? "movie" : "tv",
-      release_date: data.Released !== "N/A" ? data.Released : data.Year,
-      first_air_date:
-        data.Type === "series"
-          ? data.Released !== "N/A"
-            ? data.Released
-            : data.Year
-          : undefined,
-      vote_average: data.imdbRating !== "N/A" ? parseFloat(data.imdbRating) : 0,
-      vote_count:
-        data.imdbVotes !== "N/A"
-          ? parseInt(data.imdbVotes.replace(/,/g, ""))
-          : 0,
-      genre_ids: genreIds,
-      genre_strings: genreStrings, // Additional field to store actual genre names
-      overview: data.Plot !== "N/A" ? data.Plot : "",
-      runtime: data.Runtime !== "N/A" ? data.Runtime : "0", // Store as string to match type
-      content_rating: data.Rated !== "N/A" ? data.Rated : undefined,
-      streaming_providers: null, // OMDB doesn't provide streaming info
-      popularity: 0, // OMDB doesn't provide popularity metrics
-      year: data.Year, // Store the year explicitly
-      plot: data.Plot !== "N/A" ? data.Plot : "", // Store plot in the dedicated column
-      director: data.Director !== "N/A" ? data.Director : "",
-      actors: data.Actors !== "N/A" ? data.Actors : "",
-      writer: data.Writer !== "N/A" ? data.Writer : "",
-      language: data.Language !== "N/A" ? data.Language : "",
-      country: data.Country !== "N/A" ? data.Country : "",
-      awards: data.Awards !== "N/A" ? data.Awards : "",
-      metascore: data.Metascore !== "N/A" ? data.Metascore : "",
-      production: data.Production !== "N/A" ? data.Production : "",
-      website: data.Website !== "N/A" ? data.Website : "",
-      boxOffice: data.BoxOffice !== "N/A" ? data.BoxOffice : "",
-      ratings: data.Ratings || [],
-      poster: data.Poster !== "N/A" ? data.Poster : "", // Duplicate for compatibility
-      contentRating: data.Rated !== "N/A" ? data.Rated : undefined, // Duplicate for compatibility
-      imdb_rating: data.imdbRating !== "N/A" ? data.imdbRating : "", // Store imdb_rating in the dedicated column
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    // Add these fields for UI compatibility but they won't be saved to the database
+    contentItem.poster = data.Poster !== "N/A" ? data.Poster : "";
+    contentItem.contentRating = data.Rated !== "N/A" ? data.Rated : undefined;
+    contentItem.ratings = data.Ratings || [];
 
     // Try to add this content to Supabase for future use
     try {
@@ -792,695 +800,6 @@ function calculateCosineSimilarity(text1: string, text2: string): number {
   return dotProduct / (Math.sqrt(magnitude1) * Math.sqrt(magnitude2));
 }
 
-// Import Vector services
-import {
-  querySimilarContent,
-  storeContentVector,
-} from "../services/vectorService";
-
-// Helper function to get similar content using multiple similarity metrics
-export async function getSimilarContent(
-  contentId: string,
-  useDirectApi = false,
-  limit = 12, // Increased from 8 to 12 to get more diverse recommendations
-  useAI = getEnvVar("USE_AI_RECOMMENDATIONS") === "true",
-  useVectorDB = getEnvVar("USE_VECTOR_DB") === "true",
-  fallbackToTrending = true,
-): Promise<ContentItem[]> {
-  try {
-    // First get the content details to find genres, actors, directors
-    const content = await getContentById(contentId);
-
-    if (!content) {
-      console.log(
-        `[getSimilarContent] Content with ID ${contentId} not found, falling back to trending content`,
-      );
-      return await getTrendingContent("movie", limit);
-    }
-
-    // Store the content in the vector database for future queries
-    if (useVectorDB) {
-      try {
-        // Use a non-blocking approach with a timeout to prevent hanging if the service is slow
-        const storePromise = fetch("/.netlify/functions/vector-store", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ content }),
-        });
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("Vector storage timeout")), 5000); // 5 second timeout
-        });
-
-        // Race the storage against the timeout
-        Promise.race([storePromise, timeoutPromise]).catch((error) => {
-          console.error(
-            "[getSimilarContent] Error or timeout storing content vector:",
-            error,
-          );
-          // Continue regardless of vector storage errors
-        });
-      } catch (vectorStoreError) {
-        console.error(
-          "[getSimilarContent] Error setting up vector storage:",
-          vectorStoreError,
-        );
-        // Continue regardless of vector storage errors
-      }
-    }
-
-    // If AI is enabled, try to get similar content titles from the AI service
-    if (useAI && content.title && content.overview) {
-      console.log(
-        `[getSimilarContent] Using AI to find similar content for "${content.title}"`,
-      );
-
-      try {
-        // Use Netlify function instead of client-side API call
-        const response = await fetch("/.netlify/functions/similar-content", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            title: content.title,
-            overview: content.overview,
-            mediaType: content.media_type,
-            limit: Math.min(20, limit * 2), // Request more titles than needed to account for not finding some
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`API request failed with status ${response.status}`);
-        }
-
-        const data = await response.json();
-        const similarTitles = data.titles || [];
-
-        console.log(
-          `[getSimilarContent] AI returned titles: ${JSON.stringify(similarTitles)}`,
-        );
-
-        if (similarTitles && similarTitles.length > 0) {
-          console.log(
-            `[getSimilarContent] AI returned ${similarTitles.length} similar titles`,
-          );
-
-          // Search for each title in OMDB
-          const searchPromises = similarTitles.map((title) => {
-            const params = new URLSearchParams({
-              s: title,
-              type: content.media_type === "movie" ? "movie" : "series",
-            });
-            return fetchFromOmdb(params);
-          });
-
-          // Wait for all search results
-          const searchResults = await Promise.all(searchPromises);
-
-          // Process the results
-          const aiRecommendations = [];
-
-          searchResults.forEach((result, index) => {
-            if (result && result.Response === "True" && result.Search) {
-              // Take the first result for each title (most relevant match)
-              const item = result.Search[0];
-              if (item && item.imdbID !== contentId) {
-                aiRecommendations.push({
-                  id: item.imdbID,
-                  title: item.Title,
-                  poster_path: item.Poster !== "N/A" ? item.Poster : "",
-                  media_type: item.Type === "movie" ? "movie" : "tv",
-                  release_date: item.Year,
-                  vote_average: 0,
-                  vote_count: 0,
-                  genre_ids: content.genre_ids || [],
-                  genre_strings: content.genre_strings || [],
-                  overview: "",
-                  recommendationReason: `AI recommended based on ${content.title}`,
-                  aiRecommended: true,
-                  aiSimilarityScore: 1 - index / similarTitles.length, // Higher score for earlier results
-                });
-
-                // Store this content in the vector database for future queries
-                if (useVectorDB) {
-                  getContentById(item.imdbID)
-                    .then((detailedContent) => {
-                      if (detailedContent) {
-                        fetch("/.netlify/functions/vector-store", {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                          },
-                          body: JSON.stringify({ content: detailedContent }),
-                        }).catch((error) => {
-                          console.error(
-                            "[getSimilarContent] Error storing AI recommendation vector:",
-                            error,
-                          );
-                        });
-                      }
-                    })
-                    .catch((error) => {
-                      console.error(
-                        "[getSimilarContent] Error getting AI recommendation details:",
-                        error,
-                      );
-                    });
-                }
-              }
-            }
-          });
-
-          if (aiRecommendations.length >= limit) {
-            console.log(
-              `[getSimilarContent] Returning ${limit} AI recommendations`,
-            );
-            // Add a flag to indicate these are AI recommendations
-            return aiRecommendations.slice(0, limit).map((item) => ({
-              ...item,
-              aiRecommended: true,
-            }));
-          }
-
-          console.log(
-            `[getSimilarContent] AI returned only ${aiRecommendations.length} valid recommendations, supplementing with traditional search`,
-          );
-          // If we don't have enough AI recommendations, continue with traditional search
-          // and combine the results later
-        } else {
-          console.log(
-            `[getSimilarContent] AI returned no valid titles, falling back to traditional recommendations`,
-          );
-          // Continue with traditional recommendations
-        }
-      } catch (aiError) {
-        console.error(
-          "[getSimilarContent] Error using AI service for recommendations:",
-          aiError,
-        );
-        console.log(
-          "[getSimilarContent] Falling back to traditional recommendation methods",
-        );
-        // Continue with traditional recommendations - the function will proceed to the next section
-      }
-    }
-
-    // If vector DB is enabled, try to get similar content from the vector database
-    let vectorResults = [];
-    if (useVectorDB) {
-      try {
-        // Use Netlify function to query similar content
-        const response = await fetch("/.netlify/functions/vector-query", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contentId,
-            limit,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Vector query failed with status ${response.status}`);
-        }
-
-        const data = await response.json();
-        const similarIds = data.similarIds || [];
-
-        if (similarIds && similarIds.length > 0) {
-          const detailsPromises = similarIds.map((id) => getContentById(id));
-          const detailedContents = await Promise.all(detailsPromises);
-          vectorResults = detailedContents.filter((item) => item !== null);
-
-          if (vectorResults.length >= limit) {
-            console.log(
-              `[getSimilarContent] Returning ${limit} vector DB recommendations`,
-            );
-            // Add a flag to indicate these are vector DB recommendations
-            return vectorResults.slice(0, limit).map((item) => ({
-              ...item,
-              vectorDbRecommended: true,
-              recommendationReason:
-                item.recommendationReason ||
-                `Similar to ${content.title} (vector similarity)`,
-            }));
-          }
-        } else {
-          console.log(
-            `[getSimilarContent] Vector DB returned no results, continuing with traditional methods`,
-          );
-        }
-      } catch (vectorError) {
-        console.error(
-          "[getSimilarContent] Error using vector database for recommendations:",
-          vectorError,
-        );
-        console.log(
-          "[getSimilarContent] Falling back to traditional recommendation methods",
-        );
-        // Continue with traditional recommendations
-      }
-    }
-
-    // Collect all available metadata for similarity matching
-    const genres = content.genre_strings || [];
-    const actors = content.Actors ? content.Actors.split(", ") : [];
-    const director = content.Director || "";
-    const year = content.Year ? parseInt(content.Year.substring(0, 4)) : 0;
-    const contentType = content.media_type === "movie" ? "movie" : "series";
-    const plotSynopsis = content.overview || "";
-
-    // If we don't have enough metadata, use the title for search
-    if (genres.length === 0 && actors.length === 0 && !director) {
-      console.log(
-        `[getSimilarContent] No metadata found for ${contentId}, using title-based search`,
-      );
-      // Use the title for search instead of just returning trending content
-      const titleWords = content.title
-        .toLowerCase()
-        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
-        .split(/\s+/)
-        .filter((word) => word.length > 3);
-
-      if (titleWords.length > 0) {
-        // Try multiple title words for better coverage
-        const titleSearchPromises = [];
-
-        // Use individual meaningful words from the title
-        for (let i = 0; i < Math.min(3, titleWords.length); i++) {
-          const titleParams = new URLSearchParams({
-            s: titleWords[i],
-            type: contentType,
-          });
-          titleSearchPromises.push(fetchFromOmdb(titleParams));
-        }
-
-        // Also try the full title for exact matches
-        const fullTitleParams = new URLSearchParams({
-          s: content.title.substring(0, 30), // Limit length to avoid issues with very long titles
-          type: contentType,
-        });
-        titleSearchPromises.push(fetchFromOmdb(fullTitleParams));
-
-        // Wait for all title searches to complete
-        const titleSearchResults = await Promise.all(titleSearchPromises);
-
-        // Combine and deduplicate results
-        const uniqueResults = new Map();
-
-        titleSearchResults.forEach((result) => {
-          if (result && result.Response === "True" && result.Search) {
-            result.Search.forEach((item: any) => {
-              if (
-                item.imdbID !== contentId &&
-                !uniqueResults.has(item.imdbID)
-              ) {
-                uniqueResults.set(item.imdbID, item);
-              }
-            });
-          }
-        });
-
-        if (uniqueResults.size > 0) {
-          const mappedResults = Array.from(uniqueResults.values()).map(
-            (item: any) => ({
-              id: item.imdbID,
-              title: item.Title,
-              poster_path: item.Poster !== "N/A" ? item.Poster : "",
-              media_type: item.Type === "movie" ? "movie" : "tv",
-              release_date: item.Year,
-              vote_average: 0,
-              vote_count: 0,
-              genre_ids: [],
-              overview: "",
-              combinedSimilarity: 0.5, // Default similarity score
-              recommendationReason: `Similar to "${content.title}"`,
-            }),
-          );
-          return mappedResults.slice(0, limit);
-        }
-      }
-
-      if (fallbackToTrending) {
-        console.log(
-          `[getSimilarContent] No results found for title search, falling back to trending content`,
-        );
-        return await getTrendingContent(contentType, limit);
-      } else {
-        return [];
-      }
-    }
-
-    // Create multiple search promises based on different criteria
-    const searchPromises = [];
-
-    // 1. Search by primary genre with title keywords for better relevance
-    if (genres.length > 0) {
-      // Extract meaningful keywords from the title
-      const titleWords = content.title
-        .toLowerCase()
-        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
-        .split(/\s+/)
-        .filter((word) => word.length > 3);
-
-      // Use the first genre plus a meaningful title word if available
-      const primaryGenre = genres[0];
-      const searchTerm =
-        titleWords.length > 0
-          ? `${primaryGenre} ${titleWords[0]}`
-          : primaryGenre;
-
-      const genreParams = new URLSearchParams({
-        s: searchTerm,
-        type: contentType,
-      });
-      searchPromises.push(fetchFromOmdb(genreParams));
-    }
-
-    // 2. Search by main actor if available
-    if (actors.length > 0) {
-      const mainActor = actors[0];
-      const actorParams = new URLSearchParams({
-        s: mainActor,
-        type: contentType,
-      });
-      searchPromises.push(fetchFromOmdb(actorParams));
-    }
-
-    // 3. Search by director if available (more relevant for movies)
-    if (director && contentType === "movie") {
-      const directorParams = new URLSearchParams({
-        s: director,
-        type: contentType,
-      });
-      searchPromises.push(fetchFromOmdb(directorParams));
-    }
-
-    // 4. Search by decade/era (e.g., "1990s action")
-    if (year > 0) {
-      const decade = Math.floor(year / 10) * 10;
-      const decadeParams = new URLSearchParams({
-        s: `${decade}s ${genres[0] || contentType}`,
-        type: contentType,
-      });
-      searchPromises.push(fetchFromOmdb(decadeParams));
-    }
-
-    // 5. Search by plot keywords if we have a synopsis
-    if (plotSynopsis) {
-      const plotElements = extractKeyPlotElements(plotSynopsis);
-      if (plotElements.length > 0) {
-        // Use multiple plot elements for better coverage
-        for (let i = 0; i < Math.min(3, plotElements.length); i++) {
-          const plotKeyword = plotElements[i].split(" ").slice(0, 3).join(" ");
-          // Add the primary genre to make the search more relevant
-          const searchTerm =
-            genres.length > 0 ? `${genres[0]} ${plotKeyword}` : plotKeyword;
-
-          const plotParams = new URLSearchParams({
-            s: searchTerm,
-            type: contentType,
-          });
-          searchPromises.push(fetchFromOmdb(plotParams));
-        }
-      }
-    }
-
-    // Wait for all search results
-    const searchResults = await Promise.all(searchPromises);
-
-    // Log search results for debugging
-    console.log(
-      `[getSimilarContent] Received ${searchResults.length} search results`,
-    );
-    searchResults.forEach((result, index) => {
-      if (result && result.Response === "True" && result.Search) {
-        console.log(
-          `[getSimilarContent] Search ${index} returned ${result.Search.length} items`,
-        );
-      } else {
-        console.log(
-          `[getSimilarContent] Search ${index} failed or returned no results`,
-        );
-      }
-    });
-
-    // Combine and score results
-    const scoredResults = new Map();
-    const detailsPromises = [];
-
-    // First pass: collect all candidate IDs and their initial scores
-    searchResults.forEach((result, index) => {
-      if (result && result.Response === "True" && result.Search) {
-        result.Search.forEach((item: any) => {
-          // Skip the original content
-          if (item.imdbID === contentId) return;
-
-          // Calculate similarity score based on which search returned this item
-          // Items appearing in multiple searches get higher scores
-          const existingScore = scoredResults.get(item.imdbID)?.score || 0;
-          let additionalScore = 0;
-
-          // Weight different searches differently
-          switch (index) {
-            case 0:
-              additionalScore = 4;
-              break; // Genre + title keyword match (high weight)
-            case 1:
-              additionalScore = 3;
-              break; // Actor match
-            case 2:
-              additionalScore = 3;
-              break; // Director match
-            case 3:
-              additionalScore = 2;
-              break; // Era/decade match
-            default:
-              // Plot keyword matches (highest weight)
-              additionalScore = 5;
-              break;
-          }
-
-          scoredResults.set(item.imdbID, {
-            item,
-            score: existingScore + additionalScore,
-          });
-
-          // Queue up detailed content fetches for plot comparison
-          // Only fetch details for top candidates to avoid API rate limits
-          if (existingScore + additionalScore >= 2) {
-            detailsPromises.push(getContentById(item.imdbID));
-          }
-        });
-      }
-    });
-
-    // Fetch detailed content for plot comparison (in parallel)
-    const detailedContents = await Promise.all(detailsPromises);
-
-    // Second pass: adjust scores based on plot similarity
-    if (plotSynopsis && detailedContents.length > 0) {
-      // Filter out null contents and those without synopses
-      const validContents = detailedContents.filter(
-        (content) => content && content.overview,
-      );
-
-      if (validContents.length > 0 && useDirectApi) {
-        // Use the TensorFlow.js edge function for more accurate similarity calculation
-        console.log(
-          `[getSimilarContent] Using TensorFlow.js for ${validContents.length} plot comparisons`,
-        );
-
-        // Extract plots for comparison
-        const candidatePlots = validContents.map(
-          (content) => content.overview || "",
-        );
-
-        // Call the edge function to calculate similarities
-        const similarities = await calculatePlotSimilarities(
-          plotSynopsis,
-          candidatePlots,
-          content,
-          validContents,
-        );
-
-        if (similarities) {
-          // Update scores with the TensorFlow-based similarities
-          validContents.forEach((detailedContent, index) => {
-            if (!detailedContent) return;
-
-            const tfSimilarity = similarities[index];
-            console.log(
-              `[getSimilarContent] TF similarity for ${detailedContent.title}: ${tfSimilarity}`,
-            );
-
-            // Calculate title similarity separately (not using TensorFlow for this)
-            const titleSimilarityScore = calculateTextSimilarity(
-              content.title,
-              detailedContent.title,
-            );
-
-            // Combine TF plot similarity with title similarity
-            const combinedSimilarityScore =
-              tfSimilarity * 0.7 + titleSimilarityScore * 0.3;
-
-            // Add plot similarity score to the existing score
-            const existingData = scoredResults.get(detailedContent.id);
-            if (existingData) {
-              // Apply a higher multiplier to make the plot score more significant
-              const plotScore = Math.round(combinedSimilarityScore * 10);
-              scoredResults.set(detailedContent.id, {
-                ...existingData,
-                score: existingData.score + plotScore,
-                plotSimilarity: tfSimilarity,
-                titleSimilarity: titleSimilarityScore,
-                combinedSimilarity: combinedSimilarityScore,
-                keywords: extractKeywords(detailedContent.overview || "").slice(
-                  0,
-                  10,
-                ), // Store top 10 keywords
-              });
-            }
-          });
-        } else {
-          // Fallback to traditional similarity if edge function fails
-          console.log(
-            `[getSimilarContent] TensorFlow similarity failed, falling back to traditional methods`,
-          );
-          useTraditionalSimilarity(
-            validContents,
-            plotSynopsis,
-            content,
-            scoredResults,
-          );
-        }
-      } else {
-        // Use traditional similarity methods
-        useTraditionalSimilarity(
-          validContents,
-          plotSynopsis,
-          content,
-          scoredResults,
-        );
-      }
-    }
-
-    // Sort by score and convert to ContentItem format
-    const sortedResults = Array.from(scoredResults.values())
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map(
-        ({
-          item,
-          plotSimilarity,
-          keywordSimilarity,
-          titleSimilarity,
-          combinedSimilarity,
-        }) => ({
-          id: item.imdbID,
-          title: item.Title,
-          poster_path: item.Poster !== "N/A" ? item.Poster : "",
-          media_type: item.Type === "movie" ? "movie" : "tv",
-          release_date: item.Year,
-          vote_average: 0, // OMDB search doesn't provide ratings
-          vote_count: 0,
-          genre_ids: content.genre_ids || [], // Use the genre IDs from the original content
-          genre_strings: content.genre_strings || [], // Use genre strings from original content
-          overview: "", // OMDB search doesn't provide overview
-          plotSimilarity: plotSimilarity || 0, // Add plot similarity score if available
-          keywordSimilarity: keywordSimilarity || 0,
-          titleSimilarity: titleSimilarity || 0,
-          combinedSimilarity: combinedSimilarity || 0,
-        }),
-      );
-
-    // If we didn't find enough results, supplement with trending content
-    if (sortedResults.length < limit / 2 && fallbackToTrending) {
-      console.log(
-        `[getSimilarContent] Found only ${sortedResults.length} results, supplementing with trending content`,
-      );
-      const trendingItems = await getTrendingContent(
-        contentType,
-        limit - sortedResults.length,
-      );
-
-      // Mark trending items as supplementary
-      const markedTrendingItems = trendingItems.map((item) => ({
-        ...item,
-        isTrendingFallback: true,
-        recommendationReason:
-          item.recommendationReason || `Trending ${contentType}`,
-      }));
-
-      return [...sortedResults, ...markedTrendingItems];
-    }
-
-    console.log(
-      `[getSimilarContent] Returning ${sortedResults.length} similar items`,
-    );
-    return sortedResults;
-  } catch (error) {
-    console.error("Error getting similar content:", error);
-
-    // Determine if this was an AI-specific error
-    const isAiError =
-      error.message &&
-      (error.message.includes("AI") ||
-        error.message.includes("Gemini") ||
-        error.message.toLowerCase().includes("model") ||
-        error.message.toLowerCase().includes("token"));
-
-    // Fallback to trending content in case of any error, if enabled
-    if (fallbackToTrending) {
-      console.log(
-        `[getSimilarContent] ${isAiError ? "AI service error" : "General error"} occurred, falling back to trending content`,
-      );
-      try {
-        const trendingItems = await getTrendingContent("movie", limit);
-        return trendingItems.map((item) => ({
-          ...item,
-          isErrorFallback: true,
-          aiServiceUnavailable: isAiError,
-          recommendationReason: isAiError
-            ? "AI service currently unavailable - showing trending content instead"
-            : item.recommendationReason || "Recommended while we fix an issue",
-        }));
-      } catch (fallbackError) {
-        console.error(
-          "Error getting trending content as fallback:",
-          fallbackError,
-        );
-        // Last resort - return an empty array with an error flag
-        return [
-          {
-            id: "error-fallback",
-            title: "Recommendations Unavailable",
-            poster_path: "",
-            media_type: "movie",
-            release_date: "",
-            vote_average: 0,
-            vote_count: 0,
-            genre_ids: [],
-            overview:
-              "We're having trouble generating recommendations right now. Please try again later.",
-            isErrorFallback: true,
-            aiServiceUnavailable: isAiError,
-            recommendationReason: "Service temporarily unavailable",
-          },
-        ];
-      }
-    } else {
-      console.log(
-        "[getSimilarContent] Error occurred, returning empty array as fallback is disabled",
-      );
-      return [];
-    }
-  }
-}
-
 // Helper function to use traditional similarity methods
 function useTraditionalSimilarity(
   validContents: (ContentItem | null)[],
@@ -1646,77 +965,7 @@ async function getTrendingContentFallback(
       `[getTrendingContentFallback] API fetch completed in ${endTime - startTime}ms`,
     );
 
-    // Check if we have results in the expected format
-    if (
-      data &&
-      data.results &&
-      Array.isArray(data.results) &&
-      data.results.length > 0
-    ) {
-      console.log(
-        `[getTrendingContentFallback] Received ${data.results.length} results`,
-      );
-
-      // Format the results to match ContentItem format
-      const formattedResults = data.results.map((item: any) => ({
-        id: item.imdbID,
-        title: item.Title,
-        poster_path: item.Poster !== "N/A" ? item.Poster : "",
-        media_type: item.Type === "movie" ? "movie" : "tv",
-        release_date: item.Year,
-        vote_average: item.imdbRating ? parseFloat(item.imdbRating) : 0,
-        vote_count: item.imdbVotes
-          ? parseInt(item.imdbVotes.replace(/,/g, ""))
-          : 0,
-        genre_ids: [],
-        overview: "",
-        recommendationReason: `Trending ${item.Type === "movie" ? "movie" : "TV show"}`,
-      }));
-
-      console.log(
-        `[getTrendingContentFallback] Returning ${formattedResults.length} formatted results`,
-      );
-      return formattedResults.slice(0, limit);
-    }
-    // Check if we have results in the Search format (OMDB API format)
-    else if (
-      data &&
-      data.Search &&
-      Array.isArray(data.Search) &&
-      data.Search.length > 0
-    ) {
-      console.log(
-        `[getTrendingContentFallback] Received ${data.Search.length} results in Search format`,
-      );
-
-      // Format the results to match ContentItem format
-      const formattedResults = data.Search.map((item: any) => ({
-        id: item.imdbID,
-        title: item.Title,
-        poster_path: item.Poster !== "N/A" ? item.Poster : "",
-        media_type: item.Type === "movie" ? "movie" : "tv",
-        release_date: item.Year,
-        vote_average: item.imdbRating ? parseFloat(item.imdbRating) : 0,
-        vote_count: 0, // Not available in this format
-        genre_ids: [],
-        overview: "",
-        recommendationReason: `Trending ${item.Type === "movie" ? "movie" : "TV show"}`,
-      }));
-
-      console.log(
-        `[getTrendingContentFallback] Returning ${formattedResults.length} formatted results from Search`,
-      );
-      return formattedResults.slice(0, limit);
-    }
-
-    // If we reach here, we didn't find any usable results
-    console.log(
-      `[getTrendingContentFallback] No usable results found in response, data:`,
-      data,
-    );
-
-    // Return empty array instead of throwing an error
-    return [];
+    return processTrendingResults(data, limit);
   } catch (error) {
     console.error(
       `[getTrendingContentFallback] Error fetching content:`,
@@ -1726,7 +975,80 @@ async function getTrendingContentFallback(
   }
 }
 
-// This function is no longer needed in the simplified implementation
+// Process trending results from API
+function processTrendingResults(data: any, limit: number): ContentItem[] {
+  // Check if we have results in the expected format
+  if (
+    data &&
+    data.results &&
+    Array.isArray(data.results) &&
+    data.results.length > 0
+  ) {
+    console.log(
+      `[getTrendingContentFallback] Received ${data.results.length} results`,
+    );
+
+    // Format the results to match ContentItem format
+    const formattedResults = data.results.map((item: any) => ({
+      id: item.imdbID,
+      title: item.Title,
+      poster_path: item.Poster !== "N/A" ? item.Poster : "",
+      media_type: item.Type === "movie" ? "movie" : "tv",
+      release_date: item.Year,
+      vote_average: item.imdbRating ? parseFloat(item.imdbRating) : 0,
+      vote_count: item.imdbVotes
+        ? parseInt(item.imdbVotes.replace(/,/g, ""))
+        : 0,
+      genre_ids: [],
+      overview: "",
+      recommendationReason: `Trending ${item.Type === "movie" ? "movie" : "TV show"}`,
+    }));
+
+    console.log(
+      `[getTrendingContentFallback] Returning ${formattedResults.length} formatted results`,
+    );
+    return formattedResults.slice(0, limit);
+  }
+  // Check if we have results in the Search format (OMDB API format)
+  else if (
+    data &&
+    data.Search &&
+    Array.isArray(data.Search) &&
+    data.Search.length > 0
+  ) {
+    console.log(
+      `[getTrendingContentFallback] Received ${data.Search.length} results in Search format`,
+    );
+
+    // Format the results to match ContentItem format
+    const formattedResults = data.Search.map((item: any) => ({
+      id: item.imdbID,
+      title: item.Title,
+      poster_path: item.Poster !== "N/A" ? item.Poster : "",
+      media_type: item.Type === "movie" ? "movie" : "tv",
+      release_date: item.Year,
+      vote_average: item.imdbRating ? parseFloat(item.imdbRating) : 0,
+      vote_count: 0, // Not available in this format
+      genre_ids: [],
+      overview: "",
+      recommendationReason: `Trending ${item.Type === "movie" ? "movie" : "TV show"}`,
+    }));
+
+    console.log(
+      `[getTrendingContentFallback] Returning ${formattedResults.length} formatted results from Search`,
+    );
+    return formattedResults.slice(0, limit);
+  }
+
+  // If we reach here, we didn't find any usable results
+  console.log(
+    `[getTrendingContentFallback] No usable results found in response, data:`,
+    data,
+  );
+
+  // Return empty array instead of throwing an error
+  return [];
+}
 
 // This function is no longer needed in the simplified implementation
 export function initializeContentCache(): void {
@@ -1735,5 +1057,3 @@ export function initializeContentCache(): void {
   );
   // No-op in simplified implementation
 }
-
-// This function is no longer needed in the simplified implementation
