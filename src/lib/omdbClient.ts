@@ -307,9 +307,22 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
           })
         : [];
 
+    // Generate a UUID for the id field
+    const generateUUID = () => {
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+        /[xy]/g,
+        function (c) {
+          const r = (Math.random() * 16) | 0,
+            v = c === "x" ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        },
+      );
+    };
+
     // Transform OMDB data to match our application's expected format
     const contentItem = {
-      id: data.imdbID,
+      id: generateUUID(), // Generate a UUID for the id field
+      imdb_id: data.imdbID, // Store imdbID in the correct column
       title: data.Title,
       poster_path: data.Poster !== "N/A" ? data.Poster : "",
       backdrop_path: data.Poster !== "N/A" ? data.Poster : "", // OMDB doesn't provide backdrop
@@ -329,10 +342,28 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
       genre_ids: genreIds,
       genre_strings: genreStrings, // Additional field to store actual genre names
       overview: data.Plot !== "N/A" ? data.Plot : "",
-      runtime: data.Runtime !== "N/A" ? parseInt(data.Runtime) : 0,
+      runtime: data.Runtime !== "N/A" ? data.Runtime : "0", // Store as string to match type
       content_rating: data.Rated !== "N/A" ? data.Rated : undefined,
       streaming_providers: null, // OMDB doesn't provide streaming info
       popularity: 0, // OMDB doesn't provide popularity metrics
+      year: data.Year, // Store the year explicitly
+      plot: data.Plot !== "N/A" ? data.Plot : "", // Store plot in the dedicated column
+      director: data.Director !== "N/A" ? data.Director : "",
+      actors: data.Actors !== "N/A" ? data.Actors : "",
+      writer: data.Writer !== "N/A" ? data.Writer : "",
+      language: data.Language !== "N/A" ? data.Language : "",
+      country: data.Country !== "N/A" ? data.Country : "",
+      awards: data.Awards !== "N/A" ? data.Awards : "",
+      metascore: data.Metascore !== "N/A" ? data.Metascore : "",
+      production: data.Production !== "N/A" ? data.Production : "",
+      website: data.Website !== "N/A" ? data.Website : "",
+      boxOffice: data.BoxOffice !== "N/A" ? data.BoxOffice : "",
+      ratings: data.Ratings || [],
+      poster: data.Poster !== "N/A" ? data.Poster : "", // Duplicate for compatibility
+      contentRating: data.Rated !== "N/A" ? data.Rated : undefined, // Duplicate for compatibility
+      imdb_rating: data.imdbRating !== "N/A" ? data.imdbRating : "", // Store imdb_rating in the dedicated column
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
     // Try to add this content to Supabase for future use

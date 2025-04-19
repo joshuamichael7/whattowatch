@@ -237,7 +237,7 @@ export async function getContentByIdFromSupabase(
     const { data, error } = await supabase
       .from("content")
       .select("*")
-      .eq("id", id)
+      .eq("imdb_id", id)
       .single();
 
     if (error) {
@@ -280,11 +280,11 @@ export async function addContentToSupabase(
         : [],
     };
 
-    // Check if content already exists
+    // Check if content already exists by imdb_id
     const { data: existingContent } = await supabase
       .from("content")
       .select("id")
-      .eq("id", content.id)
+      .eq("imdb_id", content.imdb_id)
       .single();
 
     if (existingContent) {
@@ -292,7 +292,7 @@ export async function addContentToSupabase(
       const { error: updateError } = await supabase
         .from("content")
         .update(safeContent)
-        .eq("id", content.id);
+        .eq("id", existingContent.id);
 
       if (updateError) {
         console.error("[supabaseClient] Error updating content:", updateError);
