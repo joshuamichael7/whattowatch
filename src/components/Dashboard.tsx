@@ -190,16 +190,19 @@ const Dashboard = () => {
 
               if (searchResults && searchResults.length > 0) {
                 // Find exact title match with year if available - no fuzzy matching
-                const exactMatch = searchResults.find(item => {
+                const exactMatch = searchResults.find((item) => {
                   // Basic title match (case-insensitive)
-                  const titleMatches = item.title.toLowerCase() === rec.title.toLowerCase();
-                  
+                  const titleMatches =
+                    item.title.toLowerCase() === rec.title.toLowerCase();
+
                   // If we have a year from the AI recommendation, use it for additional filtering
                   if (rec.year && titleMatches) {
-                    const itemYear = item.release_date ? parseInt(item.release_date.substring(0, 4)) : null;
+                    const itemYear = item.release_date
+                      ? parseInt(item.release_date.substring(0, 4))
+                      : null;
                     return titleMatches && itemYear === parseInt(rec.year);
                   }
-                  
+
                   return titleMatches;
                 });
 
@@ -424,16 +427,19 @@ const Dashboard = () => {
                   `Found ${searchResults.length} search results for "${rec.title}"`,
                 );
                 // Find exact title match with year if available - no fuzzy matching
-                const exactMatch = searchResults.find(item => {
+                const exactMatch = searchResults.find((item) => {
                   // Basic title match (case-insensitive)
-                  const titleMatches = item.title.toLowerCase() === rec.title.toLowerCase();
-                  
+                  const titleMatches =
+                    item.title.toLowerCase() === rec.title.toLowerCase();
+
                   // If we have a year from the AI recommendation, use it for additional filtering
                   if (rec.year && titleMatches) {
-                    const itemYear = item.release_date ? parseInt(item.release_date.substring(0, 4)) : null;
+                    const itemYear = item.release_date
+                      ? parseInt(item.release_date.substring(0, 4))
+                      : null;
                     return titleMatches && itemYear === parseInt(rec.year);
                   }
-                  
+
                   return titleMatches;
                 });
 
@@ -591,15 +597,147 @@ const Dashboard = () => {
     const filteredItems = items.filter((item) => {
       // Get the content rating
       const contentRating = item.content_rating || item.Rated || "";
-      
+
       // Check if the content rating is in the accepted ratings
-      const isAcceptedRating = !currentFilters.acceptedRatings || 
+      const isAcceptedRating =
+        !currentFilters.acceptedRatings ||
         currentFilters.acceptedRatings.includes(contentRating);
-      
+
       // Return true if the content rating is accepted
       return isAcceptedRating;
     });
-    
+
     console.log("Number of items after filtering:", filteredItems.length);
     return filteredItems;
   };
+
+  // Generate mock recommendations for fallback
+  const generateMockRecommendations = (
+    preferences: PreferenceResults,
+  ): ContentItem[] => {
+    // Create some mock data based on preferences
+    return [];
+  };
+
+  return (
+    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Dashboard header */}
+      <div className="bg-white dark:bg-gray-800 shadow-sm">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 md:mb-0">
+              Your Entertainment Dashboard
+            </h1>
+            <div className="flex space-x-2">
+              <Button
+                variant={activeTab === "discover" ? "default" : "outline"}
+                onClick={() => setActiveTab("discover")}
+                className="text-sm"
+              >
+                Discover
+              </Button>
+              <Button
+                variant={activeTab === "what-to-watch" ? "default" : "outline"}
+                onClick={() => setActiveTab("what-to-watch")}
+                className="text-sm"
+              >
+                What to Watch
+              </Button>
+              <Button
+                variant={activeTab === "similar" ? "default" : "outline"}
+                onClick={() => setActiveTab("similar")}
+                className="text-sm"
+              >
+                Find Similar
+              </Button>
+              {recommendations.length > 0 && (
+                <Button
+                  variant={
+                    activeTab === "recommendations" ? "default" : "outline"
+                  }
+                  onClick={() => setActiveTab("recommendations")}
+                  className="text-sm"
+                >
+                  Recommendations
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main content area */}
+      <div className="flex-grow container mx-auto px-4 py-8">
+        {/* Loading indicator */}
+        {isLoading && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-8 flex flex-col items-center">
+              <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+              <p className="text-lg font-medium">Finding perfect matches...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Discover tab */}
+        {activeTab === "discover" && <Discover />}
+
+        {/* What to Watch tab */}
+        {activeTab === "what-to-watch" && (
+          <WhatToWatch onSubmit={handleWhatToWatchSubmit} />
+        )}
+
+        {/* Similar Content tab */}
+        {activeTab === "similar" && <SimilarContent />}
+
+        {/* Recommendations tab */}
+        {activeTab === "recommendations" && recommendations.length > 0 && (
+          <div>
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold mb-4 md:mb-0">
+                Your Recommendations
+              </h2>
+              <ContentFilters
+                filters={filters}
+                onFiltersChange={(newFilters) => {
+                  setFilters(newFilters);
+                  // Apply the new filters to all recommendations
+                  const filteredRecommendations = applyFiltersToRecommendations(
+                    allRecommendations,
+                    newFilters,
+                  );
+                  setRecommendations(filteredRecommendations);
+                }}
+              />
+            </div>
+            <RecommendationGrid recommendations={recommendations} />
+          </div>
+        )}
+
+        {/* Empty recommendations state */}
+        {activeTab === "recommendations" && recommendations.length === 0 && (
+          <div className="text-center py-12">
+            <h2 className="text-2xl font-bold mb-4">No Recommendations Yet</h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Use the "What to Watch" or "Find Similar" features to get
+              personalized recommendations.
+            </p>
+            <div className="flex justify-center space-x-4">
+              <Button
+                onClick={() => setActiveTab("what-to-watch")}
+                className="flex items-center"
+              >
+                <PlayCircle className="mr-2 h-5 w-5" />
+                Take the Quiz
+              </Button>
+              <Button variant="outline" onClick={() => setActiveTab("similar")}>
+                Find Similar Content
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
