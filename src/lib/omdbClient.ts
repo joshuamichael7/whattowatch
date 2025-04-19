@@ -635,6 +635,68 @@ function extractKeyPlotElements(synopsis: string): string[] {
   return plotElements;
 }
 
+// Helper function to get similar content based on ID
+export async function getSimilarContent(
+  id: string,
+  useDirectApi = false,
+  limit = 8,
+  useAi = false,
+  useVectorDb = false,
+): Promise<ContentItem[]> {
+  try {
+    console.log(
+      `[getSimilarContent] Getting similar content for ID: ${id}, useDirectApi: ${useDirectApi}, limit: ${limit}, useAi: ${useAi}, useVectorDb: ${useVectorDb}`,
+    );
+
+    // Get the content details first
+    const contentDetails = await getContentById(id);
+    if (!contentDetails) {
+      console.error(`[getSimilarContent] Content with ID ${id} not found`);
+      return [];
+    }
+
+    // Call the Netlify function for similar content
+    const params = new URLSearchParams({
+      id: id,
+      limit: limit.toString(),
+      useAi: useAi.toString(),
+      useVectorDb: useVectorDb.toString(),
+    });
+
+    if (contentDetails.media_type) {
+      params.append("type", contentDetails.media_type);
+    }
+
+    console.log(
+      `[getSimilarContent] Calling similar-content function with params: ${params.toString()}`,
+    );
+
+    const response = await fetch(
+      `${API_ENDPOINT}/similar-content?${params.toString()}`,
+    );
+
+    if (!response.ok) {
+      throw new Error(`Function returned status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!data || !data.results || !Array.isArray(data.results)) {
+      console.error(`[getSimilarContent] Invalid response format:`, data);
+      return [];
+    }
+
+    console.log(
+      `[getSimilarContent] Found ${data.results.length} similar items for ${contentDetails.title}`,
+    );
+
+    return data.results;
+  } catch (error) {
+    console.error(`[getSimilarContent] Error getting similar content:`, error);
+    return [];
+  }
+}
+
 // Helper function to call the Netlify function for plot similarity
 async function calculatePlotSimilarities(
   basePlot: string,
