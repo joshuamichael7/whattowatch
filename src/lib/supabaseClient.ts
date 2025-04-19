@@ -234,18 +234,45 @@ export async function getContentByIdFromSupabase(
   }
 
   try {
+    // First try to find by imdb_id
     const { data, error } = await supabase
       .from("content")
       .select("*")
-      .eq("imdb_id", id)
-      .single();
+      .eq("imdb_id", id);
 
     if (error) {
-      console.error("[supabaseClient] Error getting content by ID:", error);
+      console.error(
+        "[supabaseClient] Error getting content by imdb_id:",
+        error,
+      );
       return null;
     }
 
-    return data as ContentItem;
+    // If we found a match, return the first one
+    if (data && data.length > 0) {
+      console.log(`[supabaseClient] Found content by imdb_id: ${id}`);
+      return data[0] as ContentItem;
+    }
+
+    // If no match by imdb_id, try by id
+    const { data: idData, error: idError } = await supabase
+      .from("content")
+      .select("*")
+      .eq("id", id);
+
+    if (idError) {
+      console.error("[supabaseClient] Error getting content by id:", idError);
+      return null;
+    }
+
+    // If we found a match, return the first one
+    if (idData && idData.length > 0) {
+      console.log(`[supabaseClient] Found content by id: ${id}`);
+      return idData[0] as ContentItem;
+    }
+
+    console.log(`[supabaseClient] No content found for id: ${id}`);
+    return null;
   } catch (error) {
     console.error("[supabaseClient] Error getting content by ID:", error);
     return null;
@@ -255,6 +282,15 @@ export async function getContentByIdFromSupabase(
 /**
  * Add content to Supabase database
  */
+// Helper function to generate UUID
+function generateUUID() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0,
+      v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export async function addContentToSupabase(
   content: ContentItem,
 ): Promise<boolean> {
@@ -281,18 +317,24 @@ export async function addContentToSupabase(
     };
 
     // Check if content already exists by imdb_id
-    const { data: existingContent } = await supabase
+    const { data: existingContent, error: checkError } = await supabase
       .from("content")
       .select("id")
-      .eq("imdb_id", content.imdb_id)
-      .single();
+      .eq("imdb_id", content.imdb_id);
 
-    if (existingContent) {
+    if (checkError) {
+      console.error(
+        "[supabaseClient] Error checking for existing content:",
+        checkError,
+      );
+    }
+
+    if (existingContent && existingContent.length > 0) {
       // Content already exists, update it
       const { error: updateError } = await supabase
         .from("content")
         .update(safeContent)
-        .eq("id", existingContent.id);
+        .eq("id", existingContent[0].id);
 
       if (updateError) {
         console.error("[supabaseClient] Error updating content:", updateError);
@@ -302,9 +344,24 @@ export async function addContentToSupabase(
       return true;
     } else {
       // Content doesn't exist, insert it
+      console.log("[supabaseClient] Inserting new content:", {
+        id: safeContent.id,
+        title: safeContent.title,
+        imdb_id: safeContent.imdb_id,
+        media_type: safeContent.media_type,
+      });
+
+      // Make sure we have all required fields
+      const contentToInsert = {
+        ...safeContent,
+        id: safeContent.id || generateUUID(),
+        created_at: safeContent.created_at || new Date().toISOString(),
+        updated_at: safeContent.updated_at || new Date().toISOString(),
+      };
+
       const { error: insertError } = await supabase
         .from("content")
-        .insert(safeContent);
+        .insert(contentToInsert);
 
       if (insertError) {
         console.error("[supabaseClient] Error inserting content:", insertError);

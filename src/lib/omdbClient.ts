@@ -369,9 +369,18 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     // Try to add this content to Supabase for future use
     try {
       const { addContentToSupabase } = await import("../lib/supabaseClient");
-      await addContentToSupabase(contentItem);
+      // Log the content item for debugging
       console.log(
-        `[omdbClient] Added content to Supabase: ${contentItem.title}`,
+        `[omdbClient] Attempting to add to Supabase: ${contentItem.title}`,
+        {
+          id: contentItem.id,
+          imdb_id: contentItem.imdb_id,
+          media_type: contentItem.media_type,
+        },
+      );
+      const result = await addContentToSupabase(contentItem);
+      console.log(
+        `[omdbClient] Added content to Supabase: ${contentItem.title}, result: ${result}`,
       );
     } catch (supabaseError) {
       console.error("Error adding content to Supabase:", supabaseError);
