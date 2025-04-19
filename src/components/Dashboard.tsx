@@ -12,7 +12,6 @@ import { ContentItem } from "@/types/omdb";
 
 // Import the new components
 import Discover from "./dashboard/Discover";
-import WhatToWatch from "./dashboard/WhatToWatch";
 import SimilarContent from "./dashboard/SimilarContent";
 
 // Add a global preferences variable to store the latest quiz preferences
@@ -685,12 +684,7 @@ const Dashboard = () => {
               />
             )}
             {activeTab === "what-to-watch" && (
-              <WhatToWatch
-                onSubmit={handleWhatToWatchSubmit}
-                isLoading={isLoading}
-                maturityLevel={filters.maturityLevel}
-                initialGenres={[]}
-              />
+              <PreferenceFinder onComplete={handleQuizComplete} />
             )}
             {activeTab === "similar-content" && (
               <SimilarContent
