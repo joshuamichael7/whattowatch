@@ -3,7 +3,7 @@ import * as omdbClient from "@/lib/omdbClient";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { PlayCircle, X, Loader2 } from "lucide-react";
-import WhatToWatch from "./dashboard/WhatToWatch";
+import PreferenceFinder from "./PreferenceQuiz";
 import RecommendationGrid from "./RecommendationGrid";
 import ContentFilters from "./ContentFilters";
 import { Link } from "react-router-dom";
@@ -686,12 +686,7 @@ const Dashboard = () => {
 
         {/* What to Watch tab */}
         {activeTab === "what-to-watch" && (
-          <WhatToWatch
-            onSubmit={handleWhatToWatchSubmit}
-            isLoading={isLoading}
-            maturityLevel={filters.maturityLevel}
-            initialGenres={profile?.preferred_genres || []}
-          />
+          <PreferenceFinder onComplete={handleQuizComplete} />
         )}
 
         {/* Similar Content tab */}
