@@ -699,14 +699,11 @@ const Dashboard = () => {
 
         {/* Recommendations tab */}
         {activeTab === "recommendations" && recommendations.length > 0 && (
-          <div>
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold mb-4 md:mb-0">
-                Your Recommendations
-              </h2>
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="md:w-1/4 lg:w-1/5">
               <ContentFilters
-                filters={filters}
-                onFiltersChange={(newFilters) => {
+                initialFilters={filters}
+                onFilterChange={(newFilters) => {
                   setFilters(newFilters);
                   // Apply the new filters to all recommendations
                   const filteredRecommendations = applyFiltersToRecommendations(
@@ -717,7 +714,10 @@ const Dashboard = () => {
                 }}
               />
             </div>
-            <RecommendationGrid recommendations={recommendations} />
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold mb-6">Your Recommendations</h2>
+              <RecommendationGrid recommendations={recommendations} />
+            </div>
           </div>
         )}
 

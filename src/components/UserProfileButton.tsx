@@ -113,17 +113,23 @@ const UserProfileButton: React.FC<UserProfileButtonProps> = ({
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <User className="mr-2 h-4 w-4" />
-          <span>Profile</span>
+        <DropdownMenuItem asChild>
+          <Link to="/profile">
+            <User className="mr-2 h-4 w-4" />
+            <span>Profile</span>
+          </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Heart className="mr-2 h-4 w-4" />
-          <span>Watchlist</span>
+        <DropdownMenuItem asChild>
+          <Link to="/user-dashboard">
+            <Heart className="mr-2 h-4 w-4" />
+            <span>My Dashboard</span>
+          </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem>
-          <History className="mr-2 h-4 w-4" />
-          <span>Watch History</span>
+        <DropdownMenuItem asChild>
+          <Link to="/dashboard">
+            <History className="mr-2 h-4 w-4" />
+            <span>Discover</span>
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem>
           <Settings className="mr-2 h-4 w-4" />

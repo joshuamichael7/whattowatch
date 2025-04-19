@@ -9,7 +9,7 @@ interface MovieDetailPageHeaderProps {
 }
 
 const MovieDetailPageHeader: React.FC<MovieDetailPageHeaderProps> = ({
-  title = "MovieMatch",
+  title = "What to Watch",
 }) => {
   return (
     <header className="sticky top-0 z-10 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -25,7 +25,9 @@ const MovieDetailPageHeader: React.FC<MovieDetailPageHeaderProps> = ({
           <Button variant="ghost" asChild>
             <Link to="/dashboard">Discover</Link>
           </Button>
-          <Button variant="ghost">About</Button>
+          <Button variant="ghost" asChild>
+            <Link to="/profile">Profile</Link>
+          </Button>
           <UserProfileButton />
         </nav>
       </div>

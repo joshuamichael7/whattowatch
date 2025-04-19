@@ -14,6 +14,7 @@ import { useAuth } from "./contexts/AuthContext";
 import AdminRoleDebugger from "./components/AdminRoleDebugger";
 import DebugPanel from "./components/DebugPanel";
 import SupabaseConnectionTest from "./components/SupabaseConnectionTest";
+import UserDashboard from "./components/UserDashboard";
 
 // Lazy load authentication components
 const Auth = lazy(() => import("./components/Auth"));
@@ -53,6 +54,7 @@ function App() {
                 path="/supabase-test"
                 element={<SupabaseConnectionTest />}
               />
+              <Route path="/user-dashboard" element={<UserDashboard />} />
             </Routes>
           </>
         </Suspense>
