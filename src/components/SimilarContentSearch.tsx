@@ -147,7 +147,7 @@ const SimilarContentSearch = ({
 
       if (canUseAi && aiRecommendations.length === 0) {
         setAiError(
-          "AI recommendations were not available. Showing alternative recommendations.",
+          "AI recommendations were not available or could not be found in our database. Please try a different title.",
         );
       } else if (aiRecommendations.length > 0) {
         console.log(
@@ -168,7 +168,7 @@ const SimilarContentSearch = ({
       setError("Failed to find similar content. Please try again.");
       if (canUseAi) {
         setAiError(
-          "AI service is currently unavailable. Please try again later.",
+          "AI recommendation service is currently unavailable. Please try again later or try a different title.",
         );
       }
     } finally {

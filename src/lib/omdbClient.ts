@@ -172,24 +172,62 @@ async function searchFromOmdb(
   query: string,
   type?: "movie" | "series" | "all",
 ): Promise<ContentItem[]> {
-  // First try an exact title search using the 't' parameter
-  const exactParams = new URLSearchParams({
-    t: query,
-  });
+  try {
+    // First try an exact title search using the 't' parameter
+    const exactParams = new URLSearchParams({
+      t: query,
+    });
 
-  if (type && type !== "all") {
-    exactParams.append("type", type);
-  }
+    if (type && type !== "all") {
+      exactParams.append("type", type);
+    }
 
-  const exactData = await fetchFromOmdb(exactParams);
+    const exactData = await fetchFromOmdb(exactParams);
 
-  // If we found an exact match, use it and then supplement with regular search results
-  if (exactData && exactData.Response === "True" && exactData.Title) {
-    console.log(
-      `[omdbClient] Found exact match for "${query}": ${exactData.Title}`,
-    );
+    // If we found an exact match, use it and then supplement with regular search results
+    if (exactData && exactData.Response === "True" && exactData.Title) {
+      console.log(
+        `[omdbClient] Found exact match for "${query}": ${exactData.Title}`,
+      );
 
-    // Now do a regular search to get additional results
+      // Now do a regular search to get additional results
+      const params = new URLSearchParams({
+        s: query,
+      });
+
+      if (type && type !== "all") {
+        params.append("type", type);
+      }
+
+      const searchData = await fetchFromOmdb(params);
+
+      // Create the exact match item
+      const exactItem = transformExactMatchData(exactData);
+
+      // If we have additional search results, add them (excluding the exact match)
+      if (searchData && searchData.Response === "True" && searchData.Search) {
+        const additionalItems = searchData.Search.filter(
+          (item: any) => item.imdbID !== exactData.imdbID,
+        ).map((item: any) => ({
+          id: item.imdbID,
+          title: item.Title,
+          poster_path: item.Poster !== "N/A" ? item.Poster : "",
+          media_type: item.Type === "movie" ? "movie" : "tv",
+          release_date: item.Year,
+          vote_average: 0,
+          vote_count: 0,
+          genre_ids: [],
+          overview: "",
+        }));
+
+        return [exactItem, ...additionalItems];
+      }
+
+      // If no additional results, just return the exact match
+      return [exactItem];
+    }
+
+    // If no exact match, fall back to regular search
     const params = new URLSearchParams({
       s: query,
     });
@@ -198,75 +236,50 @@ async function searchFromOmdb(
       params.append("type", type);
     }
 
-    const searchData = await fetchFromOmdb(params);
-
-    // Create the exact match item
-    const exactItem = transformExactMatchData(exactData);
-
-    // If we have additional search results, add them (excluding the exact match)
-    if (searchData && searchData.Response === "True" && searchData.Search) {
-      const additionalItems = searchData.Search.filter(
-        (item: any) => item.imdbID !== exactData.imdbID,
-      ).map((item: any) => ({
-        id: item.imdbID,
-        title: item.Title,
-        poster_path: item.Poster !== "N/A" ? item.Poster : "",
-        media_type: item.Type === "movie" ? "movie" : "tv",
-        release_date: item.Year,
-        vote_average: 0,
-        vote_count: 0,
-        genre_ids: [],
-        overview: "",
-      }));
-
-      return [exactItem, ...additionalItems];
+    const data = await fetchFromOmdb(params);
+    if (!data) {
+      console.log(`[omdbClient] No results found for "${query}" in OMDB API`);
+      return [];
     }
 
-    // If no additional results, just return the exact match
-    return [exactItem];
-  }
+    // Transform OMDB data to match our application's expected format
+    console.log(
+      `[omdbClient] Found ${data.Search?.length || 0} results for "${query}" in OMDB API`,
+    );
 
-  // If no exact match, fall back to regular search
-  const params = new URLSearchParams({
-    s: query,
-  });
+    // Transform search results
+    const searchResults = transformSearchResults(data.Search);
 
-  if (type && type !== "all") {
-    params.append("type", type);
-  }
+    // Extract title and year from query
+    const { queryTitle, queryYear } = extractQueryTitleAndYear(query);
 
-  const data = await fetchFromOmdb(params);
-  if (!data) {
-    console.log(`[omdbClient] No results found for "${query}" in OMDB API`);
+    // Find exact title match
+    const exactMatch = findExactTitleMatch(
+      searchResults,
+      queryTitle,
+      queryYear,
+    );
+
+    // If we have an exact match, prioritize it
+    if (exactMatch) {
+      console.log(
+        `[omdbClient] Found exact match in search results for "${query}": ${exactMatch.title}`,
+      );
+      const otherResults = searchResults.filter(
+        (item) => item.id !== exactMatch.id,
+      );
+      return [exactMatch, ...otherResults];
+    }
+
+    return searchResults;
+  } catch (error) {
+    console.error(
+      `[omdbClient] Error searching for "${query}" in OMDB API:`,
+      error,
+    );
+    // Return an empty array instead of throwing an error
     return [];
   }
-
-  // Transform OMDB data to match our application's expected format
-  console.log(
-    `[omdbClient] Found ${data.Search?.length || 0} results for "${query}" in OMDB API`,
-  );
-
-  // Transform search results
-  const searchResults = transformSearchResults(data.Search);
-
-  // Extract title and year from query
-  const { queryTitle, queryYear } = extractQueryTitleAndYear(query);
-
-  // Find exact title match
-  const exactMatch = findExactTitleMatch(searchResults, queryTitle, queryYear);
-
-  // If we have an exact match, prioritize it
-  if (exactMatch) {
-    console.log(
-      `[omdbClient] Found exact match in search results for "${query}": ${exactMatch.title}`,
-    );
-    const otherResults = searchResults.filter(
-      (item) => item.id !== exactMatch.id,
-    );
-    return [exactMatch, ...otherResults];
-  }
-
-  return searchResults;
 }
 
 // Generate a UUID for the id field
@@ -797,17 +810,30 @@ async function processAiRecommendations(
         console.log(
           `[processAiRecommendations] "${aiTitle.title}" not found in Supabase, searching OMDB`,
         );
-        const omdbResults = await searchFromOmdb(query);
+        try {
+          const omdbResults = await searchFromOmdb(query);
 
-        if (omdbResults && omdbResults.length > 0) {
-          // Found in OMDB, add the first match
-          const match = omdbResults[0];
-          match.aiRecommended = true;
-          match.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
-          results.push(match);
-          console.log(
-            `[processAiRecommendations] Found "${match.title}" in OMDB`,
+          if (omdbResults && omdbResults.length > 0) {
+            // Found in OMDB, add the first match
+            const match = omdbResults[0];
+            match.aiRecommended = true;
+            match.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
+            results.push(match);
+            console.log(
+              `[processAiRecommendations] Found "${match.title}" in OMDB`,
+            );
+          } else {
+            // If not found in OMDB, log the issue but don't create fallback items
+            console.log(
+              `[processAiRecommendations] Could not find "${aiTitle.title}" in OMDB, skipping this recommendation`,
+            );
+          }
+        } catch (omdbError) {
+          console.error(
+            `[processAiRecommendations] OMDB search error for "${aiTitle.title}":`,
+            omdbError,
           );
+          // Don't create fallback items, just log the error and continue
         }
       }
     } catch (error) {
