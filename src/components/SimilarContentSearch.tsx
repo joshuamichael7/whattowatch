@@ -140,9 +140,18 @@ const SimilarContentSearch = ({
       const aiRecommendations = similarItems.filter(
         (item) => item.aiRecommended,
       );
+
+      console.log(
+        `[SimilarContentSearch] Found ${aiRecommendations.length} AI-recommended items`,
+      );
+
       if (canUseAi && aiRecommendations.length === 0) {
         setAiError(
           "AI recommendations were not available. Showing alternative recommendations.",
+        );
+      } else if (aiRecommendations.length > 0) {
+        console.log(
+          "[SimilarContentSearch] Successfully received AI recommendations",
         );
       }
 
@@ -416,85 +425,211 @@ const SimilarContentSearch = ({
                 </Tabs>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {filteredContent.map((item) => (
-                  <Card
-                    key={item.id}
-                    className="overflow-hidden hover:shadow-md transition-shadow"
-                  >
-                    <Link to={`/${item.media_type}/${item.id}`}>
-                      <div className="aspect-[2/3] relative">
-                        <img
-                          src={item.poster_path}
-                          alt={item.title}
-                          className="object-cover w-full h-full"
-                          onError={(e) => {
-                            // Hide the image if it fails to load
-                            e.currentTarget.style.display = "none";
-                          }}
-                        />
-                        <div className="absolute top-2 right-2">
-                          <Badge variant="secondary">
-                            {item.media_type === "movie" ? (
-                              <Film className="h-3 w-3 mr-1" />
-                            ) : (
-                              <Tv className="h-3 w-3 mr-1" />
-                            )}
-                            {item.media_type === "movie" ? "Movie" : "TV"}
-                          </Badge>
-                        </div>
-                      </div>
-                      <CardContent className="p-4">
-                        <h3 className="font-semibold mb-1 truncate">
-                          {item.title}
-                        </h3>
-                        <div className="flex items-center text-sm text-muted-foreground mb-2">
-                          <span>
-                            {item.release_date
-                              ? new Date(item.release_date).getFullYear()
-                              : item.first_air_date
-                                ? new Date(item.first_air_date).getFullYear()
-                                : "Unknown"}
-                          </span>
-                          <span className="mx-2">•</span>
-                          <span className="flex items-center">
-                            ★ {item.vote_average.toFixed(1)}
-                          </span>
-                        </div>
-                        <div className="mb-3 flex flex-wrap gap-1">
-                          {item.genre_ids.slice(0, 2).map((genreId) => (
-                            <Badge
-                              key={genreId}
-                              variant="outline"
-                              className="text-xs"
-                            >
-                              {genreMap[genreId] || "Genre"}
-                            </Badge>
-                          ))}
-                          {item.genre_ids.length > 2 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{item.genre_ids.length - 2}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground line-clamp-3">
-                          {item.overview || item.recommendationReason || ""}
-                        </p>
-                        {item.aiRecommended && (
-                          <div className="mt-2">
-                            <Badge
-                              variant="outline"
-                              className="bg-primary/10 text-xs"
-                            >
-                              AI Recommended
-                            </Badge>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Link>
-                  </Card>
-                ))}
-              </div>
+              {/* Group AI recommendations separately if we have them */}
+              {filteredContent.some((item) => item.aiRecommended) && (
+                <div className="mb-8">
+                  <div className="flex items-center mb-4">
+                    <h3 className="text-xl font-semibold">
+                      AI Recommendations
+                    </h3>
+                    <Badge variant="outline" className="ml-3 bg-primary/10">
+                      Based on content analysis
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {filteredContent
+                      .filter((item) => item.aiRecommended)
+                      .map((item) => (
+                        <Card
+                          key={item.id}
+                          className="overflow-hidden hover:shadow-md transition-shadow border-primary/20"
+                        >
+                          <Link to={`/${item.media_type}/${item.id}`}>
+                            <div className="aspect-[2/3] relative">
+                              <img
+                                src={item.poster_path}
+                                alt={item.title}
+                                className="object-cover w-full h-full"
+                                onError={(e) => {
+                                  // Hide the image if it fails to load
+                                  e.currentTarget.style.display = "none";
+                                }}
+                              />
+                              <div className="absolute top-2 right-2">
+                                <Badge variant="secondary">
+                                  {item.media_type === "movie" ? (
+                                    <Film className="h-3 w-3 mr-1" />
+                                  ) : (
+                                    <Tv className="h-3 w-3 mr-1" />
+                                  )}
+                                  {item.media_type === "movie" ? "Movie" : "TV"}
+                                </Badge>
+                              </div>
+                              <div className="absolute top-2 left-2">
+                                <Badge className="bg-primary text-primary-foreground">
+                                  AI Pick
+                                </Badge>
+                              </div>
+                            </div>
+                            <CardContent className="p-4">
+                              <h3 className="font-semibold mb-1 truncate">
+                                {item.title}
+                              </h3>
+                              <div className="flex items-center text-sm text-muted-foreground mb-2">
+                                <span>
+                                  {item.release_date
+                                    ? new Date(item.release_date).getFullYear()
+                                    : item.first_air_date
+                                      ? new Date(
+                                          item.first_air_date,
+                                        ).getFullYear()
+                                      : "Unknown"}
+                                </span>
+                                <span className="mx-2">•</span>
+                                <span className="flex items-center">
+                                  ★ {item.vote_average.toFixed(1)}
+                                </span>
+                              </div>
+                              <div className="mb-3 flex flex-wrap gap-1">
+                                {item.genre_ids &&
+                                  item.genre_ids.slice(0, 2).map((genreId) => (
+                                    <Badge
+                                      key={genreId}
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      {genreMap[genreId] || "Genre"}
+                                    </Badge>
+                                  ))}
+                                {item.genre_ids &&
+                                  item.genre_ids.length > 2 && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      +{item.genre_ids.length - 2}
+                                    </Badge>
+                                  )}
+                              </div>
+                              <p className="text-sm text-muted-foreground line-clamp-3">
+                                {item.recommendationReason ||
+                                  item.overview ||
+                                  ""}
+                              </p>
+                            </CardContent>
+                          </Link>
+                        </Card>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Other recommendations */}
+              {filteredContent.some((item) => !item.aiRecommended) && (
+                <div>
+                  {filteredContent.some((item) => item.aiRecommended) && (
+                    <div className="flex items-center mb-4">
+                      <h3 className="text-xl font-semibold">
+                        Other Recommendations
+                      </h3>
+                      <Badge variant="outline" className="ml-3">
+                        Based on genre matching
+                      </Badge>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {filteredContent
+                      .filter((item) => !item.aiRecommended)
+                      .map((item) => (
+                        <Card
+                          key={item.id}
+                          className="overflow-hidden hover:shadow-md transition-shadow"
+                        >
+                          <Link to={`/${item.media_type}/${item.id}`}>
+                            <div className="aspect-[2/3] relative">
+                              <img
+                                src={item.poster_path}
+                                alt={item.title}
+                                className="object-cover w-full h-full"
+                                onError={(e) => {
+                                  // Hide the image if it fails to load
+                                  e.currentTarget.style.display = "none";
+                                }}
+                              />
+                              <div className="absolute top-2 right-2">
+                                <Badge variant="secondary">
+                                  {item.media_type === "movie" ? (
+                                    <Film className="h-3 w-3 mr-1" />
+                                  ) : (
+                                    <Tv className="h-3 w-3 mr-1" />
+                                  )}
+                                  {item.media_type === "movie" ? "Movie" : "TV"}
+                                </Badge>
+                              </div>
+                            </div>
+                            <CardContent className="p-4">
+                              <h3 className="font-semibold mb-1 truncate">
+                                {item.title}
+                              </h3>
+                              <div className="flex items-center text-sm text-muted-foreground mb-2">
+                                <span>
+                                  {item.release_date
+                                    ? new Date(item.release_date).getFullYear()
+                                    : item.first_air_date
+                                      ? new Date(
+                                          item.first_air_date,
+                                        ).getFullYear()
+                                      : "Unknown"}
+                                </span>
+                                <span className="mx-2">•</span>
+                                <span className="flex items-center">
+                                  ★ {item.vote_average.toFixed(1)}
+                                </span>
+                              </div>
+                              <div className="mb-3 flex flex-wrap gap-1">
+                                {item.genre_ids &&
+                                  item.genre_ids.slice(0, 2).map((genreId) => (
+                                    <Badge
+                                      key={genreId}
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      {genreMap[genreId] || "Genre"}
+                                    </Badge>
+                                  ))}
+                                {item.genre_ids &&
+                                  item.genre_ids.length > 2 && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      +{item.genre_ids.length - 2}
+                                    </Badge>
+                                  )}
+                              </div>
+                              <p className="text-sm text-muted-foreground line-clamp-3">
+                                {item.overview || ""}
+                              </p>
+                            </CardContent>
+                          </Link>
+                        </Card>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* If no content matches the filter */}
+              {filteredContent.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  No{" "}
+                  {activeTab !== "all"
+                    ? activeTab === "movie"
+                      ? "movies"
+                      : "TV shows"
+                    : "content"}{" "}
+                  found matching your filter.
+                </div>
+              )}
             </>
           ) : (
             <div className="text-center py-12 text-muted-foreground">

@@ -655,7 +655,50 @@ export async function getSimilarContent(
       return [];
     }
 
-    // Call the Netlify function for similar content
+    // If useAi is true, call the similar-content function with title and overview
+    if (useAi && contentDetails.title && contentDetails.overview) {
+      try {
+        console.log(
+          `[getSimilarContent] Using AI to get recommendations for "${contentDetails.title}"`,
+        );
+
+        const aiResponse = await fetch("/.netlify/functions/similar-content", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: contentDetails.title,
+            overview: contentDetails.overview,
+            mediaType: contentDetails.media_type,
+            limit: limit,
+          }),
+        });
+
+        if (!aiResponse.ok) {
+          throw new Error(`AI function returned status: ${aiResponse.status}`);
+        }
+
+        const aiData = await aiResponse.json();
+
+        if (aiData && aiData.titles && aiData.titles.length > 0) {
+          console.log(
+            `[getSimilarContent] AI returned ${aiData.titles.length} recommendations`,
+          );
+
+          // Process AI recommendations
+          return await processAiRecommendations(aiData.titles, contentDetails);
+        }
+      } catch (aiError) {
+        console.error(
+          `[getSimilarContent] Error getting AI recommendations:`,
+          aiError,
+        );
+        // Continue with regular similar content if AI fails
+      }
+    }
+
+    // Call the Netlify function for similar content (fallback or if AI is not used)
     const params = new URLSearchParams({
       id: id,
       limit: limit.toString(),
@@ -681,8 +724,30 @@ export async function getSimilarContent(
 
     const data = await response.json();
 
-    if (!data || !data.results || !Array.isArray(data.results)) {
-      console.error(`[getSimilarContent] Invalid response format:`, data);
+    if (!data) {
+      console.error(`[getSimilarContent] No data returned from function`);
+      return [];
+    }
+
+    // Handle OMDB error response format
+    if (data.Response === "False") {
+      console.error(`[getSimilarContent] OMDB API error: ${data.Error}`);
+      return [];
+    }
+
+    // Check for results array
+    if (!data.results) {
+      console.error(
+        `[getSimilarContent] No results property in response:`,
+        data,
+      );
+      // Create an empty results array if missing
+      data.results = [];
+    }
+
+    // Ensure results is an array
+    if (!Array.isArray(data.results)) {
+      console.error(`[getSimilarContent] Results is not an array:`, data);
       return [];
     }
 
@@ -695,6 +760,68 @@ export async function getSimilarContent(
     console.error(`[getSimilarContent] Error getting similar content:`, error);
     return [];
   }
+}
+
+// Process AI recommendations by searching Supabase first, then OMDB
+async function processAiRecommendations(
+  aiTitles: { title: string; year: string | null; aiRecommended: boolean }[],
+  originalContent: ContentItem,
+): Promise<ContentItem[]> {
+  console.log(
+    `[processAiRecommendations] Processing ${aiTitles.length} AI recommendations`,
+  );
+
+  const results: ContentItem[] = [];
+  const { searchContentInSupabase } = await import("../lib/supabaseClient");
+
+  // Process each AI recommendation
+  for (const aiTitle of aiTitles) {
+    try {
+      // First try to find in Supabase
+      const query = aiTitle.year
+        ? `${aiTitle.title} ${aiTitle.year}`
+        : aiTitle.title;
+      const supabaseResults = await searchContentInSupabase(query);
+
+      if (supabaseResults && supabaseResults.length > 0) {
+        // Found in Supabase, add the first match
+        const match = supabaseResults[0];
+        match.aiRecommended = true;
+        match.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
+        results.push(match);
+        console.log(
+          `[processAiRecommendations] Found "${match.title}" in Supabase`,
+        );
+      } else {
+        // Not found in Supabase, search OMDB
+        console.log(
+          `[processAiRecommendations] "${aiTitle.title}" not found in Supabase, searching OMDB`,
+        );
+        const omdbResults = await searchFromOmdb(query);
+
+        if (omdbResults && omdbResults.length > 0) {
+          // Found in OMDB, add the first match
+          const match = omdbResults[0];
+          match.aiRecommended = true;
+          match.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
+          results.push(match);
+          console.log(
+            `[processAiRecommendations] Found "${match.title}" in OMDB`,
+          );
+        }
+      }
+    } catch (error) {
+      console.error(
+        `[processAiRecommendations] Error processing "${aiTitle.title}":`,
+        error,
+      );
+    }
+  }
+
+  console.log(
+    `[processAiRecommendations] Processed ${results.length} recommendations successfully`,
+  );
+  return results;
 }
 
 // Helper function to call the Netlify function for plot similarity

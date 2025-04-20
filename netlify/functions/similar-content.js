@@ -131,10 +131,11 @@ exports.handler = async (event, context) => {
           return {
             title: match[1].trim(),
             year: match[2],
+            aiRecommended: true,
           };
         }
         // If no year found, just return the title
-        return { title: fullTitle, year: null };
+        return { title: fullTitle, year: null, aiRecommended: true };
       });
 
     console.log(`Generated ${titles.length} similar titles for "${title}"`);
@@ -142,7 +143,7 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ titles }),
+      body: JSON.stringify({ titles, aiRecommended: true }),
     };
   } catch (error) {
     console.error("Error calling Gemini API:", error);
