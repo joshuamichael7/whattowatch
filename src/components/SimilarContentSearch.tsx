@@ -73,21 +73,37 @@ const SimilarContentSearch = ({
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
 
+    console.log("[DEBUG] handleSearch started with query:", searchQuery);
     setIsSearching(true);
     setError(null);
 
     try {
       // Use the appropriate API method based on the useDirectApi flag
+      console.log("[DEBUG] Before calling searchContent");
       const results = await searchContent(searchQuery, "all");
+      console.log(
+        "[DEBUG] After calling searchContent, results:",
+        results ? results.length : "null",
+      );
+
+      if (!results) {
+        console.error("[DEBUG] Search results are null or undefined");
+        setSearchResults([]);
+        setError("An error occurred while searching. Please try again.");
+        return;
+      }
+
       setSearchResults(results);
       if (results.length === 0) {
+        console.log("[DEBUG] No search results found");
         setError("No results found. Try a different search term.");
       }
     } catch (error) {
-      console.error("Search error:", error);
+      console.error("[DEBUG] Search error:", error);
       setSearchResults([]);
       setError("An error occurred while searching. Please try again.");
     } finally {
+      console.log("[DEBUG] handleSearch completed");
       setIsSearching(false);
     }
   };
@@ -101,6 +117,13 @@ const SimilarContentSearch = ({
 
   // Function to find similar content based on genre and type
   const getSimilarContentForItem = async (item: ContentItem) => {
+    console.log("[DEBUG] getSimilarContentForItem started with item:", {
+      id: item.id,
+      title: item.title,
+      media_type: item.media_type,
+      overview: item.overview ? item.overview.substring(0, 50) + "..." : "none",
+    });
+
     setSelectedItem(item);
     setIsSearching(true);
     setError(null);
@@ -108,6 +131,7 @@ const SimilarContentSearch = ({
 
     // Check if we have enough information to use AI recommendations
     const canUseAi = item.overview && item.title;
+    console.log("[DEBUG] canUseAi:", canUseAi);
     setIsUsingAi(canUseAi);
 
     if (canUseAi) {
@@ -124,6 +148,7 @@ const SimilarContentSearch = ({
         `[SimilarContentSearch] Using AI for recommendations: ${canUseAi}`,
       );
 
+      console.log("[DEBUG] Before calling getSimilarContent");
       const similarItems = await getSimilarContent(
         item.id,
         useDirectApi,
@@ -131,6 +156,17 @@ const SimilarContentSearch = ({
         canUseAi, // Use AI if we have enough information
         true, // Use vector DB if available
       );
+      console.log(
+        "[DEBUG] After calling getSimilarContent, received:",
+        similarItems ? similarItems.length : "null",
+      );
+
+      if (!similarItems) {
+        console.error("[DEBUG] similarItems is null or undefined");
+        setSimilarContent([]);
+        setError("Failed to retrieve similar content. Please try again.");
+        return;
+      }
 
       console.log(
         `[SimilarContentSearch] Found ${similarItems.length} similar items`,
@@ -146,6 +182,9 @@ const SimilarContentSearch = ({
       );
 
       if (canUseAi && aiRecommendations.length === 0) {
+        console.log(
+          "[DEBUG] No AI recommendations found despite canUseAi=true",
+        );
         setAiError(
           "AI recommendations were not available or could not be found in our database. Please try a different title.",
         );
@@ -155,15 +194,18 @@ const SimilarContentSearch = ({
         );
       }
 
+      console.log("[DEBUG] Before setting similarContent state");
       setSimilarContent(similarItems);
+      console.log("[DEBUG] After setting similarContent state");
 
       if (similarItems.length === 0) {
+        console.log("[DEBUG] No similar items found");
         setError("No similar content found based on this title's genre.");
       }
 
       onSelectItem(item);
     } catch (error) {
-      console.error("Error getting similar content:", error);
+      console.error("[DEBUG] Error getting similar content:", error);
       setSimilarContent([]);
       setError("Failed to find similar content. Please try again.");
       if (canUseAi) {
@@ -172,6 +214,7 @@ const SimilarContentSearch = ({
         );
       }
     } finally {
+      console.log("[DEBUG] getSimilarContentForItem completed");
       setIsSearching(false);
       setIsAiLoading(false);
     }
@@ -196,6 +239,14 @@ const SimilarContentSearch = ({
     activeTab === "all"
       ? similarContent
       : similarContent.filter((item) => item.media_type === activeTab);
+
+  console.log("[DEBUG] SimilarContentSearch rendering with state:", {
+    isSearching,
+    selectedItem: selectedItem ? selectedItem.title : null,
+    similarContent: similarContent.length,
+    error,
+    aiError,
+  });
 
   return (
     <div className="w-full max-w-7xl mx-auto bg-background p-4 md:p-6">

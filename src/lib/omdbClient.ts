@@ -656,17 +656,40 @@ export async function getSimilarContent(
   useAi = false,
   useVectorDb = false,
 ): Promise<ContentItem[]> {
+  console.log("[DEBUG] getSimilarContent started with params:", {
+    id,
+    useDirectApi,
+    limit,
+    useAi,
+    useVectorDb,
+  });
+
   try {
     console.log(
       `[getSimilarContent] Getting similar content for ID: ${id}, useDirectApi: ${useDirectApi}, limit: ${limit}, useAi: ${useAi}, useVectorDb: ${useVectorDb}`,
     );
 
     // Get the content details first
+    console.log("[DEBUG] Before calling getContentById");
     const contentDetails = await getContentById(id);
+    console.log(
+      "[DEBUG] After calling getContentById, result:",
+      contentDetails ? "found" : "not found",
+    );
+
     if (!contentDetails) {
       console.error(`[getSimilarContent] Content with ID ${id} not found`);
       return [];
     }
+
+    console.log("[DEBUG] Content details:", {
+      id: contentDetails.id,
+      title: contentDetails.title,
+      media_type: contentDetails.media_type,
+      overview: contentDetails.overview
+        ? contentDetails.overview.substring(0, 50) + "..."
+        : "none",
+    });
 
     // If useAi is true, call the similar-content function with title and overview
     if (useAi && contentDetails.title && contentDetails.overview) {
@@ -675,6 +698,7 @@ export async function getSimilarContent(
           `[getSimilarContent] Using AI to get recommendations for "${contentDetails.title}"`,
         );
 
+        console.log("[DEBUG] Before calling similar-content Netlify function");
         const aiResponse = await fetch("/.netlify/functions/similar-content", {
           method: "POST",
           headers: {
@@ -687,26 +711,50 @@ export async function getSimilarContent(
             limit: limit,
           }),
         });
+        console.log(
+          "[DEBUG] After calling similar-content Netlify function, status:",
+          aiResponse.status,
+        );
 
         if (!aiResponse.ok) {
+          console.error(
+            `[DEBUG] AI function returned error status: ${aiResponse.status}`,
+          );
           throw new Error(`AI function returned status: ${aiResponse.status}`);
         }
 
+        console.log("[DEBUG] Before parsing AI response JSON");
         const aiData = await aiResponse.json();
+        console.log(
+          "[DEBUG] After parsing AI response JSON:",
+          aiData ? "data received" : "no data",
+        );
 
         if (aiData && aiData.titles && aiData.titles.length > 0) {
           console.log(
             `[getSimilarContent] AI returned ${aiData.titles.length} recommendations`,
+            aiData.titles.map((t: any) => t.title),
           );
 
           // Process AI recommendations
-          return await processAiRecommendations(aiData.titles, contentDetails);
+          console.log("[DEBUG] Before calling processAiRecommendations");
+          const aiResults = await processAiRecommendations(
+            aiData.titles,
+            contentDetails,
+          );
+          console.log(
+            "[DEBUG] After calling processAiRecommendations, results:",
+            aiResults.length,
+          );
+          return aiResults;
+        } else {
+          console.log(
+            "[DEBUG] AI returned no recommendations or invalid data format",
+            aiData,
+          );
         }
       } catch (aiError) {
-        console.error(
-          `[getSimilarContent] Error getting AI recommendations:`,
-          aiError,
-        );
+        console.error(`[DEBUG] Error getting AI recommendations:`, aiError);
         // Continue with regular similar content if AI fails
       }
     }
@@ -727,15 +775,28 @@ export async function getSimilarContent(
       `[getSimilarContent] Calling similar-content function with params: ${params.toString()}`,
     );
 
+    console.log("[DEBUG] Before calling OMDB API endpoint");
     const response = await fetch(
       `${API_ENDPOINT}/similar-content?${params.toString()}`,
     );
+    console.log(
+      "[DEBUG] After calling OMDB API endpoint, status:",
+      response.status,
+    );
 
     if (!response.ok) {
+      console.error(
+        `[DEBUG] Function returned error status: ${response.status}`,
+      );
       throw new Error(`Function returned status: ${response.status}`);
     }
 
+    console.log("[DEBUG] Before parsing response JSON");
     const data = await response.json();
+    console.log(
+      "[DEBUG] After parsing response JSON:",
+      data ? "data received" : "no data",
+    );
 
     if (!data) {
       console.error(`[getSimilarContent] No data returned from function`);
@@ -770,8 +831,10 @@ export async function getSimilarContent(
 
     return data.results;
   } catch (error) {
-    console.error(`[getSimilarContent] Error getting similar content:`, error);
+    console.error(`[DEBUG] Error getting similar content:`, error);
     return [];
+  } finally {
+    console.log("[DEBUG] getSimilarContent completed");
   }
 }
 
@@ -783,69 +846,92 @@ async function processAiRecommendations(
   console.log(
     `[processAiRecommendations] Processing ${aiTitles.length} AI recommendations`,
   );
+  console.log(
+    "[DEBUG] AI titles to process:",
+    aiTitles.map((t) => `${t.title} ${t.year || ""}`),
+  );
 
   const results: ContentItem[] = [];
-  const { searchContentInSupabase } = await import("../lib/supabaseClient");
 
-  // Process each AI recommendation
-  for (const aiTitle of aiTitles) {
-    try {
-      // First try to find in Supabase
-      const query = aiTitle.year
-        ? `${aiTitle.title} ${aiTitle.year}`
-        : aiTitle.title;
-      const supabaseResults = await searchContentInSupabase(query);
+  try {
+    console.log("[DEBUG] Before importing searchContentInSupabase");
+    const { searchContentInSupabase } = await import("../lib/supabaseClient");
+    console.log("[DEBUG] After importing searchContentInSupabase");
 
-      if (supabaseResults && supabaseResults.length > 0) {
-        // Found in Supabase, add the first match
-        const match = supabaseResults[0];
-        match.aiRecommended = true;
-        match.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
-        results.push(match);
+    // Process each AI recommendation
+    for (const aiTitle of aiTitles) {
+      try {
+        // First try to find in Supabase
+        const query = aiTitle.year
+          ? `${aiTitle.title} ${aiTitle.year}`
+          : aiTitle.title;
+        console.log(`[DEBUG] Searching Supabase for: "${query}"`);
+        const supabaseResults = await searchContentInSupabase(query);
         console.log(
-          `[processAiRecommendations] Found "${match.title}" in Supabase`,
+          `[DEBUG] Supabase search results for "${query}":", ${supabaseResults ? supabaseResults.length : 0} results`,
         );
-      } else {
-        // Not found in Supabase, search OMDB
-        console.log(
-          `[processAiRecommendations] "${aiTitle.title}" not found in Supabase, searching OMDB`,
-        );
-        try {
-          const omdbResults = await searchFromOmdb(query);
 
-          if (omdbResults && omdbResults.length > 0) {
-            // Found in OMDB, add the first match
-            const match = omdbResults[0];
-            match.aiRecommended = true;
-            match.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
-            results.push(match);
-            console.log(
-              `[processAiRecommendations] Found "${match.title}" in OMDB`,
-            );
-          } else {
-            // If not found in OMDB, log the issue but don't create fallback items
-            console.log(
-              `[processAiRecommendations] Could not find "${aiTitle.title}" in OMDB, skipping this recommendation`,
-            );
-          }
-        } catch (omdbError) {
-          console.error(
-            `[processAiRecommendations] OMDB search error for "${aiTitle.title}":`,
-            omdbError,
+        if (supabaseResults && supabaseResults.length > 0) {
+          // Found in Supabase, add the first match
+          const match = supabaseResults[0];
+          match.aiRecommended = true;
+          match.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
+          results.push(match);
+          console.log(
+            `[processAiRecommendations] Found "${match.title}" in Supabase`,
           );
-          // Don't create fallback items, just log the error and continue
+        } else {
+          // Not found in Supabase, search OMDB
+          console.log(
+            `[processAiRecommendations] "${aiTitle.title}" not found in Supabase, searching OMDB`,
+          );
+          try {
+            console.log(`[DEBUG] Before searching OMDB for: "${query}"`);
+            const omdbResults = await searchFromOmdb(query);
+            console.log(
+              `[DEBUG] OMDB search results for "${query}":", ${omdbResults ? omdbResults.length : 0} results`,
+            );
+
+            if (omdbResults && omdbResults.length > 0) {
+              // Found in OMDB, add the first match
+              const match = omdbResults[0];
+              match.aiRecommended = true;
+              match.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
+              results.push(match);
+              console.log(
+                `[processAiRecommendations] Found "${match.title}" in OMDB`,
+              );
+            } else {
+              // If not found in OMDB, log the issue but don't create fallback items
+              console.log(
+                `[processAiRecommendations] Could not find "${aiTitle.title}" in OMDB, skipping this recommendation`,
+              );
+            }
+          } catch (omdbError) {
+            console.error(
+              `[DEBUG] OMDB search error for "${aiTitle.title}":`,
+              omdbError,
+            );
+            // Don't create fallback items, just log the error and continue
+          }
         }
+      } catch (error) {
+        console.error(`[DEBUG] Error processing "${aiTitle.title}":`, error);
       }
-    } catch (error) {
-      console.error(
-        `[processAiRecommendations] Error processing "${aiTitle.title}":`,
-        error,
-      );
     }
+  } catch (importError) {
+    console.error(
+      "[DEBUG] Error importing searchContentInSupabase:",
+      importError,
+    );
   }
 
   console.log(
     `[processAiRecommendations] Processed ${results.length} recommendations successfully`,
+  );
+  console.log(
+    "[DEBUG] Final results:",
+    results.map((r) => r.title),
   );
   return results;
 }
