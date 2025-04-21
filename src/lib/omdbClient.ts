@@ -848,6 +848,13 @@ async function processAiRecommendations(
   }[],
   originalContent: ContentItem,
 ): Promise<ContentItem[]> {
+  if (!aiTitles || !Array.isArray(aiTitles)) {
+    console.error(
+      "[processAiRecommendations] aiTitles is not an array or is null",
+      aiTitles,
+    );
+    return [];
+  }
   console.log(
     `[processAiRecommendations] Processing ${aiTitles.length} AI recommendations`,
   );
