@@ -840,7 +840,12 @@ export async function getSimilarContent(
 
 // Process AI recommendations by searching Supabase first, then OMDB
 async function processAiRecommendations(
-  aiTitles: { title: string; year: string | null; aiRecommended: boolean }[],
+  aiTitles: {
+    title: string;
+    year: string | null;
+    imdb_id: string | null;
+    aiRecommended: boolean;
+  }[],
   originalContent: ContentItem,
 ): Promise<ContentItem[]> {
   console.log(
@@ -848,20 +853,44 @@ async function processAiRecommendations(
   );
   console.log(
     "[DEBUG] AI titles to process:",
-    aiTitles.map((t) => `${t.title} ${t.year || ""}`),
+    aiTitles.map(
+      (t) => `${t.title} ${t.year || ""} [${t.imdb_id || "no imdb_id"}]`,
+    ),
   );
 
   const results: ContentItem[] = [];
 
   try {
     console.log("[DEBUG] Before importing searchContentInSupabase");
-    const { searchContentInSupabase } = await import("../lib/supabaseClient");
+    const { searchContentInSupabase, getContentByIdFromSupabase } =
+      await import("../lib/supabaseClient");
     console.log("[DEBUG] After importing searchContentInSupabase");
 
     // Process each AI recommendation
     for (const aiTitle of aiTitles) {
       try {
-        // First try to find in Supabase
+        // If we have an IMDB ID, try to find it directly first
+        if (aiTitle.imdb_id) {
+          console.log(
+            `[DEBUG] Searching Supabase for IMDB ID: "${aiTitle.imdb_id}"`,
+          );
+          const contentByImdbId = await getContentByIdFromSupabase(
+            aiTitle.imdb_id,
+          );
+
+          if (contentByImdbId) {
+            // Found in Supabase by IMDB ID
+            contentByImdbId.aiRecommended = true;
+            contentByImdbId.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
+            results.push(contentByImdbId);
+            console.log(
+              `[processAiRecommendations] Found "${contentByImdbId.title}" in Supabase by IMDB ID`,
+            );
+            continue; // Skip to next recommendation
+          }
+        }
+
+        // If no IMDB ID or not found by IMDB ID, try to find by title and year
         const query = aiTitle.year
           ? `${aiTitle.title} ${aiTitle.year}`
           : aiTitle.title;
@@ -886,6 +915,26 @@ async function processAiRecommendations(
             `[processAiRecommendations] "${aiTitle.title}" not found in Supabase, searching OMDB`,
           );
           try {
+            // If we have an IMDB ID, try to get content directly by ID
+            if (aiTitle.imdb_id) {
+              console.log(
+                `[DEBUG] Getting content from OMDB by IMDB ID: "${aiTitle.imdb_id}"`,
+              );
+              const contentByImdbId = await getContentById(aiTitle.imdb_id);
+
+              if (contentByImdbId) {
+                // Found in OMDB by IMDB ID
+                contentByImdbId.aiRecommended = true;
+                contentByImdbId.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
+                results.push(contentByImdbId);
+                console.log(
+                  `[processAiRecommendations] Found "${contentByImdbId.title}" in OMDB by IMDB ID`,
+                );
+                continue; // Skip to next recommendation
+              }
+            }
+
+            // If no IMDB ID or not found by IMDB ID, search by title and year
             console.log(`[DEBUG] Before searching OMDB for: "${query}"`);
             const omdbResults = await searchFromOmdb(query);
             console.log(

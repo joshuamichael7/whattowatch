@@ -79,12 +79,16 @@ exports.handler = async (event, context) => {
     Please provide exactly ${limit} titles of movies AND TV shows that are similar in plot, themes, tone, and style. 
     Consider factors like genre, setting, character dynamics, and emotional impact.
     
-    Return ONLY the EXACT titles as they appear in IMDB, FOLLOWED BY THE YEAR in parentheses, as a numbered list without any additional text, explanation, or commentary.
+    CRITICAL: For each recommendation, you MUST include the IMDB ID.
+    
+    Return ONLY the EXACT titles as they appear in IMDB, FOLLOWED BY THE YEAR in parentheses, FOLLOWED BY THE IMDB ID in square brackets, as a numbered list without any additional text, explanation, or commentary.
     // IMPORTANT: Use the EXACT title spelling and formatting as it appears in IMDB to ensure proper matching.
     // CRITICAL: Include the year in parentheses after each title to distinguish between movies/shows with the same title.
+    // CRITICAL: Include the IMDB ID in square brackets after the year. If you don't know the exact IMDB ID, make a best guess based on the title and year, always starting with 'tt' followed by 7-8 digits.
     For example:
-    1. Title One (2020)
-    2. Title Two (1995)
+    1. The Shawshank Redemption (1994) [tt0111161]
+    2. The Godfather (1972) [tt0068646]
+    3. The Dark Knight (2008) [tt0468569]
     etc.`;
 
     // Construct the API endpoint URL
@@ -122,23 +126,37 @@ exports.handler = async (event, context) => {
       .map((line) => line.trim())
       .filter((line) => /^\d+\.\s+.+/.test(line)) // Match lines starting with numbers followed by period
       .map((line) => {
-        // Extract the full title with year
+        // Extract the full title with year and IMDB ID
         const fullTitle = line.replace(/^\d+\.\s+/, "").trim();
-        // Check if the title has a year in parentheses
-        const match = fullTitle.match(/(.+)\s+\((\d{4})\)$/);
+        // Check if the title has a year in parentheses and IMDB ID in square brackets
+        const match = fullTitle.match(/(.+)\s+\((\d{4})\)\s*(?:\[(tt\d+)\])?/);
         if (match) {
-          // Return both title and year
+          // Return title, year, and IMDB ID if available
           return {
             title: match[1].trim(),
             year: match[2],
+            imdb_id: match[3] || null,
             aiRecommended: true,
           };
         }
-        // If no year found, just return the title
-        return { title: fullTitle, year: null, aiRecommended: true };
+        // If no year or IMDB ID found, just return the title
+        return {
+          title: fullTitle,
+          year: null,
+          imdb_id: null,
+          aiRecommended: true,
+        };
       });
 
     console.log(`Generated ${titles.length} similar titles for "${title}"`);
+
+    // Log the extracted titles with IMDB IDs for debugging
+    console.log(
+      "Extracted titles with IMDB IDs:",
+      titles.map(
+        (t) => `${t.title} (${t.year || "unknown"}) [${t.imdb_id || "no ID"}]`,
+      ),
+    );
 
     return {
       statusCode: 200,

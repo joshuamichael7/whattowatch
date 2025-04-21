@@ -69,7 +69,7 @@ const SimilarContentSearch = ({
   const [aiError, setAiError] = useState<string | null>(null);
   const [isUsingAi, setIsUsingAi] = useState(false);
 
-  // Handle search function using OMDB API
+  // Handle search function using Supabase first, then OMDB API as fallback
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
 
@@ -78,8 +78,10 @@ const SimilarContentSearch = ({
     setError(null);
 
     try {
-      // Use the appropriate API method based on the useDirectApi flag
-      console.log("[DEBUG] Before calling searchContent");
+      // First search in Supabase, then fall back to OMDB if needed
+      console.log(
+        "[DEBUG] Before calling searchContent with enhanced search strategy",
+      );
       const results = await searchContent(searchQuery, "all");
       console.log(
         "[DEBUG] After calling searchContent, results:",
@@ -115,13 +117,14 @@ const SimilarContentSearch = ({
     }
   }, [initialSelectedItem]);
 
-  // Function to find similar content based on genre and type
+  // Function to find similar content based on genre and type with enhanced search strategy
   const getSimilarContentForItem = async (item: ContentItem) => {
     console.log("[DEBUG] getSimilarContentForItem started with item:", {
       id: item.id,
       title: item.title,
       media_type: item.media_type,
       overview: item.overview ? item.overview.substring(0, 50) + "..." : "none",
+      imdb_id: item.imdbID || "none",
     });
 
     setSelectedItem(item);
@@ -141,7 +144,7 @@ const SimilarContentSearch = ({
     try {
       // Get similar content based on the selected item, using the appropriate API method
       console.log(
-        `[SimilarContentSearch] Getting similar content for: ${item.title} (${item.media_type}), ID: ${item.id}`,
+        `[SimilarContentSearch] Getting similar content for: ${item.title} (${item.media_type}), ID: ${item.id}, IMDB ID: ${item.imdbID || "unknown"}`,
       );
 
       console.log(
