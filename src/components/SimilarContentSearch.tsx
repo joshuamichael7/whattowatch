@@ -16,6 +16,14 @@ import { Badge } from "./ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Separator } from "./ui/separator";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "./ui/dialog";
+import {
   searchContent,
   getContentById,
   getSimilarContent,
@@ -67,6 +75,8 @@ const SimilarContentSearch = ({
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [isUsingAi, setIsUsingAi] = useState(false);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [detailsItem, setDetailsItem] = useState<ContentItem | null>(null);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -233,6 +243,11 @@ const SimilarContentSearch = ({
     setError(null);
     setAiError(null);
     setIsUsingAi(false);
+  };
+
+  const openDetailsDialog = (item: ContentItem) => {
+    setDetailsItem(item);
+    setShowDetailsDialog(true);
   };
 
   const filteredContent = React.useMemo(() => {
@@ -442,15 +457,9 @@ const SimilarContentSearch = ({
                   )}
                 </div>
 
-                <p className="text-muted-foreground">{selectedItem.overview}</p>
-
-                <div className="mt-4">
-                  <Button asChild>
-                    <Link to={`/${selectedItem.media_type}/${selectedItem.id}`}>
-                      View Details
-                    </Link>
-                  </Button>
-                </div>
+                <p className="text-sm text-muted-foreground line-clamp-3">
+                  {selectedItem.overview}
+                </p>
               </div>
             </div>
           </Card>
@@ -516,87 +525,105 @@ const SimilarContentSearch = ({
                           return (
                             <Card
                               key={item.id || index}
-                              className="overflow-hidden hover:shadow-md transition-shadow border-primary/20"
+                              className="overflow-hidden hover:shadow-md transition-shadow border-primary/20 cursor-pointer"
+                              onClick={() => openDetailsDialog(item)}
                             >
-                              <Link to={`/${item.media_type}/${item.id}`}>
-                                <div className="aspect-[2/3] relative">
-                                  <img
-                                    src={item.poster_path}
-                                    alt={item.title}
-                                    className="object-cover w-full h-full"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = "none";
-                                    }}
-                                  />
-                                  <div className="absolute top-2 right-2">
-                                    <Badge variant="secondary">
-                                      {item.media_type === "movie" ? (
-                                        <Film className="h-3 w-3 mr-1" />
-                                      ) : (
-                                        <Tv className="h-3 w-3 mr-1" />
-                                      )}
-                                      {item.media_type === "movie"
-                                        ? "Movie"
-                                        : "TV"}
-                                    </Badge>
-                                  </div>
-                                  <div className="absolute top-2 left-2">
-                                    <Badge className="bg-primary text-primary-foreground">
-                                      AI Pick
-                                    </Badge>
-                                  </div>
+                              <div className="aspect-[2/3] relative">
+                                <img
+                                  src={item.poster_path}
+                                  alt={item.title}
+                                  className="object-cover w-full h-full"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = "none";
+                                  }}
+                                />
+                                <div className="absolute top-2 right-2">
+                                  <Badge variant="secondary">
+                                    {item.media_type === "movie" ? (
+                                      <Film className="h-3 w-3 mr-1" />
+                                    ) : (
+                                      <Tv className="h-3 w-3 mr-1" />
+                                    )}
+                                    {item.media_type === "movie"
+                                      ? "Movie"
+                                      : "TV"}
+                                  </Badge>
                                 </div>
-                                <CardContent className="p-4">
-                                  <h3 className="font-semibold mb-1 truncate">
-                                    {item.title}
-                                  </h3>
-                                  <div className="flex items-center text-sm text-muted-foreground mb-2">
-                                    <span>
-                                      {item.release_date
+                                <div className="absolute top-2 left-2">
+                                  <Badge className="bg-primary text-primary-foreground">
+                                    AI Pick
+                                  </Badge>
+                                </div>
+                              </div>
+                              <CardContent className="p-4">
+                                <h3 className="font-semibold mb-1 truncate">
+                                  {item.title}
+                                </h3>
+                                <div className="flex items-center text-sm text-muted-foreground mb-2">
+                                  <span>
+                                    {item.release_date
+                                      ? new Date(
+                                          item.release_date,
+                                        ).getFullYear()
+                                      : item.first_air_date
                                         ? new Date(
-                                            item.release_date,
+                                            item.first_air_date,
                                           ).getFullYear()
-                                        : item.first_air_date
-                                          ? new Date(
-                                              item.first_air_date,
-                                            ).getFullYear()
-                                          : "Unknown"}
-                                    </span>
-                                    <span className="mx-2">•</span>
-                                    <span className="flex items-center">
-                                      ★ {item.vote_average.toFixed(1)}
-                                    </span>
-                                  </div>
-                                  <div className="mb-3 flex flex-wrap gap-1">
-                                    {item.genre_ids &&
-                                      item.genre_ids
-                                        .slice(0, 2)
-                                        .map((genreId) => (
-                                          <Badge
-                                            key={genreId}
-                                            variant="outline"
-                                            className="text-xs"
-                                          >
-                                            {genreMap[genreId] || "Genre"}
-                                          </Badge>
-                                        ))}
-                                    {item.genre_ids &&
-                                      item.genre_ids.length > 2 && (
+                                        : "Unknown"}
+                                  </span>
+                                  <span className="mx-2">•</span>
+                                  <span className="flex items-center">
+                                    ★ {item.vote_average.toFixed(1)}
+                                  </span>
+                                </div>
+                                <div className="mb-3 flex flex-wrap gap-1">
+                                  {item.genre_ids &&
+                                    item.genre_ids
+                                      .slice(0, 2)
+                                      .map((genreId) => (
                                         <Badge
+                                          key={genreId}
                                           variant="outline"
                                           className="text-xs"
                                         >
-                                          +{item.genre_ids.length - 2}
+                                          {genreMap[genreId] || "Genre"}
                                         </Badge>
-                                      )}
-                                  </div>
-                                  <p className="text-sm text-muted-foreground line-clamp-3">
-                                    {item.recommendationReason ||
-                                      item.overview ||
-                                      ""}
-                                  </p>
-                                </CardContent>
-                              </Link>
+                                      ))}
+                                  {item.genre_ids &&
+                                    item.genre_ids.length > 2 && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        +{item.genre_ids.length - 2}
+                                      </Badge>
+                                    )}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {item.recommendationReason ? (
+                                    <div className="font-medium text-primary-foreground bg-primary/10 px-2 py-1 rounded-sm mb-1">
+                                      <strong>Why:</strong>{" "}
+                                      {item.recommendationReason.length > 120
+                                        ? `${item.recommendationReason.substring(0, 120)}...`
+                                        : item.recommendationReason}
+                                    </div>
+                                  ) : (
+                                    <p className="line-clamp-3">
+                                      {item.overview || ""}
+                                    </p>
+                                  )}
+                                  <Button
+                                    variant="link"
+                                    className="p-0 h-auto text-xs mt-1"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openDetailsDialog(item);
+                                    }}
+                                  >
+                                    More details
+                                  </Button>
+                                </div>
+                              </CardContent>
                             </Card>
                           );
                         })}
@@ -629,87 +656,100 @@ const SimilarContentSearch = ({
                           return (
                             <Card
                               key={item.id || index}
-                              className="overflow-hidden hover:shadow-md transition-shadow"
+                              className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                              onClick={() => openDetailsDialog(item)}
                             >
-                              <Link to={`/${item.media_type}/${item.id}`}>
-                                <div className="aspect-[2/3] relative">
-                                  <img
-                                    src={item.poster_path}
-                                    alt={item.title}
-                                    className="object-cover w-full h-full"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = "none";
-                                    }}
-                                  />
-                                  <div className="absolute top-2 right-2">
-                                    <Badge variant="secondary">
-                                      {item.media_type === "movie" ? (
-                                        <Film className="h-3 w-3 mr-1" />
-                                      ) : (
-                                        <Tv className="h-3 w-3 mr-1" />
-                                      )}
-                                      {item.media_type === "movie"
-                                        ? "Movie"
-                                        : "TV"}
-                                    </Badge>
-                                  </div>
+                              <div className="aspect-[2/3] relative">
+                                <img
+                                  src={item.poster_path}
+                                  alt={item.title}
+                                  className="object-cover w-full h-full"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = "none";
+                                  }}
+                                />
+                                <div className="absolute top-2 right-2">
+                                  <Badge variant="secondary">
+                                    {item.media_type === "movie" ? (
+                                      <Film className="h-3 w-3 mr-1" />
+                                    ) : (
+                                      <Tv className="h-3 w-3 mr-1" />
+                                    )}
+                                    {item.media_type === "movie"
+                                      ? "Movie"
+                                      : "TV"}
+                                  </Badge>
                                 </div>
-                                <CardContent className="p-4">
-                                  <h3 className="font-semibold mb-1 truncate">
-                                    {item.title}
-                                  </h3>
-                                  <div className="flex items-center text-sm text-muted-foreground mb-2">
-                                    <span>
-                                      {item.release_date
+                              </div>
+                              <CardContent className="p-4">
+                                <h3 className="font-semibold mb-1 truncate">
+                                  {item.title}
+                                </h3>
+                                <div className="flex items-center text-sm text-muted-foreground mb-2">
+                                  <span>
+                                    {item.release_date
+                                      ? new Date(
+                                          item.release_date,
+                                        ).getFullYear()
+                                      : item.first_air_date
                                         ? new Date(
-                                            item.release_date,
+                                            item.first_air_date,
                                           ).getFullYear()
-                                        : item.first_air_date
-                                          ? new Date(
-                                              item.first_air_date,
-                                            ).getFullYear()
-                                          : "Unknown"}
-                                    </span>
-                                    <span className="mx-2">•</span>
-                                    <span className="flex items-center">
-                                      ★ {item.vote_average.toFixed(1)}
-                                    </span>
-                                  </div>
-                                  <div className="mb-3 flex flex-wrap gap-1">
-                                    {item.genre_ids &&
-                                      item.genre_ids
-                                        .slice(0, 2)
-                                        .map((genreId) => (
-                                          <Badge
-                                            key={genreId}
-                                            variant="outline"
-                                            className="text-xs"
-                                          >
-                                            {genreMap[genreId] || "Genre"}
-                                          </Badge>
-                                        ))}
-                                    {item.genre_ids &&
-                                      item.genre_ids.length > 2 && (
+                                        : "Unknown"}
+                                  </span>
+                                  <span className="mx-2">•</span>
+                                  <span className="flex items-center">
+                                    ★ {item.vote_average.toFixed(1)}
+                                  </span>
+                                </div>
+                                <div className="mb-3 flex flex-wrap gap-1">
+                                  {item.genre_ids &&
+                                    item.genre_ids
+                                      .slice(0, 2)
+                                      .map((genreId) => (
                                         <Badge
+                                          key={genreId}
                                           variant="outline"
                                           className="text-xs"
                                         >
-                                          +{item.genre_ids.length - 2}
+                                          {genreMap[genreId] || "Genre"}
                                         </Badge>
-                                      )}
-                                  </div>
-                                  <p className="text-sm text-muted-foreground line-clamp-3">
-                                    {item.recommendationReason ? (
-                                      <span className="font-medium text-muted-foreground">
-                                        Why we recommend this:{" "}
-                                        {item.recommendationReason}
-                                      </span>
-                                    ) : (
-                                      item.overview || ""
+                                      ))}
+                                  {item.genre_ids &&
+                                    item.genre_ids.length > 2 && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        +{item.genre_ids.length - 2}
+                                      </Badge>
                                     )}
-                                  </p>
-                                </CardContent>
-                              </Link>
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {item.recommendationReason ? (
+                                    <div className="font-medium text-primary-foreground bg-primary/10 px-2 py-1 rounded-sm mb-1">
+                                      <strong>Why:</strong>{" "}
+                                      {item.recommendationReason.length > 120
+                                        ? `${item.recommendationReason.substring(0, 120)}...`
+                                        : item.recommendationReason}
+                                    </div>
+                                  ) : (
+                                    <p className="line-clamp-3">
+                                      {item.overview || ""}
+                                    </p>
+                                  )}
+                                  <Button
+                                    variant="link"
+                                    className="p-0 h-auto text-xs mt-1"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openDetailsDialog(item);
+                                    }}
+                                  >
+                                    More details
+                                  </Button>
+                                </div>
+                              </CardContent>
                             </Card>
                           );
                         })}
@@ -737,6 +777,89 @@ const SimilarContentSearch = ({
           )}
         </motion.div>
       )}
+
+      {/* Details Dialog */}
+      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          {detailsItem && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  {detailsItem.title}
+                  <Badge variant="outline" className="ml-2">
+                    {detailsItem.media_type === "movie" ? "Movie" : "TV Show"}
+                  </Badge>
+                </DialogTitle>
+                <DialogDescription className="flex items-center gap-3">
+                  <span>
+                    {detailsItem.release_date
+                      ? new Date(detailsItem.release_date).getFullYear()
+                      : detailsItem.first_air_date
+                        ? new Date(detailsItem.first_air_date).getFullYear()
+                        : "Unknown"}
+                  </span>
+                  <span className="flex items-center">
+                    ★ {detailsItem.vote_average.toFixed(1)}
+                  </span>
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 mt-4">
+                <div className="aspect-[2/3] overflow-hidden rounded-md bg-muted">
+                  <img
+                    src={detailsItem.poster_path}
+                    alt={detailsItem.title}
+                    className="object-cover w-full h-full"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-medium mb-1">Overview</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {detailsItem.overview}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-1">Genres</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {detailsItem.genre_ids &&
+                        detailsItem.genre_ids.map((genreId) => (
+                          <Badge key={genreId} variant="outline">
+                            {genreMap[genreId] || "Genre"}
+                          </Badge>
+                        ))}
+                    </div>
+                  </div>
+
+                  {detailsItem.recommendationReason && (
+                    <div>
+                      <h4 className="font-medium mb-1">
+                        Why we recommend this
+                      </h4>
+                      <p className="text-sm bg-primary/10 text-primary-foreground p-3 rounded-md">
+                        {detailsItem.recommendationReason}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-4">
+                    <Button asChild>
+                      <Link to={`/${detailsItem.media_type}/${detailsItem.id}`}>
+                        View Details Page
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
