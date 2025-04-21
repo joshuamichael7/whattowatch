@@ -910,12 +910,14 @@ async function processAiRecommendations(
         if (supabaseResults && supabaseResults.length > 0) {
           // Found in Supabase, add the first match
           const match = supabaseResults[0];
-          match.aiRecommended = true;
-          match.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
-          results.push(match);
-          console.log(
-            `[processAiRecommendations] Found "${match.title}" in Supabase`,
-          );
+          if (match) {
+            match.aiRecommended = true;
+            match.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
+            results.push(match);
+            console.log(
+              `[processAiRecommendations] Found "${match.title}" in Supabase`,
+            );
+          }
         } else {
           // Not found in Supabase, search OMDB
           console.log(
@@ -951,12 +953,19 @@ async function processAiRecommendations(
             if (omdbResults && omdbResults.length > 0) {
               // Found in OMDB, add the first match
               const match = omdbResults[0];
-              match.aiRecommended = true;
-              match.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
-              results.push(match);
-              console.log(
-                `[processAiRecommendations] Found "${match.title}" in OMDB`,
-              );
+              if (match) {
+                match.aiRecommended = true;
+                match.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
+                results.push(match);
+                console.log(
+                  `[processAiRecommendations] Found "${match.title}" in OMDB`,
+                );
+              } else {
+                // If not found in OMDB, log the issue but don't create fallback items
+                console.log(
+                  `[processAiRecommendations] Could not find "${aiTitle.title}" in OMDB, skipping this recommendation`,
+                );
+              }
             } else {
               // If not found in OMDB, log the issue but don't create fallback items
               console.log(

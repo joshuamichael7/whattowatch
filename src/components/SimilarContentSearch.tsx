@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Search, X, Film, Tv, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
@@ -235,12 +235,30 @@ const SimilarContentSearch = ({
     setIsUsingAi(false);
   };
 
-  const filteredContent =
-    activeTab === "all"
-      ? similarContent
-      : similarContent?.filter(
-          (item) => item && item.media_type === activeTab,
-        ) || [];
+  const filteredContent = React.useMemo(() => {
+    try {
+      if (!similarContent || !Array.isArray(similarContent)) {
+        console.log(
+          "[DEBUG] similarContent is not an array or is null",
+          similarContent,
+        );
+        return [];
+      }
+
+      // First filter out any null or undefined items
+      const validItems = similarContent.filter(
+        (item) => item !== null && item !== undefined,
+      );
+
+      // Then apply the tab filter
+      return activeTab === "all"
+        ? validItems
+        : validItems.filter((item) => item && item.media_type === activeTab);
+    } catch (error) {
+      console.error("[DEBUG] Error filtering content:", error);
+      return [];
+    }
+  }, [similarContent, activeTab]);
 
   console.log("[DEBUG] SimilarContentSearch rendering with state:", {
     isSearching,
