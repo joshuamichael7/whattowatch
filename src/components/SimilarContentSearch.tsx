@@ -483,7 +483,9 @@ const SimilarContentSearch = ({
 
               {/* Group AI recommendations separately if we have them */}
               {filteredContent &&
-                filteredContent.some((item) => item.aiRecommended) && (
+                Array.isArray(filteredContent) &&
+                filteredContent.length > 0 &&
+                filteredContent.some((item) => item && item.aiRecommended) && (
                   <div className="mb-8">
                     <div className="flex items-center mb-4">
                       <h3 className="text-xl font-semibold">
@@ -589,6 +591,8 @@ const SimilarContentSearch = ({
 
               {/* Other recommendations */}
               {filteredContent &&
+                Array.isArray(filteredContent) &&
+                filteredContent.length > 0 &&
                 filteredContent.some((item) => item && !item.aiRecommended) && (
                   <div>
                     {filteredContent.some(
