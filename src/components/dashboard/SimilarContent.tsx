@@ -37,25 +37,12 @@ const SimilarContent: React.FC<SimilarContentProps> = ({
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      onError={() => setHasError(true)}
-    >
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <ErrorBoundary>
-        {isLoading ? (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-3 text-lg">
-              Loading similar content feature...
-            </span>
-          </div>
-        ) : (
-          <SimilarContentSearch
-            onSelectItem={onSelectItem}
-            useDirectApi={useDirectApi}
-          />
-        )}
+        <SimilarContentSearch
+          onSelectItem={onSelectItem}
+          useDirectApi={useDirectApi}
+        />
       </ErrorBoundary>
     </motion.div>
   );
