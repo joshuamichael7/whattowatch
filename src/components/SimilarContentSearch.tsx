@@ -430,11 +430,16 @@ const SimilarContentSearch = ({
                 </div>
 
                 <div className="mb-4 flex flex-wrap gap-2">
-                  {selectedItem.genre_ids.map((genreId) => (
-                    <Badge key={genreId} variant="secondary">
-                      {genreMap[genreId] || "Genre"}
-                    </Badge>
-                  ))}
+                  {selectedItem.genre_ids &&
+                  Array.isArray(selectedItem.genre_ids) ? (
+                    selectedItem.genre_ids.map((genreId) => (
+                      <Badge key={genreId} variant="secondary">
+                        {genreMap[genreId] || "Genre"}
+                      </Badge>
+                    ))
+                  ) : (
+                    <Badge variant="secondary">Unknown Genre</Badge>
+                  )}
                 </div>
 
                 <p className="text-muted-foreground">{selectedItem.overview}</p>
