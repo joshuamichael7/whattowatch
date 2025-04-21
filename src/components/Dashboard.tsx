@@ -695,10 +695,12 @@ const Dashboard = () => {
 
         {/* Similar Content tab */}
         {activeTab === "similar" && (
-          <SimilarContent
-            onSelectItem={(item) => console.log("Selected item:", item)}
-            useDirectApi={useDirectApi}
-          />
+          <ErrorBoundary>
+            <SimilarContent
+              onSelectItem={(item) => console.log("Selected item:", item)}
+              useDirectApi={useDirectApi}
+            />
+          </ErrorBoundary>
         )}
 
         {/* Recommendations tab */}

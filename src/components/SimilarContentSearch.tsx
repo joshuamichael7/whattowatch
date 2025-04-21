@@ -22,7 +22,6 @@ import {
 } from "@/lib/omdbClient";
 import { ContentItem } from "@/types/omdb";
 
-// Genre mapping
 const genreMap: Record<number, string> = {
   28: "Action",
   12: "Adventure",
@@ -69,7 +68,6 @@ const SimilarContentSearch = ({
   const [aiError, setAiError] = useState<string | null>(null);
   const [isUsingAi, setIsUsingAi] = useState(false);
 
-  // Handle search function using Supabase first, then OMDB API as fallback
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
 
@@ -78,7 +76,6 @@ const SimilarContentSearch = ({
     setError(null);
 
     try {
-      // First search in Supabase, then fall back to OMDB if needed
       console.log(
         "[DEBUG] Before calling searchContent with enhanced search strategy",
       );
@@ -110,14 +107,12 @@ const SimilarContentSearch = ({
     }
   };
 
-  // Effect to load similar content when initialSelectedItem is provided
   useEffect(() => {
     if (initialSelectedItem) {
       getSimilarContentForItem(initialSelectedItem);
     }
   }, [initialSelectedItem]);
 
-  // Function to find similar content based on genre and type with enhanced search strategy
   const getSimilarContentForItem = async (item: ContentItem) => {
     console.log("[DEBUG] getSimilarContentForItem started with item:", {
       id: item.id,
@@ -132,7 +127,6 @@ const SimilarContentSearch = ({
     setError(null);
     setAiError(null);
 
-    // Check if we have enough information to use AI recommendations
     const canUseAi = item.overview && item.title;
     console.log("[DEBUG] canUseAi:", canUseAi);
     setIsUsingAi(canUseAi);
@@ -142,7 +136,6 @@ const SimilarContentSearch = ({
     }
 
     try {
-      // Get similar content based on the selected item, using the appropriate API method
       console.log(
         `[SimilarContentSearch] Getting similar content for: ${item.title} (${item.media_type}), ID: ${item.id}, IMDB ID: ${item.imdbID || "unknown"}`,
       );
@@ -155,9 +148,9 @@ const SimilarContentSearch = ({
       const similarItems = await getSimilarContent(
         item.id,
         useDirectApi,
-        12, // Increased from default 8 to 12 for more diverse recommendations
-        canUseAi, // Use AI if we have enough information
-        true, // Use vector DB if available
+        12,
+        canUseAi,
+        true,
       );
       console.log(
         "[DEBUG] After calling getSimilarContent, received:",
@@ -175,7 +168,6 @@ const SimilarContentSearch = ({
         `[SimilarContentSearch] Found ${similarItems.length} similar items`,
       );
 
-      // Check if we got AI recommendations
       const aiRecommendations = similarItems.filter(
         (item) => item.aiRecommended,
       );
@@ -198,8 +190,13 @@ const SimilarContentSearch = ({
       }
 
       console.log("[DEBUG] Before setting similarContent state");
-      setSimilarContent(similarItems);
-      console.log("[DEBUG] After setting similarContent state");
+      try {
+        setSimilarContent(Array.isArray(similarItems) ? similarItems : []);
+        console.log("[DEBUG] After setting similarContent state");
+      } catch (error) {
+        console.error("[DEBUG] Error setting similarContent state:", error);
+        setSimilarContent([]);
+      }
 
       if (similarItems.length === 0) {
         console.log("[DEBUG] No similar items found");
@@ -294,14 +291,12 @@ const SimilarContentSearch = ({
           </Button>
         </div>
 
-        {/* Error Message */}
         {error && !isSearching && (
           <div className="mt-4 p-3 bg-destructive/10 text-destructive rounded-md">
             {error}
           </div>
         )}
 
-        {/* Search Results */}
         {searchResults.length > 0 && !selectedItem && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -322,7 +317,6 @@ const SimilarContentSearch = ({
                       alt={item.title}
                       className="object-cover w-full h-full"
                       onError={(e) => {
-                        // Hide the image if it fails to load
                         e.currentTarget.style.display = "none";
                       }}
                     />
@@ -359,7 +353,6 @@ const SimilarContentSearch = ({
         )}
       </div>
 
-      {/* Selected Item and Similar Content */}
       {selectedItem && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -384,7 +377,6 @@ const SimilarContentSearch = ({
                     alt={selectedItem.title}
                     className="object-cover w-full h-full"
                     onError={(e) => {
-                      // Hide the image if it fails to load
                       e.currentTarget.style.display = "none";
                     }}
                   />
@@ -440,7 +432,6 @@ const SimilarContentSearch = ({
             </div>
           </Card>
 
-          {/* AI Status Indicator */}
           {isUsingAi && (
             <div
               className={`mb-4 p-3 rounded-md ${aiError ? "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400" : "bg-primary/10 text-primary"}`}
@@ -481,7 +472,6 @@ const SimilarContentSearch = ({
                 </Tabs>
               </div>
 
-              {/* Group AI recommendations separately if we have them */}
               {filteredContent &&
                 Array.isArray(filteredContent) &&
                 filteredContent.length > 0 &&
@@ -510,7 +500,6 @@ const SimilarContentSearch = ({
                                   alt={item.title}
                                   className="object-cover w-full h-full"
                                   onError={(e) => {
-                                    // Hide the image if it fails to load
                                     e.currentTarget.style.display = "none";
                                   }}
                                 />
@@ -589,7 +578,6 @@ const SimilarContentSearch = ({
                   </div>
                 )}
 
-              {/* Other recommendations */}
               {filteredContent &&
                 Array.isArray(filteredContent) &&
                 filteredContent.length > 0 &&
@@ -622,7 +610,6 @@ const SimilarContentSearch = ({
                                   alt={item.title}
                                   className="object-cover w-full h-full"
                                   onError={(e) => {
-                                    // Hide the image if it fails to load
                                     e.currentTarget.style.display = "none";
                                   }}
                                 />
@@ -694,7 +681,6 @@ const SimilarContentSearch = ({
                   </div>
                 )}
 
-              {/* If no content matches the filter */}
               {filteredContent.length === 0 && (
                 <div className="text-center py-12 text-muted-foreground">
                   No{" "}
