@@ -8,14 +8,14 @@ import { ContentItem } from "../types/omdb";
  * @param overview The plot/overview of the content
  * @param mediaType The type of media (movie or tv)
  * @param limit The number of similar titles to request
- * @returns An array of similar content titles
+ * @returns An array of similar content titles with reasoning
  */
 export async function getSimilarContentTitles(
   title: string,
   overview: string,
   mediaType: "movie" | "tv",
   limit: number = 10,
-): Promise<string[]> {
+): Promise<Array<{ title: string; reason: string }>> {
   try {
     console.log("[aiService] Using Netlify function for similar content");
     const response = await axios.post(
@@ -27,6 +27,7 @@ export async function getSimilarContentTitles(
         limit,
         apiVersion: "v1beta",
         modelName: "gemini-2.0-flash",
+        includeReasoning: true, // Request reasoning for each recommendation
       },
       {
         headers: {
@@ -37,16 +38,31 @@ export async function getSimilarContentTitles(
 
     if (
       response.data &&
+      response.data.recommendations &&
+      Array.isArray(response.data.recommendations)
+    ) {
+      console.log(
+        `[aiService] Received ${response.data.recommendations.length} similar titles with reasoning from Netlify function`,
+      );
+      return response.data.recommendations;
+    } else if (
+      response.data &&
       response.data.titles &&
       Array.isArray(response.data.titles)
     ) {
+      // Backward compatibility with old API format
       console.log(
-        `[aiService] Received ${response.data.titles.length} similar titles from Netlify function`,
+        `[aiService] Received ${response.data.titles.length} similar titles from Netlify function (old format)`,
       );
-      return response.data.titles;
+      return response.data.titles.map((title: string) => ({
+        title,
+        reason: "Similar content based on genre and themes",
+      }));
     }
 
-    console.log("[aiService] Netlify function didn't return valid titles");
+    console.log(
+      "[aiService] Netlify function didn't return valid recommendations",
+    );
     return [];
   } catch (error) {
     console.error("[aiService] Error using Netlify function:", error);

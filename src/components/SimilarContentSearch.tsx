@@ -699,7 +699,14 @@ const SimilarContentSearch = ({
                                       )}
                                   </div>
                                   <p className="text-sm text-muted-foreground line-clamp-3">
-                                    {item.overview || ""}
+                                    {item.recommendationReason ? (
+                                      <span className="font-medium text-muted-foreground">
+                                        Why we recommend this:{" "}
+                                        {item.recommendationReason}
+                                      </span>
+                                    ) : (
+                                      item.overview || ""
+                                    )}
                                   </p>
                                 </CardContent>
                               </Link>
