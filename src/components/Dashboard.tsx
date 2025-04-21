@@ -10,6 +10,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ContentItem } from "@/types/omdb";
 import Header from "./layout/Header";
+import ErrorBoundary from "./ErrorBoundary";
 
 // Import the new components
 import Discover from "./dashboard/Discover";
