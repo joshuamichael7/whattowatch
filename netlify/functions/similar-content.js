@@ -79,17 +79,23 @@ exports.handler = async (event, context) => {
     Please provide exactly ${limit} titles of movies AND TV shows that are similar in plot, themes, tone, and style. 
     Consider factors like genre, setting, character dynamics, and emotional impact.
     
-    CRITICAL: For each recommendation, you MUST include the IMDB ID.
+    CRITICAL: For each recommendation, you MUST include:
+    1. The EXACT title as it appears in IMDB
+    2. The year in parentheses
+    3. The IMDB ID in square brackets
+    4. A brief reason why this content is similar to "${title}"
     
-    Return ONLY the EXACT titles as they appear in IMDB, FOLLOWED BY THE YEAR in parentheses, FOLLOWED BY THE IMDB ID in square brackets, as a numbered list without any additional text, explanation, or commentary.
-    // IMPORTANT: Use the EXACT title spelling and formatting as it appears in IMDB to ensure proper matching.
-    // CRITICAL: Include the year in parentheses after each title to distinguish between movies/shows with the same title.
-    // CRITICAL: Include the IMDB ID in square brackets after the year. If you don't know the exact IMDB ID, make a best guess based on the title and year, always starting with 'tt' followed by 7-8 digits.
+    Format each recommendation as follows:
+    1. Title (Year) [IMDB_ID] - Reason: Your specific explanation
+    
     For example:
-    1. The Shawshank Redemption (1994) [tt0111161]
-    2. The Godfather (1972) [tt0068646]
-    3. The Dark Knight (2008) [tt0468569]
-    etc.`;
+    1. Parks and Recreation (2009) [tt1266020] - Reason: Mockumentary workplace comedy with quirky characters and similar humor style
+    2. Brooklyn Nine-Nine (2013) [tt2467372] - Reason: Ensemble workplace comedy with similar character dynamics
+    
+    IMPORTANT: Use the EXACT title spelling and formatting as it appears in IMDB.
+    CRITICAL: Include the year in parentheses after each title.
+    CRITICAL: Include the IMDB ID in square brackets after the year.
+    CRITICAL: After the IMDB ID, include " - Reason: " followed by a specific explanation.`;
 
     // Construct the API endpoint URL
     const apiEndpoint = `https://generativelanguage.googleapis.com/${defaultConfig.apiVersion}/models/${defaultConfig.modelName}:generateContent`;
@@ -148,9 +154,15 @@ exports.handler = async (event, context) => {
 
           if (match[4]) {
             // Look for explicit reason format
-            const reasonMatch = match[4].match(/\s*[-|]\s*(.+)/);
+            const reasonMatch = match[4].match(/\s*[-|]\s*Reason:\s*(.+)/i);
             if (reasonMatch) {
               reason = reasonMatch[1].trim();
+            } else {
+              // Try alternative formats
+              const altReasonMatch = match[4].match(/\s*[-|:]\s*(.+)/i);
+              if (altReasonMatch) {
+                reason = altReasonMatch[1].trim();
+              }
             }
           }
 

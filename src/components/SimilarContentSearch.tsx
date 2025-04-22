@@ -608,8 +608,10 @@ const SimilarContentSearch = ({
                                 </div>
                                 <div className="text-sm text-muted-foreground">
                                   {item.recommendationReason ? (
-                                    <div className="font-medium text-primary-foreground bg-primary/10 px-2 py-1 rounded-sm mb-1">
-                                      <strong>Why:</strong>{" "}
+                                    <div className="font-medium text-primary bg-primary/10 px-3 py-2 rounded-md mb-2 border border-primary/20">
+                                      <div className="flex items-center mb-1 text-xs uppercase tracking-wider font-bold text-primary">
+                                        <span>AI Recommendation Reason</span>
+                                      </div>
                                       {item.recommendationReason.length > 120
                                         ? `${item.recommendationReason.substring(0, 120)}...`
                                         : item.recommendationReason}
@@ -737,8 +739,10 @@ const SimilarContentSearch = ({
                                 </div>
                                 <div className="text-sm text-muted-foreground">
                                   {item.recommendationReason ? (
-                                    <div className="font-medium text-primary-foreground bg-primary/10 px-2 py-1 rounded-sm mb-1">
-                                      <strong>Why:</strong>{" "}
+                                    <div className="font-medium text-primary bg-primary/10 px-3 py-2 rounded-md mb-2 border border-primary/20">
+                                      <div className="flex items-center mb-1 text-xs uppercase tracking-wider font-bold text-primary">
+                                        <span>AI Recommendation Reason</span>
+                                      </div>
                                       {item.recommendationReason.length > 120
                                         ? `${item.recommendationReason.substring(0, 120)}...`
                                         : item.recommendationReason}
@@ -854,9 +858,12 @@ const SimilarContentSearch = ({
                       <h4 className="font-medium mb-1">
                         Why we recommend this
                       </h4>
-                      <p className="text-sm bg-primary/10 text-primary-foreground p-3 rounded-md">
-                        {detailsItem.recommendationReason}
-                      </p>
+                      <div className="text-sm bg-primary/10 text-primary p-4 rounded-md border border-primary/20">
+                        <div className="flex items-center mb-2 text-xs uppercase tracking-wider font-bold text-primary">
+                          <span>AI Recommendation Reason</span>
+                        </div>
+                        <p>{detailsItem.recommendationReason}</p>
+                      </div>
                     </div>
                   )}
 

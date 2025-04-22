@@ -849,6 +849,7 @@ async function processAiRecommendations(
     year: string | null;
     imdb_id: string | null;
     aiRecommended: boolean;
+    recommendationReason?: string;
   }[],
   originalContent: ContentItem,
 ): Promise<ContentItem[]> {
@@ -893,9 +894,15 @@ async function processAiRecommendations(
           if (contentByImdbId) {
             // Found in Supabase by IMDB ID
             contentByImdbId.aiRecommended = true;
+            // Preserve the AI's specific recommendation reason
             contentByImdbId.recommendationReason =
-              aiTitle.recommendationReason ||
-              `AI recommended based on similarity to "${originalContent.title}"`;
+              aiTitle.recommendationReason &&
+              aiTitle.recommendationReason !== "Similar in style and themes"
+                ? aiTitle.recommendationReason
+                : `AI recommended based on similarity to "${originalContent.title}"`;
+            console.log(
+              `[processAiRecommendations] Setting reason for "${contentByImdbId.title}": ${contentByImdbId.recommendationReason}`,
+            );
             results.push(contentByImdbId);
             console.log(
               `[processAiRecommendations] Found "${contentByImdbId.title}" in Supabase by IMDB ID`,
@@ -919,9 +926,15 @@ async function processAiRecommendations(
           const match = supabaseResults[0];
           if (match) {
             match.aiRecommended = true;
+            // Preserve the AI's specific recommendation reason
             match.recommendationReason =
-              aiTitle.recommendationReason ||
-              `AI recommended based on similarity to "${originalContent.title}"`;
+              aiTitle.recommendationReason &&
+              aiTitle.recommendationReason !== "Similar in style and themes"
+                ? aiTitle.recommendationReason
+                : `AI recommended based on similarity to "${originalContent.title}"`;
+            console.log(
+              `[processAiRecommendations] Setting reason for "${match.title}": ${match.recommendationReason}`,
+            );
             results.push(match);
             console.log(
               `[processAiRecommendations] Found "${match.title}" in Supabase`,
@@ -966,9 +979,15 @@ async function processAiRecommendations(
               const match = omdbResults[0];
               if (match) {
                 match.aiRecommended = true;
+                // Preserve the AI's specific recommendation reason
                 match.recommendationReason =
-                  aiTitle.recommendationReason ||
-                  `AI recommended based on similarity to "${originalContent.title}"`;
+                  aiTitle.recommendationReason &&
+                  aiTitle.recommendationReason !== "Similar in style and themes"
+                    ? aiTitle.recommendationReason
+                    : `AI recommended based on similarity to "${originalContent.title}"`;
+                console.log(
+                  `[processAiRecommendations] Setting reason for "${match.title}": ${match.recommendationReason}`,
+                );
                 results.push(match);
                 console.log(
                   `[processAiRecommendations] Found "${match.title}" in OMDB`,
