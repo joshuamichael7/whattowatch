@@ -129,25 +129,65 @@ exports.handler = async (event, context) => {
         // Extract the full line
         const fullLine = line.replace(/^\d+\.\s+/, "").trim();
 
-        // Split by the reason separator if it exists
-        const parts = fullLine.split(/\s*\|\s*Reason:\s*/);
-        const fullTitle = parts[0].trim();
-        const reason =
-          parts.length > 1 ? parts[1].trim() : "Similar in style and themes";
-
         // Check if the title has a year in parentheses and IMDB ID in square brackets
-        const match = fullTitle.match(/(.+)\s+\((\d{4})\)\s*(?:\[(tt\d+)\])?/);
+        // This improved regex captures the title, year, and IMDB ID more reliably
+        const match = fullLine.match(
+          /(.+?)\s+\((\d{4})\)\s*(?:\[(tt\d+)\])?(.*)/,
+        );
+
         if (match) {
-          // Return title, year, IMDB ID, and reason if available
+          // The title is in match[1], year in match[2], IMDB ID in match[3] (if present)
+          // Any additional text after the IMDB ID would be in match[4]
+          const title = match[1].trim();
+          const year = match[2];
+          const imdb_id = match[3] || null;
+
+          // Extract reason if it exists after the IMDB ID
+          // First check if there's any text after the IMDB ID bracket
+          let reason = "Similar in style and themes";
+
+          if (match[4]) {
+            // Look for explicit reason format
+            const reasonMatch = match[4].match(/\s*[-|]\s*(.+)/);
+            if (reasonMatch) {
+              reason = reasonMatch[1].trim();
+            }
+          }
+
           return {
-            title: match[1].trim(),
-            year: match[2],
-            imdb_id: match[3] || null,
+            title: title,
+            year: year,
+            imdb_id: imdb_id,
             aiRecommended: true,
             recommendationReason: reason,
           };
         }
-        // If no year or IMDB ID found, just return the title and reason
+
+        // If the standard format wasn't found, try an alternative approach
+        // Split by common separators that might indicate a reason
+        const parts = fullLine.split(/\s*[\-|:]\s*/);
+        const fullTitle = parts[0].trim();
+        const reason =
+          parts.length > 1
+            ? parts.slice(1).join(" - ").trim()
+            : "Similar in style and themes";
+
+        // Try to extract year and IMDB ID from the title part
+        const altMatch = fullTitle.match(
+          /(.+?)(?:\s+\((\d{4})\))?(?:\s*\[(tt\d+)\])?/,
+        );
+
+        if (altMatch) {
+          return {
+            title: altMatch[1].trim(),
+            year: altMatch[2] || null,
+            imdb_id: altMatch[3] || null,
+            aiRecommended: true,
+            recommendationReason: reason,
+          };
+        }
+
+        // Fallback if no patterns match
         return {
           title: fullTitle,
           year: null,
