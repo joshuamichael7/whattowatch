@@ -132,18 +132,27 @@ exports.handler = async (event, context) => {
         // Check if the title has a year in parentheses and IMDB ID in square brackets
         // This improved regex captures the title, year, and IMDB ID more reliably
         const match = fullLine.match(
-          /(.+?)\s+\((\d{4})\)\s*(?:\[(tt\d+)\])?\s*-\s*Reason:\s*(.+)/i,
+          /(.+?)\s+\((\d{4})\)\s*(?:\[(tt\d+)\])?(.*)/,
         );
 
         if (match) {
           // The title is in match[1], year in match[2], IMDB ID in match[3] (if present)
-          // The reason is in match[4]
+          // Any additional text after the IMDB ID would be in match[4]
           const title = match[1].trim();
           const year = match[2];
           const imdb_id = match[3] || null;
-          const reason = match[4]
-            ? match[4].trim()
-            : "Similar in style and themes";
+
+          // Extract reason if it exists after the IMDB ID
+          // First check if there's any text after the IMDB ID bracket
+          let reason = "Similar in style and themes";
+
+          if (match[4]) {
+            // Look for explicit reason format
+            const reasonMatch = match[4].match(/\s*[-|]\s*(.+)/);
+            if (reasonMatch) {
+              reason = reasonMatch[1].trim();
+            }
+          }
 
           return {
             title: title,
