@@ -53,8 +53,45 @@ export async function updateMissingGenres(): Promise<{
           try {
             console.log(`Processing ${item.title} (${item.imdb_id})`);
 
-            // Use our omdbClient to get content details from OMDB via Netlify function
-            const contentDetails = await getContentById(item.imdb_id);
+            // Force a direct call to OMDB API via Netlify function instead of using Supabase cache
+            // We need to bypass the Supabase check in getContentById to get fresh data from OMDB
+            const apiEndpoint = "/.netlify/functions/omdb";
+            const params = new URLSearchParams({
+              i: item.imdb_id,
+              plot: "full",
+            });
+
+            console.log(
+              `Fetching data directly from OMDB API for ${item.title} (${item.imdb_id})`,
+            );
+            const response = await fetch(`${apiEndpoint}?${params.toString()}`);
+            const omdbData = await response.json();
+
+            // Process the OMDB data
+            let contentDetails = null;
+            if (omdbData && omdbData.Response === "True") {
+              // Extract genre information
+              const genreString = omdbData.Genre || "";
+              const genreStrings = genreString
+                .split(", ")
+                .filter((g) => g.trim() !== "");
+
+              console.log(
+                `OMDB returned genres for ${item.title}: ${genreString}`,
+              );
+
+              contentDetails = {
+                ...omdbData,
+                genre_strings: genreStrings,
+                id: item.id,
+                imdb_id: item.imdb_id,
+                title: item.title,
+              };
+            } else {
+              console.log(
+                `OMDB API returned no data for ${item.title}: ${omdbData?.Error || "Unknown error"}`,
+              );
+            }
 
             if (!contentDetails) {
               console.log(`No details found for ${item.title}`);
