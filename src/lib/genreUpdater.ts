@@ -6,7 +6,7 @@ import { mapGenreStringsToIds } from "./utils";
  * Updates missing genres for content items that have IMDB IDs but no genres
  * @returns Statistics about the update process
  */
-export async function updateMissingGenres(): Promise<{
+export async function updateMissingGenres(batchSize: number = 5): Promise<{
   total: number;
   updated: number;
   failed: number;
