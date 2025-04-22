@@ -903,10 +903,18 @@ async function processAiRecommendations(
             console.log(
               `[processAiRecommendations] Setting reason for "${contentByImdbId.title}": ${contentByImdbId.recommendationReason}`,
             );
-            results.push(contentByImdbId);
-            console.log(
-              `[processAiRecommendations] Found "${contentByImdbId.title}" in Supabase by IMDB ID`,
-            );
+
+            // Only add items that have a poster image
+            if (contentByImdbId.poster_path) {
+              results.push(contentByImdbId);
+              console.log(
+                `[processAiRecommendations] Found "${contentByImdbId.title}" in Supabase by IMDB ID`,
+              );
+            } else {
+              console.log(
+                `[processAiRecommendations] Skipping "${contentByImdbId.title}" - no poster image available`,
+              );
+            }
             continue; // Skip to next recommendation
           }
         }
@@ -935,10 +943,18 @@ async function processAiRecommendations(
             console.log(
               `[processAiRecommendations] Setting reason for "${match.title}": ${match.recommendationReason}`,
             );
-            results.push(match);
-            console.log(
-              `[processAiRecommendations] Found "${match.title}" in Supabase`,
-            );
+
+            // Only add items that have a poster image
+            if (match.poster_path) {
+              results.push(match);
+              console.log(
+                `[processAiRecommendations] Found "${match.title}" in Supabase`,
+              );
+            } else {
+              console.log(
+                `[processAiRecommendations] Skipping "${match.title}" - no poster image available`,
+              );
+            }
           }
         } else {
           // Not found in Supabase, search OMDB
@@ -959,10 +975,18 @@ async function processAiRecommendations(
                 contentByImdbId.recommendationReason =
                   aiTitle.recommendationReason ||
                   `AI recommended based on similarity to "${originalContent.title}"`;
-                results.push(contentByImdbId);
-                console.log(
-                  `[processAiRecommendations] Found "${contentByImdbId.title}" in OMDB by IMDB ID`,
-                );
+
+                // Only add items that have a poster image
+                if (contentByImdbId.poster_path) {
+                  results.push(contentByImdbId);
+                  console.log(
+                    `[processAiRecommendations] Found "${contentByImdbId.title}" in OMDB by IMDB ID`,
+                  );
+                } else {
+                  console.log(
+                    `[processAiRecommendations] Skipping "${contentByImdbId.title}" - no poster image available`,
+                  );
+                }
                 continue; // Skip to next recommendation
               }
             }
@@ -988,10 +1012,18 @@ async function processAiRecommendations(
                 console.log(
                   `[processAiRecommendations] Setting reason for "${match.title}": ${match.recommendationReason}`,
                 );
-                results.push(match);
-                console.log(
-                  `[processAiRecommendations] Found "${match.title}" in OMDB`,
-                );
+
+                // Only add items that have a poster image
+                if (match.poster_path) {
+                  results.push(match);
+                  console.log(
+                    `[processAiRecommendations] Found "${match.title}" in OMDB`,
+                  );
+                } else {
+                  console.log(
+                    `[processAiRecommendations] Skipping "${match.title}" - no poster image available`,
+                  );
+                }
               } else {
                 // If not found in OMDB, log the issue but don't create fallback items
                 console.log(
@@ -1387,71 +1419,21 @@ function processTrendingResults(data: any, limit: number): ContentItem[] {
     );
 
     // Format the results to match ContentItem format
-    const formattedResults = data.results.map((item: any) => ({
-      id: item.imdbID,
-      title: item.Title,
-      poster_path: item.Poster !== "N/A" ? item.Poster : "",
-      media_type: item.Type === "movie" ? "movie" : "tv",
-      release_date: item.Year,
-      vote_average: item.imdbRating ? parseFloat(item.imdbRating) : 0,
-      vote_count: item.imdbVotes
-        ? parseInt(item.imdbVotes.replace(/,/g, ""))
-        : 0,
-      genre_ids: [],
-      overview: "",
-      recommendationReason: `Trending ${item.Type === "movie" ? "movie" : "TV show"}`,
+    const formattedResults = data.results.map((item) => ({
+      id: item.id || item.imdbID,
+      title: item.title || item.Title,
+      poster_path:
+        item.poster_path || (item.Poster !== "N/A" ? item.Poster : ""),
+      media_type: item.media_type || (item.Type === "movie" ? "movie" : "tv"),
+      release_date: item.release_date || item.Year,
+      vote_average: item.vote_average || 0,
+      vote_count: item.vote_count || 0,
+      genre_ids: item.genre_ids || [],
+      overview: item.overview || "",
     }));
 
-    console.log(
-      `[getTrendingContentFallback] Returning ${formattedResults.length} formatted results`,
-    );
-    return formattedResults.slice(0, limit);
-  }
-  // Check if we have results in the Search format (OMDB API format)
-  else if (
-    data &&
-    data.Search &&
-    Array.isArray(data.Search) &&
-    data.Search.length > 0
-  ) {
-    console.log(
-      `[getTrendingContentFallback] Received ${data.Search.length} results in Search format`,
-    );
-
-    // Format the results to match ContentItem format
-    const formattedResults = data.Search.map((item: any) => ({
-      id: item.imdbID,
-      title: item.Title,
-      poster_path: item.Poster !== "N/A" ? item.Poster : "",
-      media_type: item.Type === "movie" ? "movie" : "tv",
-      release_date: item.Year,
-      vote_average: item.imdbRating ? parseFloat(item.imdbRating) : 0,
-      vote_count: 0, // Not available in this format
-      genre_ids: [],
-      overview: "",
-      recommendationReason: `Trending ${item.Type === "movie" ? "movie" : "TV show"}`,
-    }));
-
-    console.log(
-      `[getTrendingContentFallback] Returning ${formattedResults.length} formatted results from Search`,
-    );
-    return formattedResults.slice(0, limit);
+    return formattedResults;
   }
 
-  // If we reach here, we didn't find any usable results
-  console.log(
-    `[getTrendingContentFallback] No usable results found in response, data:`,
-    data,
-  );
-
-  // Return empty array instead of throwing an error
   return [];
-}
-
-// This function is no longer needed in the simplified implementation
-export function initializeContentCache(): void {
-  console.log(
-    "[initializeContentCache] Cache initialization disabled in simplified implementation",
-  );
-  // No-op in simplified implementation
 }

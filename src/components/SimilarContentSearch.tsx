@@ -607,20 +607,9 @@ const SimilarContentSearch = ({
                                     )}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
-                                  {item.recommendationReason ? (
-                                    <div className="font-medium text-primary bg-primary/10 px-3 py-2 rounded-md mb-2 border border-primary/20">
-                                      <div className="flex items-center mb-1 text-xs uppercase tracking-wider font-bold text-primary">
-                                        <span>AI Recommendation Reason</span>
-                                      </div>
-                                      {item.recommendationReason.length > 120
-                                        ? `${item.recommendationReason.substring(0, 120)}...`
-                                        : item.recommendationReason}
-                                    </div>
-                                  ) : (
-                                    <p className="line-clamp-3">
-                                      {item.overview || ""}
-                                    </p>
-                                  )}
+                                  <p className="line-clamp-3">
+                                    {item.overview || ""}
+                                  </p>
                                   <Button
                                     variant="link"
                                     className="p-0 h-auto text-xs mt-1"
@@ -738,20 +727,9 @@ const SimilarContentSearch = ({
                                     )}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
-                                  {item.recommendationReason ? (
-                                    <div className="font-medium text-primary bg-primary/10 px-3 py-2 rounded-md mb-2 border border-primary/20">
-                                      <div className="flex items-center mb-1 text-xs uppercase tracking-wider font-bold text-primary">
-                                        <span>AI Recommendation Reason</span>
-                                      </div>
-                                      {item.recommendationReason.length > 120
-                                        ? `${item.recommendationReason.substring(0, 120)}...`
-                                        : item.recommendationReason}
-                                    </div>
-                                  ) : (
-                                    <p className="line-clamp-3">
-                                      {item.overview || ""}
-                                    </p>
-                                  )}
+                                  <p className="line-clamp-3">
+                                    {item.overview || ""}
+                                  </p>
                                   <Button
                                     variant="link"
                                     className="p-0 h-auto text-xs mt-1"
