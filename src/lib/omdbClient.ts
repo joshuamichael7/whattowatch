@@ -892,7 +892,9 @@ async function processAiRecommendations(
           if (contentByImdbId) {
             // Found in Supabase by IMDB ID
             contentByImdbId.aiRecommended = true;
-            contentByImdbId.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
+            contentByImdbId.recommendationReason =
+              aiTitle.recommendationReason ||
+              `AI recommended based on similarity to "${originalContent.title}"`;
             results.push(contentByImdbId);
             console.log(
               `[processAiRecommendations] Found "${contentByImdbId.title}" in Supabase by IMDB ID`,
@@ -916,7 +918,9 @@ async function processAiRecommendations(
           const match = supabaseResults[0];
           if (match) {
             match.aiRecommended = true;
-            match.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
+            match.recommendationReason =
+              aiTitle.recommendationReason ||
+              `AI recommended based on similarity to "${originalContent.title}"`;
             results.push(match);
             console.log(
               `[processAiRecommendations] Found "${match.title}" in Supabase`,
@@ -938,7 +942,9 @@ async function processAiRecommendations(
               if (contentByImdbId) {
                 // Found in OMDB by IMDB ID
                 contentByImdbId.aiRecommended = true;
-                contentByImdbId.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
+                contentByImdbId.recommendationReason =
+                  aiTitle.recommendationReason ||
+                  `AI recommended based on similarity to "${originalContent.title}"`;
                 results.push(contentByImdbId);
                 console.log(
                   `[processAiRecommendations] Found "${contentByImdbId.title}" in OMDB by IMDB ID`,
@@ -959,7 +965,9 @@ async function processAiRecommendations(
               const match = omdbResults[0];
               if (match) {
                 match.aiRecommended = true;
-                match.recommendationReason = `AI recommended based on similarity to "${originalContent.title}"`;
+                match.recommendationReason =
+                  aiTitle.recommendationReason ||
+                  `AI recommended based on similarity to "${originalContent.title}"`;
                 results.push(match);
                 console.log(
                   `[processAiRecommendations] Found "${match.title}" in OMDB`,
