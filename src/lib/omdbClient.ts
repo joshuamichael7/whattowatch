@@ -891,7 +891,11 @@ async function processAiRecommendations(
             aiTitle.imdb_id,
           );
 
-          if (contentByImdbId) {
+          if (
+            contentByImdbId &&
+            contentByImdbId.title &&
+            contentByImdbId.title !== "Unknown"
+          ) {
             // Found in Supabase by IMDB ID
             contentByImdbId.aiRecommended = true;
             // Preserve the AI's specific recommendation reason
@@ -904,12 +908,22 @@ async function processAiRecommendations(
               `[processAiRecommendations] Setting reason for "${contentByImdbId.title}": ${contentByImdbId.recommendationReason}`,
             );
 
-            // Only add items that have a poster image
-            if (contentByImdbId.poster_path) {
-              results.push(contentByImdbId);
-              console.log(
-                `[processAiRecommendations] Found "${contentByImdbId.title}" in Supabase by IMDB ID`,
-              );
+            // Only add items that have a poster image and valid title
+            if (
+              contentByImdbId.poster_path &&
+              contentByImdbId.poster_path.trim() !== ""
+            ) {
+              // Verify the poster URL is valid (not a 404)
+              if (!contentByImdbId.poster_path.includes("null")) {
+                results.push(contentByImdbId);
+                console.log(
+                  `[processAiRecommendations] Found "${contentByImdbId.title}" in Supabase by IMDB ID`,
+                );
+              } else {
+                console.log(
+                  `[processAiRecommendations] Skipping "${contentByImdbId.title}" - invalid poster URL`,
+                );
+              }
             } else {
               console.log(
                 `[processAiRecommendations] Skipping "${contentByImdbId.title}" - no poster image available`,
@@ -932,7 +946,7 @@ async function processAiRecommendations(
         if (supabaseResults && supabaseResults.length > 0) {
           // Found in Supabase, add the first match
           const match = supabaseResults[0];
-          if (match) {
+          if (match && match.title && match.title !== "Unknown") {
             match.aiRecommended = true;
             // Preserve the AI's specific recommendation reason
             match.recommendationReason =
@@ -944,12 +958,19 @@ async function processAiRecommendations(
               `[processAiRecommendations] Setting reason for "${match.title}": ${match.recommendationReason}`,
             );
 
-            // Only add items that have a poster image
-            if (match.poster_path) {
-              results.push(match);
-              console.log(
-                `[processAiRecommendations] Found "${match.title}" in Supabase`,
-              );
+            // Only add items that have a poster image and valid title
+            if (match.poster_path && match.poster_path.trim() !== "") {
+              // Verify the poster URL is valid (not a 404)
+              if (!match.poster_path.includes("null")) {
+                results.push(match);
+                console.log(
+                  `[processAiRecommendations] Found "${match.title}" in Supabase`,
+                );
+              } else {
+                console.log(
+                  `[processAiRecommendations] Skipping "${match.title}" - invalid poster URL`,
+                );
+              }
             } else {
               console.log(
                 `[processAiRecommendations] Skipping "${match.title}" - no poster image available`,
@@ -969,19 +990,33 @@ async function processAiRecommendations(
               );
               const contentByImdbId = await getContentById(aiTitle.imdb_id);
 
-              if (contentByImdbId) {
+              if (
+                contentByImdbId &&
+                contentByImdbId.title &&
+                contentByImdbId.title !== "Unknown"
+              ) {
                 // Found in OMDB by IMDB ID
                 contentByImdbId.aiRecommended = true;
                 contentByImdbId.recommendationReason =
                   aiTitle.recommendationReason ||
                   `AI recommended based on similarity to "${originalContent.title}"`;
 
-                // Only add items that have a poster image
-                if (contentByImdbId.poster_path) {
-                  results.push(contentByImdbId);
-                  console.log(
-                    `[processAiRecommendations] Found "${contentByImdbId.title}" in OMDB by IMDB ID`,
-                  );
+                // Only add items that have a poster image and valid title
+                if (
+                  contentByImdbId.poster_path &&
+                  contentByImdbId.poster_path.trim() !== ""
+                ) {
+                  // Verify the poster URL is valid (not a 404)
+                  if (!contentByImdbId.poster_path.includes("null")) {
+                    results.push(contentByImdbId);
+                    console.log(
+                      `[processAiRecommendations] Found "${contentByImdbId.title}" in OMDB by IMDB ID`,
+                    );
+                  } else {
+                    console.log(
+                      `[processAiRecommendations] Skipping "${contentByImdbId.title}" - invalid poster URL`,
+                    );
+                  }
                 } else {
                   console.log(
                     `[processAiRecommendations] Skipping "${contentByImdbId.title}" - no poster image available`,
@@ -1001,7 +1036,7 @@ async function processAiRecommendations(
             if (omdbResults && omdbResults.length > 0) {
               // Found in OMDB, add the first match
               const match = omdbResults[0];
-              if (match) {
+              if (match && match.title && match.title !== "Unknown") {
                 match.aiRecommended = true;
                 // Preserve the AI's specific recommendation reason
                 match.recommendationReason =
@@ -1013,12 +1048,19 @@ async function processAiRecommendations(
                   `[processAiRecommendations] Setting reason for "${match.title}": ${match.recommendationReason}`,
                 );
 
-                // Only add items that have a poster image
-                if (match.poster_path) {
-                  results.push(match);
-                  console.log(
-                    `[processAiRecommendations] Found "${match.title}" in OMDB`,
-                  );
+                // Only add items that have a poster image and valid title
+                if (match.poster_path && match.poster_path.trim() !== "") {
+                  // Verify the poster URL is valid (not a 404)
+                  if (!match.poster_path.includes("null")) {
+                    results.push(match);
+                    console.log(
+                      `[processAiRecommendations] Found "${match.title}" in OMDB`,
+                    );
+                  } else {
+                    console.log(
+                      `[processAiRecommendations] Skipping "${match.title}" - invalid poster URL`,
+                    );
+                  }
                 } else {
                   console.log(
                     `[processAiRecommendations] Skipping "${match.title}" - no poster image available`,
@@ -1055,14 +1097,26 @@ async function processAiRecommendations(
     );
   }
 
+  // Final filter to ensure no undefined or "Unknown" titles are included
+  const filteredResults = results.filter((item) => {
+    return (
+      item &&
+      item.title &&
+      item.title !== "Unknown" &&
+      item.poster_path &&
+      item.poster_path.trim() !== "" &&
+      !item.poster_path.includes("null")
+    );
+  });
+
   console.log(
-    `[processAiRecommendations] Processed ${results.length} recommendations successfully`,
+    `[processAiRecommendations] Processed ${filteredResults.length} recommendations successfully (filtered from ${results.length})`,
   );
   console.log(
     "[DEBUG] Final results:",
-    results.map((r) => r.title),
+    filteredResults.map((r) => r.title),
   );
-  return results;
+  return filteredResults;
 }
 
 // Helper function to call the Netlify function for plot similarity
@@ -1432,7 +1486,23 @@ function processTrendingResults(data: any, limit: number): ContentItem[] {
       overview: item.overview || "",
     }));
 
-    return formattedResults;
+    // Filter out items with missing or invalid data
+    const validResults = formattedResults.filter((item) => {
+      return (
+        item &&
+        item.title &&
+        item.title !== "Unknown" &&
+        item.poster_path &&
+        item.poster_path.trim() !== "" &&
+        !item.poster_path.includes("null")
+      );
+    });
+
+    console.log(
+      `[getTrendingContentFallback] Filtered ${formattedResults.length - validResults.length} invalid items`,
+    );
+
+    return validResults;
   }
 
   return [];
