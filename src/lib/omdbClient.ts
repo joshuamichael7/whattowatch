@@ -291,23 +291,15 @@ function generateUUID(): string {
   });
 }
 
+import { mapGenreStringsToIds } from "./utils";
+
 // Convert OMDB data to our format
 function formatOMDBData(data: any): ContentItem {
   // Extract genres as an array
   const genreStrings = data.Genre ? data.Genre.split(", ") : [];
 
-  // Generate genre IDs using a simple hash
-  const genreIds =
-    genreStrings.length > 0
-      ? genreStrings.map((genre: string) => {
-          let hash = 0;
-          for (let i = 0; i < genre.length; i++) {
-            hash = (hash << 5) - hash + genre.charCodeAt(i);
-            hash |= 0;
-          }
-          return Math.abs(hash % 100);
-        })
-      : [];
+  // Map genre strings to consistent IDs using our explicit mapping
+  const genreIds = mapGenreStringsToIds(genreStrings);
 
   return {
     id: generateUUID(),
@@ -1507,4 +1499,120 @@ function processTrendingResults(data: any, limit: number): ContentItem[] {
   }
 
   return [];
+}
+
+// Helper function to update genre information for content items missing genres
+export async function updateMissingGenres(): Promise<{
+  updated: number;
+  failed: number;
+}> {
+  console.log(
+    "[updateMissingGenres] Starting to update content items with missing genres",
+  );
+
+  try {
+    // Import Supabase client
+    const { supabase } = await import("./supabaseClient");
+
+    // Find content without genres
+    const { data: contentWithoutGenres, error: findError } = await supabase.rpc(
+      "find_content_without_genres",
+    );
+
+    if (findError) {
+      console.error(
+        "[updateMissingGenres] Error finding content without genres:",
+        findError,
+      );
+      return { updated: 0, failed: 0 };
+    }
+
+    console.log(
+      `[updateMissingGenres] Found ${contentWithoutGenres.length} content items without genres`,
+    );
+
+    let updatedCount = 0;
+    let failedCount = 0;
+
+    // Process each item in batches to avoid rate limiting
+    for (let i = 0; i < contentWithoutGenres.length; i++) {
+      const item = contentWithoutGenres[i];
+      try {
+        // Get updated content from OMDB
+        console.log(
+          `[updateMissingGenres] Processing ${i + 1}/${contentWithoutGenres.length}: ${item.title}`,
+        );
+
+        // Use the imdb_id if available, otherwise use the title
+        let updatedContent;
+        if (item.imdb_id) {
+          updatedContent = await getContentById(item.imdb_id);
+        } else {
+          // Search by title and get the first result
+          const searchResults = await searchContent(
+            item.title,
+            item.media_type as any,
+          );
+          updatedContent =
+            searchResults.length > 0
+              ? await getContentById(searchResults[0].id)
+              : null;
+        }
+
+        if (
+          updatedContent &&
+          updatedContent.genre_strings &&
+          updatedContent.genre_strings.length > 0
+        ) {
+          // Update the content in Supabase
+          const { error: updateError } = await supabase.rpc(
+            "update_content_genres",
+            {
+              p_id: item.id,
+              p_genre_strings: updatedContent.genre_strings,
+              p_genre_ids: updatedContent.genre_ids,
+            },
+          );
+
+          if (updateError) {
+            console.error(
+              `[updateMissingGenres] Error updating genres for ${item.title}:`,
+              updateError,
+            );
+            failedCount++;
+          } else {
+            console.log(
+              `[updateMissingGenres] Successfully updated genres for ${item.title}`,
+            );
+            updatedCount++;
+          }
+        } else {
+          console.log(
+            `[updateMissingGenres] No genre information found for ${item.title}`,
+          );
+          failedCount++;
+        }
+
+        // Add a small delay to avoid rate limiting
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      } catch (itemError) {
+        console.error(
+          `[updateMissingGenres] Error processing ${item.title}:`,
+          itemError,
+        );
+        failedCount++;
+      }
+    }
+
+    console.log(
+      `[updateMissingGenres] Completed: Updated ${updatedCount} items, Failed ${failedCount} items`,
+    );
+    return { updated: updatedCount, failed: failedCount };
+  } catch (error) {
+    console.error(
+      "[updateMissingGenres] Error updating missing genres:",
+      error,
+    );
+    return { updated: 0, failed: 0 };
+  }
 }

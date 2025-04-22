@@ -246,6 +246,16 @@ const AdminDashboard: React.FC = () => {
                 <AdminPasswordReset />
               </div>
             </TabsContent>
+
+            <TabsContent value="genres" className="space-y-4">
+              <h3 className="text-lg font-medium">Genre Management</h3>
+              <p className="text-muted-foreground">
+                Update missing genres for content items using OMDB data.
+              </p>
+              <div className="mt-6">
+                <GenreUpdater />
+              </div>
+            </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
