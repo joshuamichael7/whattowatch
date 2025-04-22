@@ -85,10 +85,10 @@ export async function updateMissingGenres(): Promise<{
             }
 
             // Map genre strings to IDs
-            const genreIds =
-              contentDetails.genre_ids && contentDetails.genre_ids.length > 0
-                ? contentDetails.genre_ids
-                : mapGenreStringsToIds(contentDetails.genre_strings);
+            const genreIds = mapGenreStringsToIds(contentDetails.genre_strings);
+            console.log(
+              `Mapped genres for ${item.title}: ${JSON.stringify(genreIds)}`,
+            );
 
             // Update the content in Supabase
             const { error: updateError } = await supabase
