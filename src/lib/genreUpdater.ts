@@ -133,15 +133,15 @@ export async function updateMissingGenres(batchSize: number = 5): Promise<{
               genre_ids: genreIds,
             });
 
-            // Use RPC function instead of direct update
-            const { error: updateError } = await supabase.rpc(
-              "update_content_genres",
-              {
-                p_id: item.id,
-                p_genre_strings: contentDetails.genre_strings,
-                p_genre_ids: genreIds,
-              },
-            );
+            // Use direct update instead of RPC function since the function isn't available
+            const { error: updateError } = await supabase
+              .from("content")
+              .update({
+                genre_strings: contentDetails.genre_strings,
+                genre_ids: genreIds,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", item.id);
 
             if (!updateError) {
               // Double-check that the update was successful
