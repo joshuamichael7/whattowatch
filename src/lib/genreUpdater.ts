@@ -128,14 +128,38 @@ export async function updateMissingGenres(batchSize: number = 5): Promise<{
             );
 
             // Update the content in Supabase
-            const { error: updateError } = await supabase
-              .from("content")
-              .update({
-                genre_strings: contentDetails.genre_strings,
-                genre_ids: genreIds,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", item.id);
+            console.log(`Updating Supabase for ${item.title} with:`, {
+              genre_strings: contentDetails.genre_strings,
+              genre_ids: genreIds,
+            });
+
+            // Use RPC function instead of direct update
+            const { error: updateError } = await supabase.rpc(
+              "update_content_genres",
+              {
+                p_id: item.id,
+                p_genre_strings: contentDetails.genre_strings,
+                p_genre_ids: genreIds,
+              },
+            );
+
+            if (!updateError) {
+              // Double-check that the update was successful
+              const { data: checkData, error: checkError } = await supabase
+                .from("content")
+                .select("genre_strings, genre_ids")
+                .eq("id", item.id)
+                .single();
+
+              if (!checkError && checkData) {
+                console.log(`Verification check for ${item.title}:`, checkData);
+              } else {
+                console.error(
+                  `Verification check failed for ${item.title}:`,
+                  checkError,
+                );
+              }
+            }
 
             if (updateError) {
               console.error(`Error updating ${item.title}:`, updateError);
