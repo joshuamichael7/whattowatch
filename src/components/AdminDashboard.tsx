@@ -19,18 +19,19 @@ import {
   ShieldCheck,
   Check,
   Layout,
+  Tag,
 } from "lucide-react";
 import CsvManagement from "./admin/CsvManagement";
 import AdminPasswordReset from "./admin/AdminPasswordReset";
 import AdminPasswordForm from "./AdminPasswordForm";
 import HomepageContentManager from "./admin/HomepageContentManager";
+import GenreUpdater from "./GenreUpdater";
 
 const AdminDashboard: React.FC = () => {
   const { user, profile, isLoading, isAdmin, isAdminVerified, refreshProfile } =
     useAuth();
   const navigate = useNavigate();
 
-  // Log detailed auth information when accessing admin dashboard
   React.useEffect(() => {
     console.log("[ADMIN_DASHBOARD] Auth details:", {
       user,
@@ -41,9 +42,7 @@ const AdminDashboard: React.FC = () => {
     });
   }, [user, profile, isAdmin, isAdminVerified, isLoading]);
 
-  // Redirect non-admin users
   React.useEffect(() => {
-    // Don't wait for loading to complete if we already know the user is admin by email
     if (isLoading && !isAdmin) {
       console.log(
         "[ADMIN] Still loading and not yet identified as admin, waiting...",
@@ -60,15 +59,12 @@ const AdminDashboard: React.FC = () => {
       isAdminVerified,
     });
 
-    // If user exists but no profile is found after loading completes, handle appropriately
     if (!isLoading && user && !profile) {
       console.log(
         "[ADMIN] User exists but no profile found, checking admin by email",
       );
-      // Only proceed with email-based admin check
     }
 
-    // Simple redirect logic
     if (!user) {
       console.log("[ADMIN] Redirecting: No user logged in");
       navigate("/");
@@ -78,7 +74,6 @@ const AdminDashboard: React.FC = () => {
     }
   }, [user, isAdmin, isLoading, navigate, profile]);
 
-  // Only show loading if we're still loading AND not yet identified as admin
   if (isLoading && !isAdmin) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -87,8 +82,6 @@ const AdminDashboard: React.FC = () => {
     );
   }
 
-  // Only show the no permission alert if we're sure the user is not an admin
-  // (profile has loaded and they're definitely not an admin)
   if ((!user && !isLoading) || (profile !== null && !isAdmin && !isLoading)) {
     console.log("Showing no permission alert, user is definitely not admin");
     return (
@@ -103,14 +96,12 @@ const AdminDashboard: React.FC = () => {
     );
   }
 
-  // If user is admin but hasn't verified with password yet
   if (isAdmin && !isAdminVerified) {
     console.log("Showing admin password form, user is admin but not verified");
     return (
       <AdminPasswordForm
         onSuccess={() => {
           console.log("Admin password verified, setting admin verified");
-          // Don't reload the page, just update the state
           refreshProfile();
         }}
       />
@@ -128,7 +119,7 @@ const AdminDashboard: React.FC = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="data" className="w-full">
-            <TabsList className="grid w-full grid-cols-5 mb-8">
+            <TabsList className="grid w-full grid-cols-6 mb-8">
               <TabsTrigger value="data" className="flex items-center gap-2">
                 <Database className="h-4 w-4" />
                 Data Management
@@ -148,6 +139,10 @@ const AdminDashboard: React.FC = () => {
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4" />
                 Security
+              </TabsTrigger>
+              <TabsTrigger value="genres" className="flex items-center gap-2">
+                <Tag className="h-4 w-4" />
+                Genres
               </TabsTrigger>
             </TabsList>
 

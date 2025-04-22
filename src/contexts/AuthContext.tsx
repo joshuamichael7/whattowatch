@@ -12,6 +12,7 @@ type AuthContextType = {
   isAdmin: boolean;
   isAdminVerified?: boolean;
   verifyAdminPassword: (password: string) => Promise<boolean>;
+  refreshProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -23,6 +24,7 @@ const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
   isAdminVerified: false,
   verifyAdminPassword: async () => false,
+  refreshProfile: async () => {},
 });
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -33,6 +35,19 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check if admin was previously verified in this session
     return localStorage.getItem("isAdminVerified") === "true";
   });
+
+  // Function to refresh the user profile
+  const refreshProfile = async () => {
+    if (!session?.user) return;
+
+    try {
+      const userProfile = await getUserProfile(session.user.id);
+      console.log("[AuthContext] Profile refreshed:", userProfile);
+      setProfile(userProfile);
+    } catch (error) {
+      console.error("[AuthContext] Error refreshing profile:", error);
+    }
+  };
 
   // Initialize auth state
   useEffect(() => {
@@ -174,6 +189,7 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     isAdmin,
     isAdminVerified,
     verifyAdminPassword,
+    refreshProfile,
   };
 
   console.log("[AuthContext] Current state:", {
