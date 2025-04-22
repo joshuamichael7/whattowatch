@@ -1097,11 +1097,12 @@ async function processAiRecommendations(
     );
   }
 
-  // Final filter to ensure no undefined or "Unknown" titles are included
+  // Final filter to ensure all items have both a valid title and a valid poster
   const filteredResults = results.filter((item) => {
     return (
       item &&
       item.title &&
+      item.title.trim() !== "" &&
       item.title !== "Unknown" &&
       item.poster_path &&
       item.poster_path.trim() !== "" &&
