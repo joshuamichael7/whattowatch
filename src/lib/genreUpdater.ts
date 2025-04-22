@@ -43,7 +43,7 @@ export async function updateMissingGenres(): Promise<{
     );
 
     // Process each item in batches to avoid rate limiting
-    const batchSize = 5;
+    // batchSize is now a parameter with default value of 5
     for (let i = 0; i < contentWithoutGenres.length; i += batchSize) {
       const batch = contentWithoutGenres.slice(i, i + batchSize);
 

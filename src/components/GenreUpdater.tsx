@@ -44,8 +44,12 @@ const GenreUpdater: React.FC = () => {
         });
       }, 1000);
 
-      // Call the update function
-      const result = await updateMissingGenres();
+      console.log(
+        "Starting genre update process - will query OMDB API directly",
+      );
+
+      // Call the update function with a smaller batch size to avoid overwhelming the API
+      const result = await updateMissingGenres(3, 20); // Process 3 items at a time, max 20 items total
 
       // Clear the interval and set final progress
       clearInterval(progressInterval);
