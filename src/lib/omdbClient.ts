@@ -1111,7 +1111,7 @@ async function processAiRecommendations(
   });
 
   console.log(
-    `[processAiRecommendations] Processed ${filteredResults.length} recommendations successfully (filtered from ${results.length})`,
+    `[processAiRecommendations] Processed ${filteredResults.length} recommendations successfully (filtered from ${results.length}, removed ${results.length - filteredResults.length})`,
   );
   console.log(
     "[DEBUG] Final results:",

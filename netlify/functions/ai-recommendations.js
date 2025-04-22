@@ -9,6 +9,95 @@ const defaultConfig = {
   temperature: parseFloat(process.env.GEMINI_TEMPERATURE || "0.7"),
 };
 
+// Helper function to validate recommendations against user preferences
+function validateRecommendations(recommendations, preferences) {
+  if (!recommendations || !Array.isArray(recommendations)) {
+    return [];
+  }
+
+  // Extract genres from user preferences
+  const preferredGenres = preferences.genres || [];
+  const favoriteContent = preferences.favoriteContent || [];
+
+  // Convert to lowercase for case-insensitive matching
+  const preferredGenresLower = preferredGenres.map((g) => g.toLowerCase());
+  const favoriteContentLower = Array.isArray(favoriteContent)
+    ? favoriteContent.map((c) => c.toLowerCase())
+    : typeof favoriteContent === "string"
+      ? [favoriteContent.toLowerCase()]
+      : [];
+
+  // Keywords that indicate documentary content
+  const documentaryKeywords = [
+    "documentary",
+    "historical",
+    "educational",
+    "factual",
+    "informative",
+  ];
+
+  // Keywords that indicate comedy/mockumentary content
+  const comedyKeywords = [
+    "comedy",
+    "mockumentary",
+    "sitcom",
+    "humorous",
+    "funny",
+    "satire",
+  ];
+
+  // Check if user likes mockumentary/comedy content
+  const userLikesComedy = favoriteContentLower.some(
+    (item) =>
+      comedyKeywords.some((keyword) => item.includes(keyword)) ||
+      item.includes("the office") ||
+      item.includes("parks and rec") ||
+      item.includes("modern family") ||
+      item.includes("what we do in the shadows"),
+  );
+
+  return recommendations.filter((rec) => {
+    // Skip recommendations without required fields
+    if (!rec.title || !rec.reason) return false;
+
+    const title = rec.title.toLowerCase();
+    const reason = rec.reason.toLowerCase();
+    const genres =
+      rec.genres && Array.isArray(rec.genres)
+        ? rec.genres.map((g) => g.toLowerCase())
+        : [];
+
+    // Check for genre mismatch - documentary recommended for comedy lovers
+    if (
+      userLikesComedy &&
+      documentaryKeywords.some(
+        (keyword) => title.includes(keyword) || reason.includes(keyword),
+      ) &&
+      !comedyKeywords.some(
+        (keyword) => title.includes(keyword) || reason.includes(keyword),
+      ) &&
+      genres.includes("documentary") &&
+      !genres.includes("comedy")
+    ) {
+      console.log(`Filtering out documentary "${rec.title}" for comedy lover`);
+      return false;
+    }
+
+    // Ensure the recommendation reason matches the actual content
+    if (genres.length > 0 && preferredGenresLower.length > 0) {
+      const hasMatchingGenre = genres.some((g) =>
+        preferredGenresLower.includes(g),
+      );
+      if (!hasMatchingGenre) {
+        console.log(`Filtering out "${rec.title}" due to genre mismatch`);
+        return false;
+      }
+    }
+
+    return true;
+  });
+}
+
 exports.handler = async (event, context) => {
   // Set CORS headers
   const headers = {
