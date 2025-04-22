@@ -376,7 +376,8 @@ const SimilarContentSearch = ({
                         ? new Date(item.first_air_date).getFullYear()
                         : "Unknown"}
                     <span className="ml-auto flex items-center">
-                      ★ {item.vote_average.toFixed(1)}
+                      ★{" "}
+                      {item.vote_average ? item.vote_average.toFixed(1) : "N/A"}
                     </span>
                   </CardFooter>
                 </Card>
@@ -440,7 +441,10 @@ const SimilarContentSearch = ({
                   </span>
                   <span className="mx-2">•</span>
                   <span className="flex items-center">
-                    ★ {selectedItem.vote_average.toFixed(1)}
+                    ★{" "}
+                    {selectedItem.vote_average
+                      ? selectedItem.vote_average.toFixed(1)
+                      : "N/A"}
                   </span>
                 </div>
 
@@ -573,7 +577,10 @@ const SimilarContentSearch = ({
                                   </span>
                                   <span className="mx-2">•</span>
                                   <span className="flex items-center">
-                                    ★ {item.vote_average.toFixed(1)}
+                                    ★{" "}
+                                    {item.vote_average
+                                      ? item.vote_average.toFixed(1)
+                                      : "N/A"}
                                   </span>
                                 </div>
                                 <div className="mb-3 flex flex-wrap gap-1">
@@ -699,7 +706,10 @@ const SimilarContentSearch = ({
                                   </span>
                                   <span className="mx-2">•</span>
                                   <span className="flex items-center">
-                                    ★ {item.vote_average.toFixed(1)}
+                                    ★{" "}
+                                    {item.vote_average
+                                      ? item.vote_average.toFixed(1)
+                                      : "N/A"}
                                   </span>
                                 </div>
                                 <div className="mb-3 flex flex-wrap gap-1">
@@ -799,7 +809,10 @@ const SimilarContentSearch = ({
                         : "Unknown"}
                   </span>
                   <span className="flex items-center">
-                    ★ {detailsItem.vote_average.toFixed(1)}
+                    ★{" "}
+                    {detailsItem.vote_average
+                      ? detailsItem.vote_average.toFixed(1)
+                      : "N/A"}
                   </span>
                 </DialogDescription>
               </DialogHeader>
