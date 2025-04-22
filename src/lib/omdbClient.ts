@@ -865,7 +865,8 @@ async function processAiRecommendations(
   console.log(
     "[DEBUG] AI titles to process:",
     aiTitles.map(
-      (t) => `${t.title} ${t.year || ""} [${t.imdb_id || "no imdb_id"}]`,
+      (t) =>
+        `${t.title} ${t.year || ""} [${t.imdb_id || "no imdb_id"}] - Reason: ${t.recommendationReason?.substring(0, 30) || "No reason"}...`,
     ),
   );
 

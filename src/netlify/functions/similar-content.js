@@ -165,6 +165,15 @@ exports.handler = async (event, context) => {
         };
       });
 
+    // Log the extracted titles with reasons for debugging
+    console.log(
+      "Extracted titles with detailed reasons:",
+      titles.map(
+        (t) =>
+          `${t.title} (${t.year || "unknown"}) [${t.imdb_id || "no ID"}] - Reason: ${t.recommendationReason.substring(0, 50)}...`,
+      ),
+    );
+
     console.log(`Generated ${titles.length} similar titles for "${title}"`);
 
     // Log the extracted titles with IMDB IDs for debugging

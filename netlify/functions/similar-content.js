@@ -120,41 +120,51 @@ exports.handler = async (event, context) => {
     // Parse the response to extract just the titles
     const responseText = response.data.candidates[0].content.parts[0].text;
 
-    // Extract numbered list items (1. Title (Year), 2. Title (Year), etc.)
+    // Extract numbered list items with reasons
     const titles = responseText
       .split("\n")
       .map((line) => line.trim())
       .filter((line) => /^\d+\.\s+.+/.test(line)) // Match lines starting with numbers followed by period
       .map((line) => {
-        // Extract the full title with year and IMDB ID
-        const fullTitle = line.replace(/^\d+\.\s+/, "").trim();
+        // Extract the full line
+        const fullLine = line.replace(/^\d+\.\s+/, "").trim();
+
+        // Split by the reason separator if it exists
+        const parts = fullLine.split(/\s*\|\s*Reason:\s*/);
+        const fullTitle = parts[0].trim();
+        const reason =
+          parts.length > 1 ? parts[1].trim() : "Similar in style and themes";
+
         // Check if the title has a year in parentheses and IMDB ID in square brackets
         const match = fullTitle.match(/(.+)\s+\((\d{4})\)\s*(?:\[(tt\d+)\])?/);
         if (match) {
-          // Return title, year, and IMDB ID if available
+          // Return title, year, IMDB ID, and reason if available
           return {
             title: match[1].trim(),
             year: match[2],
             imdb_id: match[3] || null,
             aiRecommended: true,
+            recommendationReason: reason,
           };
         }
-        // If no year or IMDB ID found, just return the title
+        // If no year or IMDB ID found, just return the title and reason
         return {
           title: fullTitle,
           year: null,
           imdb_id: null,
           aiRecommended: true,
+          recommendationReason: reason,
         };
       });
 
     console.log(`Generated ${titles.length} similar titles for "${title}"`);
 
-    // Log the extracted titles with IMDB IDs for debugging
+    // Log the extracted titles with reasons for debugging
     console.log(
-      "Extracted titles with IMDB IDs:",
+      "Extracted titles with detailed reasons:",
       titles.map(
-        (t) => `${t.title} (${t.year || "unknown"}) [${t.imdb_id || "no ID"}]`,
+        (t) =>
+          `${t.title} (${t.year || "unknown"}) [${t.imdb_id || "no ID"}] - Reason: ${t.recommendationReason.substring(0, 50)}...`,
       ),
     );
 
