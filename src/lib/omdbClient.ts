@@ -380,7 +380,11 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     if (!data) return null;
 
     // Use the helper function to format OMDB data
-    const contentItem = formatOMDBData(data);
+    const contentItem: ContentItem = {
+      ...data,
+      poster_path: data.Poster !== "N/A" ? data.Poster : "",
+      recommendationReason: "AI recommended based on your preferences",
+    };
 
     // Add these fields for UI compatibility but they won't be saved to the database
     contentItem.poster = data.Poster !== "N/A" ? data.Poster : "";
