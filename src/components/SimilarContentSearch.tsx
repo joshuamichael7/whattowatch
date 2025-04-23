@@ -350,7 +350,8 @@ const SimilarContentSearch = ({
                       alt={item.title}
                       className="object-cover w-full h-full"
                       onError={(e) => {
-                        e.currentTarget.style.display = "none";
+                        e.currentTarget.src =
+                          "https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=800&q=80";
                       }}
                     />
                     <div className="absolute top-2 right-2">
@@ -411,7 +412,8 @@ const SimilarContentSearch = ({
                     alt={selectedItem.title}
                     className="object-cover w-full h-full"
                     onError={(e) => {
-                      e.currentTarget.style.display = "none";
+                      e.currentTarget.src =
+                        "https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=800&q=80";
                     }}
                   />
                 </div>
@@ -538,7 +540,8 @@ const SimilarContentSearch = ({
                                   alt={item.title}
                                   className="object-cover w-full h-full"
                                   onError={(e) => {
-                                    e.currentTarget.style.display = "none";
+                                    e.currentTarget.src =
+                                      "https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=800&q=80";
                                   }}
                                 />
                                 <div className="absolute top-2 right-2">
@@ -663,7 +666,8 @@ const SimilarContentSearch = ({
                                   alt={item.title}
                                   className="object-cover w-full h-full"
                                   onError={(e) => {
-                                    e.currentTarget.style.display = "none";
+                                    e.currentTarget.src =
+                                      "https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=800&q=80";
                                   }}
                                 />
                                 <div className="absolute top-2 right-2">
@@ -806,7 +810,8 @@ const SimilarContentSearch = ({
                     alt={detailsItem.title}
                     className="object-cover w-full h-full"
                     onError={(e) => {
-                      e.currentTarget.style.display = "none";
+                      e.currentTarget.src =
+                        "https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=800&q=80";
                     }}
                   />
                 </div>

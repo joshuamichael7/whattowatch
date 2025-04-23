@@ -124,3 +124,44 @@ export function mapGenreStringsToIds(genreStrings: string[]): number[] {
     })
     .filter((id): id is number => id !== null);
 }
+
+/**
+ * Calculate similarity between two titles
+ * @param title1 First title to compare
+ * @param title2 Second title to compare
+ * @returns Similarity score between 0 and 1
+ */
+export function calculateTitleSimilarity(
+  title1: string,
+  title2: string,
+): number {
+  if (!title1 || !title2) return 0;
+
+  // Convert to lowercase for case-insensitive comparison
+  const t1 = title1.toLowerCase();
+  const t2 = title2.toLowerCase();
+
+  // Check for exact match or substring match
+  if (t1 === t2) return 1.0;
+  if (t1.includes(t2) || t2.includes(t1)) return 0.9;
+
+  // Calculate word overlap for longer titles
+  const words1 = t1.split(/\s+/).filter((word) => word.length > 1);
+  const words2 = t2.split(/\s+/).filter((word) => word.length > 1);
+
+  if (words1.length === 0 || words2.length === 0) return 0;
+
+  const uniqueWords1 = new Set(words1);
+  const uniqueWords2 = new Set(words2);
+
+  let matchCount = 0;
+  for (const word of uniqueWords1) {
+    if (uniqueWords2.has(word)) matchCount++;
+  }
+
+  const totalUniqueWords = uniqueWords1.size + uniqueWords2.size - matchCount;
+  const wordSimilarity =
+    totalUniqueWords > 0 ? matchCount / totalUniqueWords : 0;
+
+  return wordSimilarity;
+}
