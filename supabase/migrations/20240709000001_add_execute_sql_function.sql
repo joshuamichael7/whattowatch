@@ -1,13 +1,13 @@
--- Create a function to execute SQL queries directly and return results
+-- Create a function to execute SQL queries directly
 CREATE OR REPLACE FUNCTION execute_sql(sql_query TEXT)
-RETURNS JSONB AS $$
-DECLARE
-  result JSONB;
+RETURNS VOID AS $$
 BEGIN
-  EXECUTE sql_query INTO result;
-  RETURN result;
-EXCEPTION WHEN OTHERS THEN
-  -- Return the error information
-  RETURN jsonb_build_object('error', SQLERRM, 'detail', SQLSTATE);
+  EXECUTE sql_query;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION execute_sql TO authenticated;
+
+-- Add comment explaining the purpose
+COMMENT ON FUNCTION execute_sql IS 'Executes a SQL query with elevated privileges. Use with caution.';

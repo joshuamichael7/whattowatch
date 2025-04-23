@@ -888,13 +888,6 @@ async function processAiRecommendations(
             contentByImdbId.title &&
             contentByImdbId.title !== "Unknown"
           ) {
-            // Verify title match to ensure we have the right content
-            if (!doTitlesMatch(aiTitle.title, contentByImdbId.title)) {
-              console.log(
-                `[processAiRecommendations] IMDB ID found but title mismatch: AI title "${aiTitle.title}" vs DB title "${contentByImdbId.title}". Skipping.`,
-              );
-              continue;
-            }
             // Found in Supabase by IMDB ID
             contentByImdbId.aiRecommended = true;
             // Preserve the AI's specific recommendation reason
