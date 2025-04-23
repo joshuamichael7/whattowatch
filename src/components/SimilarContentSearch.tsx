@@ -349,6 +349,14 @@ const SimilarContentSearch = ({
                       src={item.poster_path}
                       alt={item.title}
                       className="object-cover w-full h-full"
+                      onError={(e) => {
+                        console.log(
+                          `[SimilarContentSearch] Image failed to load: ${item.title}`,
+                        );
+                        // Replace with a placeholder image instead of hiding
+                        e.currentTarget.src =
+                          "https://placehold.co/300x450/gray/white?text=No+Image";
+                      }}
                     />
                     <div className="absolute top-2 right-2">
                       <Badge variant="secondary">
@@ -407,6 +415,14 @@ const SimilarContentSearch = ({
                     src={selectedItem.poster_path}
                     alt={selectedItem.title}
                     className="object-cover w-full h-full"
+                    onError={(e) => {
+                      console.log(
+                        `[SimilarContentSearch] Selected item image failed to load: ${selectedItem.title}`,
+                      );
+                      // Replace with a placeholder image instead of hiding
+                      e.currentTarget.src =
+                        "https://placehold.co/300x450/gray/white?text=No+Image";
+                    }}
                   />
                 </div>
               </div>
@@ -531,6 +547,14 @@ const SimilarContentSearch = ({
                                   src={item.poster_path}
                                   alt={item.title}
                                   className="object-cover w-full h-full"
+                                  onError={(e) => {
+                                    console.log(
+                                      `[SimilarContentSearch] Image failed to load: ${item.title}`,
+                                    );
+                                    // Replace with a placeholder image instead of hiding
+                                    e.currentTarget.src =
+                                      "https://placehold.co/300x450/gray/white?text=No+Image";
+                                  }}
                                 />
                                 <div className="absolute top-2 right-2">
                                   <Badge variant="secondary">
@@ -653,6 +677,14 @@ const SimilarContentSearch = ({
                                   src={item.poster_path}
                                   alt={item.title}
                                   className="object-cover w-full h-full"
+                                  onError={(e) => {
+                                    console.log(
+                                      `[SimilarContentSearch] Image failed to load: ${item.title}`,
+                                    );
+                                    // Replace with a placeholder image instead of hiding
+                                    e.currentTarget.src =
+                                      "https://placehold.co/300x450/gray/white?text=No+Image";
+                                  }}
                                 />
                                 <div className="absolute top-2 right-2">
                                   <Badge variant="secondary">

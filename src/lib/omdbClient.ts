@@ -82,6 +82,24 @@ function extractQueryTitleAndYear(query: string): {
 function isTitleMatch(title1: string, title2: string): boolean {
   if (!title1 || !title2) return false;
 
+  // Log the titles being compared for debugging
+  console.log(`[isTitleMatch] Comparing titles: "${title1}" and "${title2}"`);
+
+  // Check for suspicious titles that contain multiple titles
+  if (
+    title1.includes(",") ||
+    title1.includes(";") ||
+    title1.includes("|") ||
+    title2.includes(",") ||
+    title2.includes(";") ||
+    title2.includes("|") ||
+    title1.length > 50 ||
+    title2.length > 50
+  ) {
+    console.log(`[isTitleMatch] Suspicious title detected, returning false`);
+    return false;
+  }
+
   // Normalize titles: lowercase, remove special characters, trim whitespace
   const normalizeTitle = (title: string): string => {
     return title
@@ -95,7 +113,12 @@ function isTitleMatch(title1: string, title2: string): boolean {
   const normalizedTitle2 = normalizeTitle(title2);
 
   // Check for exact match first
-  if (normalizedTitle1 === normalizedTitle2) return true;
+  if (normalizedTitle1 === normalizedTitle2) {
+    console.log(
+      `[isTitleMatch] Exact match found between "${title1}" and "${title2}"`,
+    );
+    return true;
+  }
 
   // Check if one title is contained within the other (for partial matches)
   // This helps with titles that might have additional info like "(2022)" or "- Extended Cut"
@@ -103,6 +126,9 @@ function isTitleMatch(title1: string, title2: string): boolean {
     normalizedTitle1.includes(normalizedTitle2) ||
     normalizedTitle2.includes(normalizedTitle1)
   ) {
+    console.log(
+      `[isTitleMatch] Partial match found between "${title1}" and "${title2}"`,
+    );
     return true;
   }
 
@@ -114,8 +140,18 @@ function isTitleMatch(title1: string, title2: string): boolean {
   const distance = levenshteinDistance(normalizedTitle1, normalizedTitle2);
   const similarity = 1 - distance / maxLength;
 
+  console.log(
+    `[isTitleMatch] Similarity between "${title1}" and "${title2}": ${similarity.toFixed(2)}`,
+  );
+
   // Consider it a match if similarity is above threshold (e.g., 0.8 or 80% similar)
-  return similarity > 0.8;
+  const isMatch = similarity > 0.8;
+  if (isMatch) {
+    console.log(
+      `[isTitleMatch] Close match found between "${title1}" and "${title2}"`,
+    );
+  }
+  return isMatch;
 }
 
 // Helper function to calculate Levenshtein distance between two strings
@@ -1571,22 +1607,38 @@ function processTrendingResults(data: any, limit: number): ContentItem[] {
       overview: item.overview || "",
     }));
 
-    // Filter out items without valid poster URLs
+    // Filter out items without valid poster URLs or with suspicious titles
     const validResults = formattedResults.filter((item) => {
-      const isValid =
+      // Check if poster URL is valid
+      const hasValidPoster =
         item &&
         item.poster_path &&
         item.poster_path.trim() !== "" &&
         !item.poster_path.includes("null") &&
         item.poster_path !== "N/A";
 
-      if (!isValid) {
+      // Check if title is suspicious (too long or contains multiple titles)
+      const hasSuspiciousTitle =
+        item?.title &&
+        (item.title.length > 50 ||
+          item.title.includes(",") ||
+          item.title.includes(";") ||
+          item.title.includes("|") ||
+          item.title.includes(" - "));
+
+      if (!hasValidPoster) {
         console.log(
           `[getSimilarContent] Filtering out item with invalid poster: ${item?.title || "unknown"}, poster: ${item?.poster_path || "none"}`,
         );
       }
 
-      return isValid;
+      if (hasSuspiciousTitle) {
+        console.log(
+          `[getSimilarContent] Filtering out item with suspicious title: ${item?.title}`,
+        );
+      }
+
+      return hasValidPoster && !hasSuspiciousTitle;
     });
 
     console.log(
