@@ -133,7 +133,7 @@ export async function updateMissingGenres(batchSize: number = 5): Promise<{
               genre_ids: genreIds,
             });
 
-            // Use direct update instead of RPC function since the function isn't available
+            // Use direct update with explicit casting for arrays
             const { error: updateError } = await supabase
               .from("content")
               .update({
@@ -143,25 +143,49 @@ export async function updateMissingGenres(batchSize: number = 5): Promise<{
               })
               .eq("id", item.id);
 
-            if (!updateError) {
-              // Double-check that the update was successful
-              const { data: checkData, error: checkError } = await supabase
-                .from("content")
-                .select("genre_strings, genre_ids")
-                .eq("id", item.id)
-                .single();
+            // If the regular update fails, try using a raw SQL query
+            if (updateError) {
+              console.log(
+                `Regular update failed for ${item.title}, trying raw SQL query`,
+              );
 
-              if (!checkError && checkData) {
-                console.log(`Verification check for ${item.title}:`, checkData);
-              } else {
-                console.error(
-                  `Verification check failed for ${item.title}:`,
-                  checkError,
-                );
-              }
+              // Convert arrays to PostgreSQL array format
+              const genreStringsStr = JSON.stringify(
+                contentDetails.genre_strings,
+              )
+                .replace("[", "{")
+                .replace("]", "}");
+              const genreIdsStr = JSON.stringify(genreIds)
+                .replace("[", "{")
+                .replace("]", "}");
+
+              const { error: rpcError } = await supabase.rpc("execute_sql", {
+                sql_query: `UPDATE content 
+                             SET genre_strings = '${genreStringsStr}'::text[], 
+                                 genre_ids = '${genreIdsStr}'::integer[], 
+                                 updated_at = NOW() 
+                             WHERE id = '${item.id}'`,
+              });
             }
 
-            if (updateError) {
+            // Double-check that the update was successful
+            const { data: checkData, error: checkError } = await supabase
+              .from("content")
+              .select("genre_strings, genre_ids")
+              .eq("id", item.id)
+              .single();
+
+            if (!checkError && checkData) {
+              console.log(`Verification check for ${item.title}:`, checkData);
+            } else {
+              console.error(
+                `Verification check failed for ${item.title}:`,
+                checkError,
+              );
+            }
+
+            // Check if the update failed
+            if (updateError && !checkData?.genre_strings?.length) {
               console.error(`Error updating ${item.title}:`, updateError);
               details.push({
                 id: item.id,
