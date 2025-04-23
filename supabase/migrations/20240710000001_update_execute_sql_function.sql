@@ -1,3 +1,6 @@
+-- Drop the existing function first
+DROP FUNCTION IF EXISTS execute_sql(text);
+
 -- Create a function to execute SQL queries directly and return results
 CREATE OR REPLACE FUNCTION execute_sql(sql_query TEXT)
 RETURNS JSONB AS $$

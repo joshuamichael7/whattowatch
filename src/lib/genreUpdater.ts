@@ -186,7 +186,10 @@ export async function updateMissingGenres(batchSize: number = 5): Promise<{
 
             // Check if the update failed
             if (updateError && !checkData?.genre_strings?.length) {
-              console.error(`Error updating ${item.title}:`, updateError);
+              console.error(
+                `Error updating ${item.title}:`,
+                updateError || rpcError,
+              );
               details.push({
                 id: item.id,
                 title: item.title,
