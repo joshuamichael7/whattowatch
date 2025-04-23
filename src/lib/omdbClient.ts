@@ -1182,7 +1182,7 @@ async function processAiRecommendations(
   }
 
   // Final filter to ensure all items have both a valid title and a valid poster
-  const filteredResults = results.filter((item) => {
+  const validResults = results.filter((item) => {
     return (
       item &&
       item.title &&
@@ -1195,13 +1195,13 @@ async function processAiRecommendations(
   });
 
   console.log(
-    `[processAiRecommendations] Processed ${filteredResults.length} recommendations successfully (filtered from ${results.length}, removed ${results.length - filteredResults.length})`,
+    `[processAiRecommendations] Processed ${validResults.length} recommendations successfully (filtered from ${results.length}, removed ${results.length - validResults.length})`,
   );
   console.log(
     "[DEBUG] Final results:",
-    filteredResults.map((r) => r.title),
+    validResults.map((r) => r.title),
   );
-  return filteredResults;
+  return validResults;
 }
 
 // Helper function to call the Netlify function for plot similarity
@@ -1571,16 +1571,22 @@ function processTrendingResults(data: any, limit: number): ContentItem[] {
       overview: item.overview || "",
     }));
 
-    // Filter out items with missing or invalid data
+    // Filter out items without valid poster URLs
     const validResults = formattedResults.filter((item) => {
-      return (
+      const isValid =
         item &&
-        item.title &&
-        item.title !== "Unknown" &&
         item.poster_path &&
         item.poster_path.trim() !== "" &&
-        !item.poster_path.includes("null")
-      );
+        !item.poster_path.includes("null") &&
+        item.poster_path !== "N/A";
+
+      if (!isValid) {
+        console.log(
+          `[getSimilarContent] Filtering out item with invalid poster: ${item?.title || "unknown"}, poster: ${item?.poster_path || "none"}`,
+        );
+      }
+
+      return isValid;
     });
 
     console.log(
