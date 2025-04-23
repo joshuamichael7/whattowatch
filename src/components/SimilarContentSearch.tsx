@@ -349,9 +349,6 @@ const SimilarContentSearch = ({
                       src={item.poster_path}
                       alt={item.title}
                       className="object-cover w-full h-full"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
                     />
                     <div className="absolute top-2 right-2">
                       <Badge variant="secondary">
@@ -410,9 +407,6 @@ const SimilarContentSearch = ({
                     src={selectedItem.poster_path}
                     alt={selectedItem.title}
                     className="object-cover w-full h-full"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
                   />
                 </div>
               </div>
@@ -537,9 +531,6 @@ const SimilarContentSearch = ({
                                   src={item.poster_path}
                                   alt={item.title}
                                   className="object-cover w-full h-full"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = "none";
-                                  }}
                                 />
                                 <div className="absolute top-2 right-2">
                                   <Badge variant="secondary">
@@ -662,9 +653,6 @@ const SimilarContentSearch = ({
                                   src={item.poster_path}
                                   alt={item.title}
                                   className="object-cover w-full h-full"
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = "none";
-                                  }}
                                 />
                                 <div className="absolute top-2 right-2">
                                   <Badge variant="secondary">
@@ -805,9 +793,6 @@ const SimilarContentSearch = ({
                     src={detailsItem.poster_path}
                     alt={detailsItem.title}
                     className="object-cover w-full h-full"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
                   />
                 </div>
 

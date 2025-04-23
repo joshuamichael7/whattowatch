@@ -78,7 +78,104 @@ function extractQueryTitleAndYear(query: string): {
   return { queryTitle, queryYear };
 }
 
-// Find exact title match in results
+// Helper function to check if two titles match (case-insensitive)
+function isTitleMatch(title1: string, title2: string): boolean {
+  if (!title1 || !title2) return false;
+
+  // Normalize titles: lowercase, remove special characters, trim whitespace
+  const normalizeTitle = (title: string): string => {
+    return title
+      .toLowerCase()
+      .replace(/[^\w\s]/g, "") // Remove special characters
+      .replace(/\s+/g, " ") // Replace multiple spaces with a single space
+      .trim();
+  };
+
+  const normalizedTitle1 = normalizeTitle(title1);
+  const normalizedTitle2 = normalizeTitle(title2);
+
+  // Check for exact match first
+  if (normalizedTitle1 === normalizedTitle2) return true;
+
+  // Check if one title is contained within the other (for partial matches)
+  // This helps with titles that might have additional info like "(2022)" or "- Extended Cut"
+  if (
+    normalizedTitle1.includes(normalizedTitle2) ||
+    normalizedTitle2.includes(normalizedTitle1)
+  ) {
+    return true;
+  }
+
+  // Calculate similarity for close matches
+  const maxLength = Math.max(normalizedTitle1.length, normalizedTitle2.length);
+  if (maxLength === 0) return false;
+
+  // Simple Levenshtein distance calculation for similarity
+  const distance = levenshteinDistance(normalizedTitle1, normalizedTitle2);
+  const similarity = 1 - distance / maxLength;
+
+  // Consider it a match if similarity is above threshold (e.g., 0.8 or 80% similar)
+  return similarity > 0.8;
+}
+
+// Helper function to calculate Levenshtein distance between two strings
+function levenshteinDistance(str1: string, str2: string): number {
+  const m = str1.length;
+  const n = str2.length;
+
+  // Create a matrix of size (m+1) x (n+1)
+  const dp: number[][] = Array(m + 1)
+    .fill(null)
+    .map(() => Array(n + 1).fill(0));
+
+  // Initialize the first row and column
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  // Fill the matrix
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1, // deletion
+        dp[i][j - 1] + 1, // insertion
+        dp[i - 1][j - 1] + cost, // substitution
+      );
+    }
+  }
+
+  return dp[m][n];
+}
+
+// Helper function to find the best title match in results
+function findBestTitleMatch(
+  results: ContentItem[],
+  queryTitle: string,
+  queryYear: string | null,
+): ContentItem | null {
+  if (!results || !Array.isArray(results) || results.length === 0) return null;
+
+  // First try to find an exact title match
+  const exactMatch = results.find(
+    (item) =>
+      isTitleMatch(item.title, queryTitle) &&
+      (!queryYear ||
+        (item.release_date && item.release_date.includes(queryYear))),
+  );
+
+  if (exactMatch) return exactMatch;
+
+  // If no exact match with year, try just title match
+  const titleMatch = results.find((item) =>
+    isTitleMatch(item.title, queryTitle),
+  );
+  if (titleMatch) return titleMatch;
+
+  // If still no match, return the first result as fallback
+  return results[0];
+}
+
+// Helper function to find exact title match in results (legacy version)
 function findExactTitleMatch(
   results: ContentItem[],
   queryTitle: string,
@@ -87,7 +184,7 @@ function findExactTitleMatch(
   return (
     results.find((item) => {
       // First check for exact title match (case-insensitive)
-      const titleMatches = item.title.toLowerCase() === queryTitle;
+      const titleMatches = isTitleMatch(item.title, queryTitle);
 
       // If a year was specified in the query, also check if it matches
       if (queryYear && titleMatches) {
@@ -834,7 +931,7 @@ export async function getSimilarContent(
   }
 }
 
-// Process AI recommendations by searching Supabase first, then OMDB
+// Process AI recommendations by searching OMDB first, then Supabase
 async function processAiRecommendations(
   aiTitles: {
     title: string;
@@ -874,31 +971,23 @@ async function processAiRecommendations(
     // Process each AI recommendation
     for (const aiTitle of aiTitles) {
       try {
-        // If we have an IMDB ID, try to find it directly first
+        // CHANGE: First try OMDB if we have an IMDB ID
         if (aiTitle.imdb_id) {
           console.log(
-            `[DEBUG] Searching Supabase for IMDB ID: "${aiTitle.imdb_id}"`,
+            `[DEBUG] Getting content from OMDB by IMDB ID: "${aiTitle.imdb_id}"`,
           );
-          const contentByImdbId = await getContentByIdFromSupabase(
-            aiTitle.imdb_id,
-          );
+          const contentByImdbId = await getContentById(aiTitle.imdb_id);
 
           if (
             contentByImdbId &&
             contentByImdbId.title &&
             contentByImdbId.title !== "Unknown"
           ) {
-            // Found in Supabase by IMDB ID
+            // Found in OMDB by IMDB ID
             contentByImdbId.aiRecommended = true;
-            // Preserve the AI's specific recommendation reason
             contentByImdbId.recommendationReason =
-              aiTitle.recommendationReason &&
-              aiTitle.recommendationReason !== "Similar in style and themes"
-                ? aiTitle.recommendationReason
-                : `AI recommended based on similarity to "${originalContent.title}"`;
-            console.log(
-              `[processAiRecommendations] Setting reason for "${contentByImdbId.title}": ${contentByImdbId.recommendationReason}`,
-            );
+              aiTitle.recommendationReason ||
+              `AI recommended based on similarity to "${originalContent.title}"`;
 
             // Only add items that have a poster image and valid title
             if (
@@ -909,7 +998,7 @@ async function processAiRecommendations(
               if (!contentByImdbId.poster_path.includes("null")) {
                 results.push(contentByImdbId);
                 console.log(
-                  `[processAiRecommendations] Found "${contentByImdbId.title}" in Supabase by IMDB ID`,
+                  `[processAiRecommendations] Found "${contentByImdbId.title}" in OMDB by IMDB ID`,
                 );
               } else {
                 console.log(
@@ -923,12 +1012,111 @@ async function processAiRecommendations(
             }
             continue; // Skip to next recommendation
           }
+
+          // If not found in OMDB by IMDB ID, try Supabase
+          console.log(
+            `[DEBUG] Not found in OMDB, searching Supabase for IMDB ID: "${aiTitle.imdb_id}"`,
+          );
+          const contentByImdbIdFromSupabase = await getContentByIdFromSupabase(
+            aiTitle.imdb_id,
+          );
+
+          if (
+            contentByImdbIdFromSupabase &&
+            contentByImdbIdFromSupabase.title &&
+            contentByImdbIdFromSupabase.title !== "Unknown"
+          ) {
+            // Found in Supabase by IMDB ID
+            contentByImdbIdFromSupabase.aiRecommended = true;
+            // Preserve the AI's specific recommendation reason
+            contentByImdbIdFromSupabase.recommendationReason =
+              aiTitle.recommendationReason &&
+              aiTitle.recommendationReason !== "Similar in style and themes"
+                ? aiTitle.recommendationReason
+                : `AI recommended based on similarity to "${originalContent.title}"`;
+            console.log(
+              `[processAiRecommendations] Setting reason for "${contentByImdbIdFromSupabase.title}": ${contentByImdbIdFromSupabase.recommendationReason}`,
+            );
+
+            // Only add items that have a poster image and valid title
+            if (
+              contentByImdbIdFromSupabase.poster_path &&
+              contentByImdbIdFromSupabase.poster_path.trim() !== ""
+            ) {
+              // Verify the poster URL is valid (not a 404)
+              if (!contentByImdbIdFromSupabase.poster_path.includes("null")) {
+                results.push(contentByImdbIdFromSupabase);
+                console.log(
+                  `[processAiRecommendations] Found "${contentByImdbIdFromSupabase.title}" in Supabase by IMDB ID`,
+                );
+              } else {
+                console.log(
+                  `[processAiRecommendations] Skipping "${contentByImdbIdFromSupabase.title}" - invalid poster URL`,
+                );
+              }
+            } else {
+              console.log(
+                `[processAiRecommendations] Skipping "${contentByImdbIdFromSupabase.title}" - no poster image available`,
+              );
+            }
+            continue; // Skip to next recommendation
+          }
         }
 
         // If no IMDB ID or not found by IMDB ID, try to find by title and year
         const query = aiTitle.year
           ? `${aiTitle.title} ${aiTitle.year}`
           : aiTitle.title;
+
+        // CHANGE: Try OMDB first for title search
+        console.log(`[DEBUG] Before searching OMDB for: "${query}"`);
+        const omdbResults = await searchFromOmdb(query);
+        console.log(
+          `[DEBUG] OMDB search results for "${query}":", ${omdbResults ? omdbResults.length : 0} results`,
+        );
+
+        if (omdbResults && omdbResults.length > 0) {
+          // Find best title match in OMDB results
+          const match = findBestTitleMatch(
+            omdbResults,
+            aiTitle.title,
+            aiTitle.year,
+          );
+          if (match && match.title && match.title !== "Unknown") {
+            match.aiRecommended = true;
+            // Preserve the AI's specific recommendation reason
+            match.recommendationReason =
+              aiTitle.recommendationReason &&
+              aiTitle.recommendationReason !== "Similar in style and themes"
+                ? aiTitle.recommendationReason
+                : `AI recommended based on similarity to "${originalContent.title}"`;
+            console.log(
+              `[processAiRecommendations] Setting reason for "${match.title}": ${match.recommendationReason}`,
+            );
+
+            // Only add items that have a poster image and valid title
+            if (match.poster_path && match.poster_path.trim() !== "") {
+              // Verify the poster URL is valid (not a 404)
+              if (!match.poster_path.includes("null")) {
+                results.push(match);
+                console.log(
+                  `[processAiRecommendations] Found "${match.title}" in OMDB`,
+                );
+                continue; // Skip to next recommendation if found in OMDB
+              } else {
+                console.log(
+                  `[processAiRecommendations] Skipping "${match.title}" - invalid poster URL`,
+                );
+              }
+            } else {
+              console.log(
+                `[processAiRecommendations] Skipping "${match.title}" - no poster image available`,
+              );
+            }
+          }
+        }
+
+        // If not found in OMDB, try Supabase
         console.log(`[DEBUG] Searching Supabase for: "${query}"`);
         const supabaseResults = await searchContentInSupabase(query);
         console.log(
@@ -936,8 +1124,12 @@ async function processAiRecommendations(
         );
 
         if (supabaseResults && supabaseResults.length > 0) {
-          // Found in Supabase, add the first match
-          const match = supabaseResults[0];
+          // Find best title match in Supabase results
+          const match = findBestTitleMatch(
+            supabaseResults,
+            aiTitle.title,
+            aiTitle.year,
+          );
           if (match && match.title && match.title !== "Unknown") {
             match.aiRecommended = true;
             // Preserve the AI's specific recommendation reason
@@ -968,115 +1160,15 @@ async function processAiRecommendations(
                 `[processAiRecommendations] Skipping "${match.title}" - no poster image available`,
               );
             }
+          } else {
+            console.log(
+              `[processAiRecommendations] No valid title match found in Supabase for "${aiTitle.title}"`,
+            );
           }
         } else {
-          // Not found in Supabase, search OMDB
           console.log(
-            `[processAiRecommendations] "${aiTitle.title}" not found in Supabase, searching OMDB`,
+            `[processAiRecommendations] No results found in Supabase for "${aiTitle.title}"`,
           );
-          try {
-            // If we have an IMDB ID, try to get content directly by ID
-            if (aiTitle.imdb_id) {
-              console.log(
-                `[DEBUG] Getting content from OMDB by IMDB ID: "${aiTitle.imdb_id}"`,
-              );
-              const contentByImdbId = await getContentById(aiTitle.imdb_id);
-
-              if (
-                contentByImdbId &&
-                contentByImdbId.title &&
-                contentByImdbId.title !== "Unknown"
-              ) {
-                // Found in OMDB by IMDB ID
-                contentByImdbId.aiRecommended = true;
-                contentByImdbId.recommendationReason =
-                  aiTitle.recommendationReason ||
-                  `AI recommended based on similarity to "${originalContent.title}"`;
-
-                // Only add items that have a poster image and valid title
-                if (
-                  contentByImdbId.poster_path &&
-                  contentByImdbId.poster_path.trim() !== ""
-                ) {
-                  // Verify the poster URL is valid (not a 404)
-                  if (!contentByImdbId.poster_path.includes("null")) {
-                    results.push(contentByImdbId);
-                    console.log(
-                      `[processAiRecommendations] Found "${contentByImdbId.title}" in OMDB by IMDB ID`,
-                    );
-                  } else {
-                    console.log(
-                      `[processAiRecommendations] Skipping "${contentByImdbId.title}" - invalid poster URL`,
-                    );
-                  }
-                } else {
-                  console.log(
-                    `[processAiRecommendations] Skipping "${contentByImdbId.title}" - no poster image available`,
-                  );
-                }
-                continue; // Skip to next recommendation
-              }
-            }
-
-            // If no IMDB ID or not found by IMDB ID, search by title and year
-            console.log(`[DEBUG] Before searching OMDB for: "${query}"`);
-            const omdbResults = await searchFromOmdb(query);
-            console.log(
-              `[DEBUG] OMDB search results for "${query}":", ${omdbResults ? omdbResults.length : 0} results`,
-            );
-
-            if (omdbResults && omdbResults.length > 0) {
-              // Found in OMDB, add the first match
-              const match = omdbResults[0];
-              if (match && match.title && match.title !== "Unknown") {
-                match.aiRecommended = true;
-                // Preserve the AI's specific recommendation reason
-                match.recommendationReason =
-                  aiTitle.recommendationReason &&
-                  aiTitle.recommendationReason !== "Similar in style and themes"
-                    ? aiTitle.recommendationReason
-                    : `AI recommended based on similarity to "${originalContent.title}"`;
-                console.log(
-                  `[processAiRecommendations] Setting reason for "${match.title}": ${match.recommendationReason}`,
-                );
-
-                // Only add items that have a poster image and valid title
-                if (match.poster_path && match.poster_path.trim() !== "") {
-                  // Verify the poster URL is valid (not a 404)
-                  if (!match.poster_path.includes("null")) {
-                    results.push(match);
-                    console.log(
-                      `[processAiRecommendations] Found "${match.title}" in OMDB`,
-                    );
-                  } else {
-                    console.log(
-                      `[processAiRecommendations] Skipping "${match.title}" - invalid poster URL`,
-                    );
-                  }
-                } else {
-                  console.log(
-                    `[processAiRecommendations] Skipping "${match.title}" - no poster image available`,
-                  );
-                }
-              } else {
-                // If not found in OMDB, log the issue but don't create fallback items
-                console.log(
-                  `[processAiRecommendations] Could not find "${aiTitle.title}" in OMDB, skipping this recommendation`,
-                );
-              }
-            } else {
-              // If not found in OMDB, log the issue but don't create fallback items
-              console.log(
-                `[processAiRecommendations] Could not find "${aiTitle.title}" in OMDB, skipping this recommendation`,
-              );
-            }
-          } catch (omdbError) {
-            console.error(
-              `[DEBUG] OMDB search error for "${aiTitle.title}":`,
-              omdbError,
-            );
-            // Don't create fallback items, just log the error and continue
-          }
         }
       } catch (error) {
         console.error(`[DEBUG] Error processing "${aiTitle.title}":`, error);
