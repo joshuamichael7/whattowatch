@@ -1030,6 +1030,28 @@ async function processAiRecommendations(
           aiTitle.year,
         );
         if (match && match.title && match.title !== "Unknown") {
+          // If AI provided an IMDB ID, verify it matches the one from OMDB search
+          if (aiTitle.imdb_id && match.id !== aiTitle.imdb_id) {
+            console.log(
+              `[processAiRecommendations] IMDB ID mismatch for "${aiTitle.title}": AI provided ${aiTitle.imdb_id}, OMDB returned ${match.id}`,
+            );
+
+            // Double-check by looking up the AI-provided IMDB ID directly
+            const imdbParams = new URLSearchParams({
+              i: aiTitle.imdb_id,
+              plot: "full",
+            });
+
+            const imdbData = await fetchFromOmdb(imdbParams);
+            if (imdbData) {
+              console.log(
+                `[processAiRecommendations] IMDB ID ${aiTitle.imdb_id} resolves to "${imdbData.Title}" which doesn't match "${aiTitle.title}"`,
+              );
+              // Skip this recommendation due to IMDB ID mismatch
+              continue;
+            }
+          }
+
           match.aiRecommended = true;
           // Preserve the AI's specific recommendation reason
           match.recommendationReason =
@@ -1080,6 +1102,16 @@ async function processAiRecommendations(
 
         const data = await fetchFromOmdb(params);
         if (data) {
+          // Verify the title from IMDB ID lookup matches the AI-suggested title
+          const titleMatches = isTitleMatch(data.Title, aiTitle.title);
+          if (!titleMatches) {
+            console.log(
+              `[processAiRecommendations] Title mismatch for IMDB ID ${aiTitle.imdb_id}: AI suggested "${aiTitle.title}" but OMDB returned "${data.Title}"`,
+            );
+            // Skip this recommendation due to title mismatch
+            continue;
+          }
+
           // Format the OMDB data directly
           const contentItem: ContentItem = {
             id: data.imdbID || generateUUID(),
@@ -1150,6 +1182,13 @@ async function processAiRecommendations(
       item.title !== "Unknown" &&
       !hasSuspiciousTitle;
 
+    // Check if it has a valid overview
+    const hasValidOverview =
+      item &&
+      item.overview &&
+      item.overview.trim() !== "" &&
+      item.overview.length > 10;
+
     // Log items being filtered out
     if (!hasValidPoster) {
       console.log(
@@ -1169,17 +1208,39 @@ async function processAiRecommendations(
       );
     }
 
-    return hasValidTitle && hasValidPoster;
+    if (!hasValidOverview) {
+      console.log(
+        `[processAiRecommendations] Filtering out item with missing or invalid overview: ${item?.title || "unknown"}`,
+      );
+    }
+
+    return hasValidTitle && hasValidPoster && hasValidOverview;
   });
 
+  // Remove duplicates based on title (case-insensitive)
+  const uniqueResults: ContentItem[] = [];
+  const uniqueTitles = new Set<string>();
+
+  for (const item of validResults) {
+    const normalizedTitle = item.title.toLowerCase().trim();
+    if (!uniqueTitles.has(normalizedTitle)) {
+      uniqueTitles.add(normalizedTitle);
+      uniqueResults.push(item);
+    } else {
+      console.log(
+        `[processAiRecommendations] Removing duplicate title: "${item.title}"`,
+      );
+    }
+  }
+
   console.log(
-    `[processAiRecommendations] Processed ${validResults.length} recommendations successfully (filtered from ${results.length}, removed ${results.length - validResults.length})`,
+    `[processAiRecommendations] Processed ${uniqueResults.length} recommendations successfully (filtered from ${results.length}, removed ${results.length - uniqueResults.length})`,
   );
   console.log(
     "[DEBUG] Final results:",
-    validResults.map((r) => r.title),
+    uniqueResults.map((r) => r.title),
   );
-  return validResults;
+  return uniqueResults;
 }
 
 // Helper function to call the Netlify function for plot similarity
