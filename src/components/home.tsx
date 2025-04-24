@@ -112,19 +112,14 @@ const HomePage = () => {
               favorites.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <Button
-                size="lg"
-                onClick={() => (window.location.href = "/dashboard")}
-              >
-                What to Watch
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={() => (window.location.href = "/dashboard")}
-              >
-                Find Similar Content
-              </Button>
+              <Link to="/dashboard/what-to-watch">
+                <Button size="lg">What to Watch</Button>
+              </Link>
+              <Link to="/dashboard/similar">
+                <Button size="lg" variant="outline">
+                  Find Similar Content
+                </Button>
+              </Link>
             </div>
 
             {/* Preference Builder Prompt for users without preferences */}
@@ -142,12 +137,9 @@ const HomePage = () => {
                   Take our quick preference quiz to get recommendations tailored
                   just for you.
                 </p>
-                <Button
-                  onClick={() => (window.location.href = "/dashboard")}
-                  className="w-full sm:w-auto"
-                >
-                  Take the Quiz
-                </Button>
+                <Link to="/dashboard/what-to-watch">
+                  <Button className="w-full sm:w-auto">Take the Quiz</Button>
+                </Link>
               </motion.div>
             )}
           </motion.div>
@@ -360,13 +352,11 @@ const HomePage = () => {
                 Answer a few questions to help us understand your taste and
                 provide personalized recommendations.
               </p>
-              <Button
-                size="lg"
-                className="w-full sm:w-auto"
-                onClick={() => (window.location.href = "/dashboard")}
-              >
-                What to Watch
-              </Button>
+              <Link to="/dashboard/what-to-watch">
+                <Button size="lg" className="w-full sm:w-auto">
+                  What to Watch
+                </Button>
+              </Link>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
@@ -405,20 +395,20 @@ const HomePage = () => {
               <h4 className="text-sm font-semibold mb-3">Navigation</h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <a
-                    href="#"
+                  <Link
+                    to="/"
                     className="text-muted-foreground hover:text-foreground"
                   >
                     Home
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a
-                    href="#"
+                  <Link
+                    to="/dashboard"
                     className="text-muted-foreground hover:text-foreground"
                   >
                     Discover
-                  </a>
+                  </Link>
                 </li>
                 <li>
                   <a
@@ -434,20 +424,20 @@ const HomePage = () => {
               <h4 className="text-sm font-semibold mb-3">Features</h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <a
-                    href="#"
+                  <Link
+                    to="/dashboard/what-to-watch"
                     className="text-muted-foreground hover:text-foreground"
                   >
                     What to Watch
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a
-                    href="#"
+                  <Link
+                    to="/dashboard/similar"
                     className="text-muted-foreground hover:text-foreground"
                   >
                     Similar Content
-                  </a>
+                  </Link>
                 </li>
                 <li>
                   <a
