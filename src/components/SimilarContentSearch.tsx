@@ -790,7 +790,11 @@ const SimilarContentSearch = ({
                 Close
               </Button>
               <Button asChild>
-                <Link to={`/${detailsItem.media_type}/${detailsItem.id}`}>
+                <Link
+                  to={`/${detailsItem.media_type}/${detailsItem.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   View Details
                 </Link>
               </Button>
