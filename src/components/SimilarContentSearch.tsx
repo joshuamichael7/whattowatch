@@ -120,6 +120,9 @@ const SimilarContentSearch = ({
   useEffect(() => {
     if (initialSelectedItem) {
       getSimilarContentForItem(initialSelectedItem);
+    } else if (selectedItem && similarContent.length === 0) {
+      // If we have a selected item from localStorage but no similar content yet, fetch it
+      getSimilarContentForItem(selectedItem);
     }
   }, [initialSelectedItem]);
 
