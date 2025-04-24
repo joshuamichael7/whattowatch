@@ -720,15 +720,19 @@ const SimilarContentSearch = ({
 
       {showDetailsDialog && detailsItem && (
         <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-[600px] bg-background">
             <DialogHeader>
-              <DialogTitle>{detailsItem.title}</DialogTitle>
-              <DialogDescription>
-                {detailsItem.release_date
-                  ? new Date(detailsItem.release_date).getFullYear()
-                  : detailsItem.first_air_date
-                    ? new Date(detailsItem.first_air_date).getFullYear()
-                    : "Unknown"}
+              <DialogTitle className="text-xl font-bold">
+                {detailsItem.title}
+              </DialogTitle>
+              <DialogDescription className="flex items-center">
+                <span>
+                  {detailsItem.release_date
+                    ? new Date(detailsItem.release_date).getFullYear()
+                    : detailsItem.first_air_date
+                      ? new Date(detailsItem.first_air_date).getFullYear()
+                      : "Unknown"}
+                </span>
                 {detailsItem.content_rating && (
                   <Badge variant="outline" className="ml-2">
                     {detailsItem.content_rating}
@@ -736,24 +740,24 @@ const SimilarContentSearch = ({
                 )}
               </DialogDescription>
             </DialogHeader>
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-4">
-              <div className="aspect-[2/3] relative">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-4 mt-2">
+              <div className="aspect-[2/3] relative max-w-[180px] w-full mx-auto md:mx-0">
                 <img
                   src={detailsItem.poster_path}
                   alt={detailsItem.title}
-                  className="object-cover w-full h-full rounded-md"
+                  className="object-cover w-full h-full rounded-md border border-border"
                 />
               </div>
-              <div>
+              <div className="flex flex-col">
                 <div className="mb-4">
-                  <h4 className="font-medium mb-1">Overview</h4>
+                  <h4 className="font-medium mb-1 text-foreground">Overview</h4>
                   <p className="text-sm text-muted-foreground">
                     {detailsItem.overview || "No overview available."}
                   </p>
                 </div>
                 {detailsItem.genre_ids && detailsItem.genre_ids.length > 0 && (
                   <div className="mb-4">
-                    <h4 className="font-medium mb-1">Genres</h4>
+                    <h4 className="font-medium mb-1 text-foreground">Genres</h4>
                     <div className="flex flex-wrap gap-1">
                       {detailsItem.genre_ids.map((genreId) => (
                         <Badge key={genreId} variant="secondary">
@@ -765,7 +769,9 @@ const SimilarContentSearch = ({
                 )}
                 {detailsItem.recommendationReason && (
                   <div className="mb-4">
-                    <h4 className="font-medium mb-1">Why it's recommended</h4>
+                    <h4 className="font-medium mb-1 text-foreground">
+                      Why it's recommended
+                    </h4>
                     <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md">
                       {detailsItem.recommendationReason}
                     </p>
@@ -773,7 +779,7 @@ const SimilarContentSearch = ({
                 )}
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="mt-4 flex justify-end gap-2">
               <Button
                 variant="outline"
                 onClick={() => setShowDetailsDialog(false)}
