@@ -112,14 +112,19 @@ const HomePage = () => {
               favorites.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <Link to="/dashboard/what-to-watch">
-                <Button size="lg">What to Watch</Button>
-              </Link>
-              <Link to="/dashboard/similar">
-                <Button size="lg" variant="outline">
-                  Find Similar Content
-                </Button>
-              </Link>
+              <Button
+                size="lg"
+                onClick={() => (window.location.href = "/dashboard")}
+              >
+                What to Watch
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => (window.location.href = "/dashboard")}
+              >
+                Find Similar Content
+              </Button>
             </div>
 
             {/* Preference Builder Prompt for users without preferences */}
@@ -137,9 +142,12 @@ const HomePage = () => {
                   Take our quick preference quiz to get recommendations tailored
                   just for you.
                 </p>
-                <Link to="/dashboard/what-to-watch">
-                  <Button className="w-full sm:w-auto">Take the Quiz</Button>
-                </Link>
+                <Button
+                  onClick={() => (window.location.href = "/dashboard")}
+                  className="w-full sm:w-auto"
+                >
+                  Take the Quiz
+                </Button>
               </motion.div>
             )}
           </motion.div>
@@ -352,11 +360,13 @@ const HomePage = () => {
                 Answer a few questions to help us understand your taste and
                 provide personalized recommendations.
               </p>
-              <Link to="/dashboard/what-to-watch">
-                <Button size="lg" className="w-full sm:w-auto">
-                  What to Watch
-                </Button>
-              </Link>
+              <Button
+                size="lg"
+                className="w-full sm:w-auto"
+                onClick={() => (window.location.href = "/dashboard")}
+              >
+                What to Watch
+              </Button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
@@ -395,20 +405,20 @@ const HomePage = () => {
               <h4 className="text-sm font-semibold mb-3">Navigation</h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <Link
-                    to="/"
+                  <a
+                    href="#"
                     className="text-muted-foreground hover:text-foreground"
                   >
                     Home
-                  </Link>
+                  </a>
                 </li>
                 <li>
-                  <Link
-                    to="/dashboard"
+                  <a
+                    href="#"
                     className="text-muted-foreground hover:text-foreground"
                   >
                     Discover
-                  </Link>
+                  </a>
                 </li>
                 <li>
                   <a
@@ -424,20 +434,20 @@ const HomePage = () => {
               <h4 className="text-sm font-semibold mb-3">Features</h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <Link
-                    to="/dashboard/what-to-watch"
+                  <a
+                    href="#"
                     className="text-muted-foreground hover:text-foreground"
                   >
                     What to Watch
-                  </Link>
+                  </a>
                 </li>
                 <li>
-                  <Link
-                    to="/dashboard/similar"
+                  <a
+                    href="#"
                     className="text-muted-foreground hover:text-foreground"
                   >
                     Similar Content
-                  </Link>
+                  </a>
                 </li>
                 <li>
                   <a
