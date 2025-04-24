@@ -168,11 +168,11 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="display-name">Display Name</Label>
+              <Label htmlFor="username">Username</Label>
               <Input
-                id="display-name"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 placeholder="How you want to be known on MovieMatch"
               />
             </div>

@@ -35,6 +35,7 @@ export async function signUp(email: string, password: string) {
         await createUser({
           id: data.user.id,
           email: email,
+          username: data.user.user_metadata?.name || email.split("@")[0], // Use name from metadata or generate from email
           role: "user", // Always set regular users by default
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),

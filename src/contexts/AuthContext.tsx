@@ -195,6 +195,11 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   console.log("[AuthContext] Current state:", {
     user: currentUser ? { id: currentUser.id, email: currentUser.email } : null,
     profile,
+    username:
+      profile?.username ||
+      currentUser?.user_metadata?.name ||
+      currentUser?.email?.split("@")[0] ||
+      null,
     isAuthenticated: !!currentUser,
     isAdmin,
     isAdminVerified,

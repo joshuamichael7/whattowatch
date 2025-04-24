@@ -89,18 +89,8 @@ const UserProfileButton: React.FC<UserProfileButtonProps> = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className={`p-0 ${className}`}>
-          <Avatar className="h-8 w-8">
-            <AvatarImage
-              src={
-                user?.avatar ||
-                "https://api.dicebear.com/7.x/avataaars/svg?seed=user"
-              }
-            />
-            <AvatarFallback>
-              {user?.name.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+        <Button variant="ghost" className={`${className}`}>
+          {user?.name || "User"}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
