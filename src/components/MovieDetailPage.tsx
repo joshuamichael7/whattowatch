@@ -128,11 +128,11 @@ const MovieDetailPage = () => {
       </div>
 
       <div className="container py-8">
-        <Button variant="ghost" asChild className="mb-6">
-          <Link to="/" className="flex items-center">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-6">
+          <div className="flex items-center">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Home
-          </Link>
+            Back
+          </div>
         </Button>
 
         <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-8">
