@@ -518,20 +518,28 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
 
     // Try to add this content to Supabase for future use
     try {
-      const { addContentToSupabase } = await import("../lib/supabaseClient");
-      // Log the content item for debugging
-      console.log(
-        `[omdbClient] Attempting to add to Supabase: ${contentItem.title}`,
-        {
-          id: contentItem.id,
-          imdb_id: contentItem.imdb_id,
-          media_type: contentItem.media_type,
-        },
-      );
-      const result = await addContentToSupabase(contentItem);
-      console.log(
-        `[omdbClient] Added content to Supabase: ${contentItem.title}, result: ${result}`,
-      );
+      // Verify we have all required fields before attempting to add to Supabase
+      if (contentItem && contentItem.title && contentItem.id) {
+        const { addContentToSupabase } = await import("../lib/supabaseClient");
+        // Log the content item for debugging
+        console.log(
+          `[omdbClient] Attempting to add to Supabase: ${contentItem.title}`,
+          {
+            id: contentItem.id,
+            imdb_id: contentItem.imdb_id,
+            media_type: contentItem.media_type,
+          },
+        );
+        const result = await addContentToSupabase(contentItem);
+        console.log(
+          `[omdbClient] Added content to Supabase: ${contentItem.title}, result: ${result}`,
+        );
+      } else {
+        console.error(
+          "[omdbClient] Cannot add incomplete content to Supabase:",
+          contentItem,
+        );
+      }
     } catch (supabaseError) {
       console.error("Error adding content to Supabase:", supabaseError);
       // Continue even if adding to Supabase fails

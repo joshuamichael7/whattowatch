@@ -184,10 +184,24 @@ const SimilarContentSearch = ({
         similarItems ? similarItems.length : "null",
       );
 
-      if (!similarItems) {
-        console.error("[DEBUG] similarItems is null or undefined");
+      if (!similarItems || !Array.isArray(similarItems)) {
+        console.error(
+          "[DEBUG] similarItems is null, undefined, or not an array",
+        );
         setSimilarContent([]);
         setError("Failed to retrieve similar content. Please try again.");
+        return;
+      }
+
+      // Ensure we have valid items with required fields
+      const validItems = similarItems.filter((item) => {
+        return item && item.title && item.id;
+      });
+
+      if (validItems.length === 0 && similarItems.length > 0) {
+        console.error("[DEBUG] No valid items found in similarItems");
+        setSimilarContent([]);
+        setError("Failed to retrieve valid similar content. Please try again.");
         return;
       }
 
