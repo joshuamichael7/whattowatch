@@ -60,7 +60,7 @@ interface SimilarContentSearchProps {
 
 const SimilarContentSearch = ({
   onSelectItem = () => {},
-  useDirectApi = false,
+  useDirectApi = true, // Always use direct API
   initialSelectedItem = null,
 }: SimilarContentSearchProps) => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -601,16 +601,6 @@ const SimilarContentSearch = ({
                                   <p className="line-clamp-3">
                                     {item.overview || ""}
                                   </p>
-                                  <Button
-                                    variant="link"
-                                    className="p-0 h-auto text-xs mt-1"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openDetailsDialog(item);
-                                    }}
-                                  >
-                                    More details
-                                  </Button>
                                 </div>
                               </CardContent>
                             </Card>
@@ -623,226 +613,186 @@ const SimilarContentSearch = ({
               {filteredContent &&
                 Array.isArray(filteredContent) &&
                 filteredContent.length > 0 &&
-                filteredContent.some((item) => item && !item.aiRecommended) && (
-                  <div>
-                    {filteredContent.some(
-                      (item) => item && item.aiRecommended,
-                    ) && (
-                      <div className="flex items-center mb-4">
-                        <h3 className="text-xl font-semibold">
-                          Other Recommendations
-                        </h3>
-                        <Badge variant="outline" className="ml-3">
-                          Based on genre matching
-                        </Badge>
-                      </div>
-                    )}
+                !filteredContent.some((item) => item && item.aiRecommended) && (
+                  <div className="mb-8">
+                    <div className="flex items-center mb-4">
+                      <h3 className="text-xl font-semibold">Similar Content</h3>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                      {filteredContent
-                        .filter((item) => item && !item.aiRecommended)
-                        .map((item, index) => {
-                          if (!item) return null;
-                          return (
-                            <Card
-                              key={item.id || index}
-                              className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-                              onClick={() => openDetailsDialog(item)}
-                            >
-                              <div className="aspect-[2/3] relative">
-                                <img
-                                  src={item.poster_path}
-                                  alt={item.title}
-                                  className="object-cover w-full h-full"
-                                />
-                                <div className="absolute top-2 right-2">
-                                  <Badge variant="secondary">
-                                    {item.media_type === "movie" ? (
-                                      <Film className="h-3 w-3 mr-1" />
-                                    ) : (
-                                      <Tv className="h-3 w-3 mr-1" />
-                                    )}
-                                    {item.media_type === "movie"
-                                      ? "Movie"
-                                      : "TV"}
-                                  </Badge>
-                                </div>
+                      {filteredContent.map((item, index) => {
+                        if (!item) return null;
+                        return (
+                          <Card
+                            key={item.id || index}
+                            className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                            onClick={() => openDetailsDialog(item)}
+                          >
+                            <div className="aspect-[2/3] relative">
+                              <img
+                                src={item.poster_path}
+                                alt={item.title}
+                                className="object-cover w-full h-full"
+                              />
+                              <div className="absolute top-2 right-2">
+                                <Badge variant="secondary">
+                                  {item.media_type === "movie" ? (
+                                    <Film className="h-3 w-3 mr-1" />
+                                  ) : (
+                                    <Tv className="h-3 w-3 mr-1" />
+                                  )}
+                                  {item.media_type === "movie" ? "Movie" : "TV"}
+                                </Badge>
                               </div>
-                              <CardContent className="p-4">
-                                <h3 className="font-semibold mb-1 truncate">
-                                  {item.title}
-                                </h3>
-                                <div className="flex items-center text-sm text-muted-foreground mb-2">
-                                  <span>
-                                    {item.release_date
+                            </div>
+                            <CardContent className="p-4">
+                              <h3 className="font-semibold mb-1 truncate">
+                                {item.title}
+                              </h3>
+                              <div className="flex items-center text-sm text-muted-foreground mb-2">
+                                <span>
+                                  {item.release_date
+                                    ? new Date(item.release_date).getFullYear()
+                                    : item.first_air_date
                                       ? new Date(
-                                          item.release_date,
+                                          item.first_air_date,
                                         ).getFullYear()
-                                      : item.first_air_date
-                                        ? new Date(
-                                            item.first_air_date,
-                                          ).getFullYear()
-                                        : "Unknown"}
-                                  </span>
-                                  <span className="mx-2">•</span>
-                                  <span className="flex items-center">
-                                    ★{" "}
-                                    {item.vote_average
-                                      ? item.vote_average.toFixed(1)
-                                      : "N/A"}
-                                  </span>
-                                </div>
-                                <div className="mb-3 flex flex-wrap gap-1">
-                                  {item.genre_ids &&
-                                    item.genre_ids
-                                      .slice(0, 2)
-                                      .map((genreId) => (
-                                        <Badge
-                                          key={genreId}
-                                          variant="outline"
-                                          className="text-xs"
-                                        >
-                                          {genreMap[genreId] || "Genre"}
-                                        </Badge>
-                                      ))}
-                                  {item.genre_ids &&
-                                    item.genre_ids.length > 2 && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs"
-                                      >
-                                        +{item.genre_ids.length - 2}
-                                      </Badge>
-                                    )}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                  <p className="line-clamp-3">
-                                    {item.overview || ""}
-                                  </p>
-                                  <Button
-                                    variant="link"
-                                    className="p-0 h-auto text-xs mt-1"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openDetailsDialog(item);
-                                    }}
-                                  >
-                                    More details
-                                  </Button>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          );
-                        })}
+                                      : "Unknown"}
+                                </span>
+                                <span className="mx-2">•</span>
+                                <span className="flex items-center">
+                                  ★{" "}
+                                  {item.vote_average
+                                    ? item.vote_average.toFixed(1)
+                                    : "N/A"}
+                                </span>
+                              </div>
+                              <div className="mb-3 flex flex-wrap gap-1">
+                                {item.genre_ids &&
+                                  item.genre_ids.slice(0, 2).map((genreId) => (
+                                    <Badge
+                                      key={genreId}
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      {genreMap[genreId] || "Genre"}
+                                    </Badge>
+                                  ))}
+                                {item.genre_ids &&
+                                  item.genre_ids.length > 2 && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      +{item.genre_ids.length - 2}
+                                    </Badge>
+                                  )}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                <p className="line-clamp-3">
+                                  {item.overview || ""}
+                                </p>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
-
-              {filteredContent.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground">
-                  No{" "}
-                  {activeTab !== "all"
-                    ? activeTab === "movie"
-                      ? "movies"
-                      : "TV shows"
-                    : "content"}{" "}
-                  found matching your filter.
-                </div>
-              )}
             </>
           ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              {error ||
-                "No similar content found. Try searching for a different title."}
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="text-muted-foreground mb-4">
+                <Film className="h-16 w-16 mx-auto mb-4 opacity-20" />
+                <p className="text-lg">No similar content found</p>
+              </div>
+              <p className="text-sm text-muted-foreground max-w-md mb-6">
+                We couldn't find any similar content for this title. Try
+                searching for a different movie or TV show.
+              </p>
+              <Button onClick={clearSelection} variant="outline">
+                <X className="h-4 w-4 mr-2" /> Clear Selection
+              </Button>
             </div>
           )}
         </motion.div>
       )}
 
-      {/* Details Dialog */}
-      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          {detailsItem && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  {detailsItem.title}
+      {showDetailsDialog && detailsItem && (
+        <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>{detailsItem.title}</DialogTitle>
+              <DialogDescription>
+                {detailsItem.release_date
+                  ? new Date(detailsItem.release_date).getFullYear()
+                  : detailsItem.first_air_date
+                    ? new Date(detailsItem.first_air_date).getFullYear()
+                    : "Unknown"}
+                {detailsItem.content_rating && (
                   <Badge variant="outline" className="ml-2">
-                    {detailsItem.media_type === "movie" ? "Movie" : "TV Show"}
+                    {detailsItem.content_rating}
                   </Badge>
-                </DialogTitle>
-                <DialogDescription className="flex items-center gap-3">
-                  <span>
-                    {detailsItem.release_date
-                      ? new Date(detailsItem.release_date).getFullYear()
-                      : detailsItem.first_air_date
-                        ? new Date(detailsItem.first_air_date).getFullYear()
-                        : "Unknown"}
-                  </span>
-                  <span className="flex items-center">
-                    ★{" "}
-                    {detailsItem.vote_average
-                      ? detailsItem.vote_average.toFixed(1)
-                      : "N/A"}
-                  </span>
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 mt-4">
-                <div className="aspect-[2/3] overflow-hidden rounded-md bg-muted">
-                  <img
-                    src={detailsItem.poster_path}
-                    alt={detailsItem.title}
-                    className="object-cover w-full h-full"
-                  />
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr] gap-4">
+              <div className="aspect-[2/3] relative">
+                <img
+                  src={detailsItem.poster_path}
+                  alt={detailsItem.title}
+                  className="object-cover w-full h-full rounded-md"
+                />
+              </div>
+              <div>
+                <div className="mb-4">
+                  <h4 className="font-medium mb-1">Overview</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {detailsItem.overview || "No overview available."}
+                  </p>
                 </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-medium mb-1">Overview</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {detailsItem.overview}
-                    </p>
-                  </div>
-
-                  <div>
+                {detailsItem.genre_ids && detailsItem.genre_ids.length > 0 && (
+                  <div className="mb-4">
                     <h4 className="font-medium mb-1">Genres</h4>
                     <div className="flex flex-wrap gap-1">
-                      {detailsItem.genre_ids &&
-                        detailsItem.genre_ids.map((genreId) => (
-                          <Badge key={genreId} variant="outline">
-                            {genreMap[genreId] || "Genre"}
-                          </Badge>
-                        ))}
+                      {detailsItem.genre_ids.map((genreId) => (
+                        <Badge key={genreId} variant="secondary">
+                          {genreMap[genreId] || "Genre"}
+                        </Badge>
+                      ))}
                     </div>
                   </div>
-
-                  {detailsItem.recommendationReason && (
-                    <div>
-                      <h4 className="font-medium mb-1">
-                        Why we recommend this
-                      </h4>
-                      <div className="text-sm bg-primary/10 text-primary p-4 rounded-md border border-primary/20">
-                        <div className="flex items-center mb-2 text-xs uppercase tracking-wider font-bold text-primary">
-                          <span>AI Recommendation Reason</span>
-                        </div>
-                        <p>{detailsItem.recommendationReason}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-4">
-                    <Button asChild>
-                      <Link to={`/${detailsItem.media_type}/${detailsItem.id}`}>
-                        View Details Page
-                      </Link>
-                    </Button>
+                )}
+                {detailsItem.recommendationReason && (
+                  <div className="mb-4">
+                    <h4 className="font-medium mb-1">Why it's recommended</h4>
+                    <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md">
+                      {detailsItem.recommendationReason}
+                    </p>
                   </div>
-                </div>
+                )}
               </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowDetailsDialog(false)}
+              >
+                Close
+              </Button>
+              <Button asChild>
+                <Link
+                  to={`/${detailsItem.media_type}/${detailsItem.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View Details
+                </Link>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

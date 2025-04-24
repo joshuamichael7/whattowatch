@@ -785,6 +785,9 @@ export async function getSimilarContent(
   useAi = false,
   useVectorDb = false,
 ): Promise<ContentItem[]> {
+  // Force useDirectApi to true to always use OMDB API directly
+  useDirectApi = true;
+
   console.log("[DEBUG] getSimilarContent started with params:", {
     id,
     useDirectApi,
@@ -821,6 +824,7 @@ export async function getSimilarContent(
     });
 
     // If useAi is true, call the similar-content function with title and overview
+    // This is ONLY used for the Similar Content feature, not What to Watch
     if (useAi && contentDetails.title && contentDetails.overview) {
       try {
         console.log(
@@ -967,7 +971,7 @@ export async function getSimilarContent(
   }
 }
 
-// Process AI recommendations by searching OMDB first, then Supabase
+// Process AI recommendations by searching ONLY OMDB API (no Supabase)
 async function processAiRecommendations(
   aiTitles: {
     title: string;
@@ -978,6 +982,12 @@ async function processAiRecommendations(
   }[],
   originalContent: ContentItem,
 ): Promise<ContentItem[]> {
+  // Log the original AI titles for debugging
+  console.log(
+    "Original AI titles with IMDB IDs:",
+    aiTitles.map((t) => `${t.title} - ${t.imdb_id}`),
+  );
+
   if (!aiTitles || !Array.isArray(aiTitles)) {
     console.error(
       "[processAiRecommendations] aiTitles is not an array or is null",
@@ -998,236 +1008,168 @@ async function processAiRecommendations(
 
   const results: ContentItem[] = [];
 
-  try {
-    console.log("[DEBUG] Before importing searchContentInSupabase");
-    const { searchContentInSupabase, getContentByIdFromSupabase } =
-      await import("../lib/supabaseClient");
-    console.log("[DEBUG] After importing searchContentInSupabase");
+  // Process each AI recommendation
+  for (const aiTitle of aiTitles) {
+    try {
+      // First try direct OMDB API call by title and year (most reliable method)
+      const query = aiTitle.year
+        ? `${aiTitle.title} ${aiTitle.year}`
+        : aiTitle.title;
 
-    // Process each AI recommendation
-    for (const aiTitle of aiTitles) {
-      try {
-        // CHANGE: First try OMDB if we have an IMDB ID
-        if (aiTitle.imdb_id) {
-          console.log(
-            `[DEBUG] Getting content from OMDB by IMDB ID: "${aiTitle.imdb_id}"`,
-          );
-          const contentByImdbId = await getContentById(aiTitle.imdb_id);
+      console.log(`[DEBUG] Searching OMDB for title: "${query}"`);
+      const omdbResults = await searchFromOmdb(query);
+      console.log(
+        `[DEBUG] OMDB search results for "${query}":", ${omdbResults ? omdbResults.length : 0} results`,
+      );
 
-          if (
-            contentByImdbId &&
-            contentByImdbId.title &&
-            contentByImdbId.title !== "Unknown"
-          ) {
-            // Found in OMDB by IMDB ID
-            contentByImdbId.aiRecommended = true;
-            contentByImdbId.recommendationReason =
-              aiTitle.recommendationReason ||
-              `AI recommended based on similarity to "${originalContent.title}"`;
-
-            // Only add items that have a poster image and valid title
-            if (
-              contentByImdbId.poster_path &&
-              contentByImdbId.poster_path.trim() !== ""
-            ) {
-              // Verify the poster URL is valid (not a 404)
-              if (!contentByImdbId.poster_path.includes("null")) {
-                results.push(contentByImdbId);
-                console.log(
-                  `[processAiRecommendations] Found "${contentByImdbId.title}" in OMDB by IMDB ID`,
-                );
-              } else {
-                console.log(
-                  `[processAiRecommendations] Skipping "${contentByImdbId.title}" - invalid poster URL`,
-                );
-              }
-            } else {
-              console.log(
-                `[processAiRecommendations] Skipping "${contentByImdbId.title}" - no poster image available`,
-              );
-            }
-            continue; // Skip to next recommendation
-          }
-
-          // If not found in OMDB by IMDB ID, try Supabase
-          console.log(
-            `[DEBUG] Not found in OMDB, searching Supabase for IMDB ID: "${aiTitle.imdb_id}"`,
-          );
-          const contentByImdbIdFromSupabase = await getContentByIdFromSupabase(
-            aiTitle.imdb_id,
-          );
-
-          if (
-            contentByImdbIdFromSupabase &&
-            contentByImdbIdFromSupabase.title &&
-            contentByImdbIdFromSupabase.title !== "Unknown"
-          ) {
-            // Found in Supabase by IMDB ID
-            contentByImdbIdFromSupabase.aiRecommended = true;
-            // Preserve the AI's specific recommendation reason
-            contentByImdbIdFromSupabase.recommendationReason =
-              aiTitle.recommendationReason &&
-              aiTitle.recommendationReason !== "Similar in style and themes"
-                ? aiTitle.recommendationReason
-                : `AI recommended based on similarity to "${originalContent.title}"`;
-            console.log(
-              `[processAiRecommendations] Setting reason for "${contentByImdbIdFromSupabase.title}": ${contentByImdbIdFromSupabase.recommendationReason}`,
-            );
-
-            // Only add items that have a poster image and valid title
-            if (
-              contentByImdbIdFromSupabase.poster_path &&
-              contentByImdbIdFromSupabase.poster_path.trim() !== ""
-            ) {
-              // Verify the poster URL is valid (not a 404)
-              if (!contentByImdbIdFromSupabase.poster_path.includes("null")) {
-                results.push(contentByImdbIdFromSupabase);
-                console.log(
-                  `[processAiRecommendations] Found "${contentByImdbIdFromSupabase.title}" in Supabase by IMDB ID`,
-                );
-              } else {
-                console.log(
-                  `[processAiRecommendations] Skipping "${contentByImdbIdFromSupabase.title}" - invalid poster URL`,
-                );
-              }
-            } else {
-              console.log(
-                `[processAiRecommendations] Skipping "${contentByImdbIdFromSupabase.title}" - no poster image available`,
-              );
-            }
-            continue; // Skip to next recommendation
-          }
-        }
-
-        // If no IMDB ID or not found by IMDB ID, try to find by title and year
-        const query = aiTitle.year
-          ? `${aiTitle.title} ${aiTitle.year}`
-          : aiTitle.title;
-
-        // CHANGE: Try OMDB first for title search
-        console.log(`[DEBUG] Before searching OMDB for: "${query}"`);
-        const omdbResults = await searchFromOmdb(query);
-        console.log(
-          `[DEBUG] OMDB search results for "${query}":", ${omdbResults ? omdbResults.length : 0} results`,
+      if (omdbResults && omdbResults.length > 0) {
+        // Find best title match in OMDB results
+        const match = findBestTitleMatch(
+          omdbResults,
+          aiTitle.title,
+          aiTitle.year,
         );
-
-        if (omdbResults && omdbResults.length > 0) {
-          // Find best title match in OMDB results
-          const match = findBestTitleMatch(
-            omdbResults,
-            aiTitle.title,
-            aiTitle.year,
+        if (match && match.title && match.title !== "Unknown") {
+          match.aiRecommended = true;
+          // Preserve the AI's specific recommendation reason
+          match.recommendationReason =
+            aiTitle.recommendationReason &&
+            aiTitle.recommendationReason !== "Similar in style and themes"
+              ? aiTitle.recommendationReason
+              : `AI recommended based on similarity to "${originalContent.title}"`;
+          console.log(
+            `[processAiRecommendations] Setting reason for "${match.title}": ${match.recommendationReason}`,
           );
-          if (match && match.title && match.title !== "Unknown") {
-            match.aiRecommended = true;
-            // Preserve the AI's specific recommendation reason
-            match.recommendationReason =
-              aiTitle.recommendationReason &&
-              aiTitle.recommendationReason !== "Similar in style and themes"
-                ? aiTitle.recommendationReason
-                : `AI recommended based on similarity to "${originalContent.title}"`;
-            console.log(
-              `[processAiRecommendations] Setting reason for "${match.title}": ${match.recommendationReason}`,
-            );
 
-            // Only add items that have a poster image and valid title
-            if (match.poster_path && match.poster_path.trim() !== "") {
-              // Verify the poster URL is valid (not a 404)
-              if (!match.poster_path.includes("null")) {
-                results.push(match);
-                console.log(
-                  `[processAiRecommendations] Found "${match.title}" in OMDB`,
-                );
-                continue; // Skip to next recommendation if found in OMDB
-              } else {
-                console.log(
-                  `[processAiRecommendations] Skipping "${match.title}" - invalid poster URL`,
-                );
-              }
-            } else {
+          // Only add items that have a poster image and valid title
+          if (match.poster_path && match.poster_path.trim() !== "") {
+            // Verify the poster URL is valid (not a 404)
+            if (
+              !match.poster_path.includes("null") &&
+              match.poster_path !== "N/A"
+            ) {
+              results.push(match);
               console.log(
-                `[processAiRecommendations] Skipping "${match.title}" - no poster image available`,
+                `[processAiRecommendations] Found "${match.title}" in OMDB by title search`,
               );
-            }
-          }
-        }
-
-        // If not found in OMDB, try Supabase
-        console.log(`[DEBUG] Searching Supabase for: "${query}"`);
-        const supabaseResults = await searchContentInSupabase(query);
-        console.log(
-          `[DEBUG] Supabase search results for "${query}":", ${supabaseResults ? supabaseResults.length : 0} results`,
-        );
-
-        if (supabaseResults && supabaseResults.length > 0) {
-          // Find best title match in Supabase results
-          const match = findBestTitleMatch(
-            supabaseResults,
-            aiTitle.title,
-            aiTitle.year,
-          );
-          if (match && match.title && match.title !== "Unknown") {
-            match.aiRecommended = true;
-            // Preserve the AI's specific recommendation reason
-            match.recommendationReason =
-              aiTitle.recommendationReason &&
-              aiTitle.recommendationReason !== "Similar in style and themes"
-                ? aiTitle.recommendationReason
-                : `AI recommended based on similarity to "${originalContent.title}"`;
-            console.log(
-              `[processAiRecommendations] Setting reason for "${match.title}": ${match.recommendationReason}`,
-            );
-
-            // Only add items that have a poster image and valid title
-            if (match.poster_path && match.poster_path.trim() !== "") {
-              // Verify the poster URL is valid (not a 404)
-              if (!match.poster_path.includes("null")) {
-                results.push(match);
-                console.log(
-                  `[processAiRecommendations] Found "${match.title}" in Supabase`,
-                );
-              } else {
-                console.log(
-                  `[processAiRecommendations] Skipping "${match.title}" - invalid poster URL`,
-                );
-              }
+              continue; // Skip to next recommendation if found in OMDB
             } else {
               console.log(
-                `[processAiRecommendations] Skipping "${match.title}" - no poster image available`,
+                `[processAiRecommendations] Skipping "${match.title}" - invalid poster URL`,
               );
             }
           } else {
             console.log(
-              `[processAiRecommendations] No valid title match found in Supabase for "${aiTitle.title}"`,
+              `[processAiRecommendations] Skipping "${match.title}" - no poster image available`,
             );
           }
-        } else {
-          console.log(
-            `[processAiRecommendations] No results found in Supabase for "${aiTitle.title}"`,
-          );
         }
-      } catch (error) {
-        console.error(`[DEBUG] Error processing "${aiTitle.title}":`, error);
       }
+
+      // If title search didn't work and we have an IMDB ID, try that as fallback
+      if (aiTitle.imdb_id) {
+        console.log(
+          `[DEBUG] Title search failed, trying IMDB ID: "${aiTitle.imdb_id}"`,
+        );
+
+        // Use the direct OMDB API call, not the Supabase lookup
+        const params = new URLSearchParams({
+          i: aiTitle.imdb_id,
+          plot: "full",
+        });
+
+        const data = await fetchFromOmdb(params);
+        if (data) {
+          // Format the OMDB data directly
+          const contentItem: ContentItem = {
+            id: data.imdbID || generateUUID(),
+            title: data.Title,
+            poster_path: data.Poster !== "N/A" ? data.Poster : "",
+            media_type: data.Type === "movie" ? "movie" : "tv",
+            release_date: data.Released !== "N/A" ? data.Released : data.Year,
+            vote_average:
+              data.imdbRating !== "N/A" ? parseFloat(data.imdbRating) : 0,
+            vote_count:
+              data.imdbVotes !== "N/A"
+                ? parseInt(data.imdbVotes.replace(/,/g, ""))
+                : 0,
+            genre_ids: [],
+            overview: data.Plot !== "N/A" ? data.Plot : "",
+            aiRecommended: true,
+            recommendationReason:
+              aiTitle.recommendationReason ||
+              `AI recommended based on similarity to "${originalContent.title}"`,
+          };
+
+          // Only add if it has a valid poster
+          if (
+            contentItem.poster_path &&
+            contentItem.poster_path !== "N/A" &&
+            !contentItem.poster_path.includes("null")
+          ) {
+            results.push(contentItem);
+            console.log(
+              `[processAiRecommendations] Found "${contentItem.title}" in OMDB by IMDB ID`,
+            );
+          } else {
+            console.log(
+              `[processAiRecommendations] Skipping "${contentItem.title}" - invalid poster URL`,
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`[DEBUG] Error processing "${aiTitle.title}":`, error);
     }
-  } catch (importError) {
-    console.error(
-      "[DEBUG] Error importing searchContentInSupabase:",
-      importError,
-    );
   }
 
   // Final filter to ensure all items have both a valid title and a valid poster
   const validResults = results.filter((item) => {
-    return (
+    // Check if title is suspicious (too long or contains multiple titles)
+    const hasSuspiciousTitle =
+      item?.title &&
+      (item.title.length > 50 ||
+        item.title.includes(",") ||
+        item.title.includes(";") ||
+        item.title.includes("|") ||
+        item.title.includes(" - "));
+
+    // Check if poster URL is valid
+    const hasValidPoster =
+      item &&
+      item.poster_path &&
+      item.poster_path.trim() !== "" &&
+      !item.poster_path.includes("null") &&
+      item.poster_path !== "N/A";
+
+    // Check if title is valid
+    const hasValidTitle =
       item &&
       item.title &&
       item.title.trim() !== "" &&
       item.title !== "Unknown" &&
-      item.poster_path &&
-      item.poster_path.trim() !== "" &&
-      !item.poster_path.includes("null")
-    );
+      !hasSuspiciousTitle;
+
+    // Log items being filtered out
+    if (!hasValidPoster) {
+      console.log(
+        `[processAiRecommendations] Filtering out item with invalid poster: ${item?.title || "unknown"}, poster: ${item?.poster_path || "none"}`,
+      );
+    }
+
+    if (!hasValidTitle) {
+      console.log(
+        `[processAiRecommendations] Filtering out item with invalid title: ${item?.title || "unknown"}`,
+      );
+    }
+
+    if (hasSuspiciousTitle) {
+      console.log(
+        `[processAiRecommendations] Filtering out item with suspicious title: ${item?.title}`,
+      );
+    }
+
+    return hasValidTitle && hasValidPoster;
   });
 
   console.log(
