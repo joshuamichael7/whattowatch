@@ -129,7 +129,19 @@ const MovieDetailPage = () => {
       </div>
 
       <div className="container py-8">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-6">
+        <Button
+          variant="ghost"
+          onClick={() => {
+            // Check if there's history to go back to
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              // If no history (new tab), go to home page
+              navigate("/");
+            }
+          }}
+          className="mb-6"
+        >
           <div className="flex items-center">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
