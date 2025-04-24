@@ -803,4 +803,23 @@ const SimilarContentSearch = ({
   );
 };
 
-export default SimilarContentSearch;
+// Clean up localStorage when component unmounts
+const SimilarContentSearchWithCleanup = (props: SimilarContentSearchProps) => {
+  const Component = SimilarContentSearch;
+
+  useEffect(() => {
+    // This effect will run when the component is unmounted
+    return () => {
+      // Uncomment the following line if you want to clear localStorage on unmount
+      // localStorage.removeItem("similarContentSearchQuery");
+      // localStorage.removeItem("similarContentSearchResults");
+      // localStorage.removeItem("similarContentSelectedItem");
+      // localStorage.removeItem("similarContentSimilarContent");
+      // localStorage.removeItem("similarContentActiveTab");
+    };
+  }, []);
+
+  return <Component {...props} />;
+};
+
+export default SimilarContentSearchWithCleanup;
