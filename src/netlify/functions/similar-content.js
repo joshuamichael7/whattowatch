@@ -97,7 +97,8 @@ exports.handler = async (event, context) => {
     IMPORTANT: Use the EXACT title spelling and formatting as it appears in IMDB to ensure proper matching.
     CRITICAL: Include the year in parentheses after each title to distinguish between movies/shows with the same title.
     CRITICAL: Include the IMDB ID in square brackets after the year. If you don't know the exact IMDB ID, make a best guess based on the title and year, always starting with 'tt' followed by 7-8 digits.
-    CRITICAL: Provide a SPECIFIC reason for each recommendation that explains the similarities in detail, not just generic statements.`;
+    CRITICAL: Provide a SPECIFIC reason for each recommendation that explains the similarities in detail, not just generic statements.
+    CRITICAL: Ensure you recommend a diverse range of content that captures different aspects of similarity to the original title.`;
 
     // Construct the API endpoint URL
     const apiEndpoint = `https://generativelanguage.googleapis.com/${defaultConfig.apiVersion}/models/${defaultConfig.modelName}:generateContent`;

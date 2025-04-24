@@ -133,6 +133,8 @@ const SimilarContentSearch = ({
       media_type: item.media_type,
       overview: item.overview ? item.overview.substring(0, 50) + "..." : "none",
       imdb_id: item.imdbID || "none",
+      hasGenres: item.genre_strings && item.genre_strings.length > 0,
+      genres: item.genre_strings ? item.genre_strings.join(", ") : "none",
     });
 
     setSelectedItem(item);
@@ -156,6 +158,18 @@ const SimilarContentSearch = ({
       console.log(
         `[SimilarContentSearch] Using AI for recommendations: ${canUseAi}`,
       );
+
+      // Check if item has genres
+      const hasGenres =
+        item.genre_strings &&
+        Array.isArray(item.genre_strings) &&
+        item.genre_strings.length > 0;
+
+      if (!hasGenres) {
+        console.log(
+          "[DEBUG] Item doesn't have genres, will try to fetch them from OMDB",
+        );
+      }
 
       console.log("[DEBUG] Before calling getSimilarContent");
       const similarItems = await getSimilarContent(
@@ -213,7 +227,7 @@ const SimilarContentSearch = ({
 
       if (similarItems.length === 0) {
         console.log("[DEBUG] No similar items found");
-        setError("No similar content found based on this title's genre.");
+        setError("No similar content found. Please try a different title.");
       }
 
       onSelectItem(item);

@@ -801,7 +801,7 @@ export async function getSimilarContent(
       `[getSimilarContent] Getting similar content for ID: ${id}, useDirectApi: ${useDirectApi}, limit: ${limit}, useAi: ${useAi}, useVectorDb: ${useVectorDb}`,
     );
 
-    // Get the content details first
+    // Get the content details first - this will now try to fetch genres from OMDB if missing
     console.log("[DEBUG] Before calling getContentById");
     const contentDetails = await getContentById(id);
     console.log(
@@ -814,10 +814,18 @@ export async function getSimilarContent(
       return [];
     }
 
+    // Check if content has genres after potential OMDB update
+    const hasGenres =
+      contentDetails.genre_strings &&
+      Array.isArray(contentDetails.genre_strings) &&
+      contentDetails.genre_strings.length > 0;
+
     console.log("[DEBUG] Content details:", {
       id: contentDetails.id,
       title: contentDetails.title,
       media_type: contentDetails.media_type,
+      hasGenres: hasGenres,
+      genres: hasGenres ? contentDetails.genre_strings?.join(", ") : "none",
       overview: contentDetails.overview
         ? contentDetails.overview.substring(0, 50) + "..."
         : "none",
