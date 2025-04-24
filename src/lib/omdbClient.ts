@@ -505,11 +505,10 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     if (!data) return null;
 
     // Use the helper function to format OMDB data
-    const contentItem: ContentItem = {
-      ...data,
-      poster_path: data.Poster !== "N/A" ? data.Poster : "",
-      recommendationReason: "AI recommended based on your preferences",
-    };
+    const contentItem = formatOMDBData(data);
+
+    // Ensure the ID is set to the IMDB ID for consistency
+    contentItem.id = data.imdbID;
 
     // Add these fields for UI compatibility but they won't be saved to the database
     contentItem.poster = data.Poster !== "N/A" ? data.Poster : "";
@@ -520,6 +519,12 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     try {
       // Verify we have all required fields before attempting to add to Supabase
       if (contentItem && contentItem.title && contentItem.id) {
+        // Ensure the ID is a UUID and not an IMDB ID
+        if (contentItem.id.startsWith("tt") && /^tt\d+$/.test(contentItem.id)) {
+          console.log(`[omdbClient] ID is an IMDB ID, generating a new UUID`);
+          contentItem.id = generateUUID();
+        }
+
         const { addContentToSupabase } = await import("../lib/supabaseClient");
         // Log the content item for debugging
         console.log(

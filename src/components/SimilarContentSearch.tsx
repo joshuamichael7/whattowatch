@@ -195,7 +195,20 @@ const SimilarContentSearch = ({
 
       // Ensure we have valid items with required fields
       const validItems = similarItems.filter((item) => {
-        return item && item.title && item.id;
+        // Check for title in both standard and OMDB formats
+        const hasTitle = item && (item.title || item.Title);
+        // Check for ID in both standard and OMDB formats
+        const hasId = item && (item.id || item.imdbID);
+
+        // If we have an item with OMDB format but not standard format, convert it
+        if (item && !item.title && item.Title) {
+          item.title = item.Title;
+        }
+        if (item && !item.id && item.imdbID) {
+          item.id = item.imdbID;
+        }
+
+        return hasTitle && hasId;
       });
 
       if (validItems.length === 0 && similarItems.length > 0) {
