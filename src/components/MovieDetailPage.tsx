@@ -20,7 +20,6 @@ import MovieDetailPageHeader from "@/components/MovieDetailPageHeader";
 import MovieDetailPageFooter from "@/components/MovieDetailPageFooter";
 import SimilarContentCarousel from "@/components/SimilarContentCarousel";
 
-// Genre mapping (same as in other components)
 const genreMap: Record<number, string> = {
   28: "Action",
   12: "Adventure",
@@ -49,6 +48,7 @@ const MovieDetailPage = () => {
   const [movie, setMovie] = useState<ContentItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fromRecommendations, setFromRecommendations] = useState(false);
 
   useEffect(() => {
     const fetchMovieDetails = async () => {
@@ -63,9 +63,6 @@ const MovieDetailPage = () => {
         if (!movieData) {
           throw new Error("Movie not found");
         }
-
-        // Remove the media type check to allow both movies and TV shows
-        // since we're using the same component for both
 
         setMovie(movieData as ContentItem);
       } catch (err) {
@@ -105,12 +102,9 @@ const MovieDetailPage = () => {
 
   return (
     <div className="min-h-screen bg-background font-body">
-      {/* Header */}
       <MovieDetailPageHeader title="MovieMatch" />
 
-      {/* Hero Background */}
       <div className="relative w-full h-[40vh] overflow-hidden bg-gradient-to-r from-gray-900 to-gray-800">
-        {/* Extremely Blurred Poster as Background */}
         <div className="absolute inset-0 opacity-60">
           {movie.poster_path && (
             <img
@@ -123,8 +117,6 @@ const MovieDetailPage = () => {
             />
           )}
         </div>
-
-        {/* Overlay Gradient */}
         <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent z-10" />
       </div>
 
@@ -132,11 +124,9 @@ const MovieDetailPage = () => {
         <Button
           variant="ghost"
           onClick={() => {
-            // Check if there's history to go back to
             if (window.history.length > 1) {
               navigate(-1);
             } else {
-              // If no history (new tab), go to home page
               navigate("/");
             }
           }}
@@ -149,7 +139,6 @@ const MovieDetailPage = () => {
         </Button>
 
         <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-8">
-          {/* Movie Poster */}
           <div>
             <div className="rounded-lg overflow-hidden shadow-lg transition-all hover:shadow-xl">
               {movie.poster_path ? (
@@ -172,6 +161,7 @@ const MovieDetailPage = () => {
               <Button
                 className="w-full animate-pulse-glow transition-all hover:shadow-md"
                 variant="default"
+                onClick={() => handleAddToWatchlist(movie)}
               >
                 <Heart className="mr-2 h-4 w-4" />
                 Add to Watchlist
@@ -183,10 +173,28 @@ const MovieDetailPage = () => {
                 <Share2 className="mr-2 h-4 w-4" />
                 Share
               </Button>
+              {fromRecommendations ? (
+                <Button
+                  className="w-full transition-all hover:shadow-md"
+                  variant="secondary"
+                  onClick={() => navigate(-1)}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Recommendations
+                </Button>
+              ) : (
+                <Button
+                  className="w-full transition-all hover:shadow-md"
+                  variant="secondary"
+                  onClick={() => navigate(-1)}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
+              )}
             </div>
           </div>
 
-          {/* Movie Details */}
           <div>
             <div className="flex items-center mb-2">
               <Badge variant="outline" className="mr-2">
@@ -274,7 +282,6 @@ const MovieDetailPage = () => {
         </div>
       </div>
 
-      {/* Similar Content Section */}
       <div className="container py-8">
         <Separator className="my-8" />
         <SimilarContentCarousel
@@ -284,7 +291,6 @@ const MovieDetailPage = () => {
         />
       </div>
 
-      {/* Footer */}
       <MovieDetailPageFooter />
     </div>
   );

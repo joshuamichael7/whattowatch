@@ -1078,9 +1078,11 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
                               ? `/movie/${rec.imdb_id}`
                               : `/search?q=${encodeURIComponent(rec.title)}`
                           }
+                          state={{ fromRecommendations: true }}
                         >
                           <Film className="h-3 w-3 mr-1" />
                           Details
+                          <ArrowRight className="ml-1 h-3 w-3" />
                         </Link>
                       </Button>
                     </h3>
