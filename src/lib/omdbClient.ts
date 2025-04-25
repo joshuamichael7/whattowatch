@@ -1138,29 +1138,7 @@ async function processAiRecommendations(
         }
       }
 
-      // If title search didn't work and we have an IMDB ID, try that as fallback
-      if (aiTitle.imdb_id) {
-        console.log(
-          `[DEBUG] Title search failed, trying IMDB ID: "${aiTitle.imdb_id}"`,
-        );
-
-        // Use the direct OMDB API call, not the Supabase lookup
-        const params = new URLSearchParams({
-          i: aiTitle.imdb_id,
-          plot: "full",
-        });
-
-        const data = await fetchFromOmdb(params);
-        if (data) {
-          // Verify the title from IMDB ID lookup matches the AI-suggested title
-          const titleMatches = isTitleMatch(data.Title, aiTitle.title);
-          if (!titleMatches) {
-            console.log(
-              `[processAiRecommendations] Title mismatch for IMDB ID ${aiTitle.imdb_id}: AI suggested "${aiTitle.title}" but OMDB returned "${data.Title}"`,
-            );
-            // Skip this recommendation due to title mismatch
-            continue;
-          }
+      // We already tried IMDB ID at the beginning, so we don't need this section anymore
 
           // Format the OMDB data directly
           const contentItem: ContentItem = {

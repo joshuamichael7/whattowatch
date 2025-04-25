@@ -129,7 +129,7 @@ exports.handler = async (event, context) => {
     // Parse the request body
     const {
       preferences,
-      limit = 10,
+      limit = 20, // Increased to 20 to allow for filtering
       apiVersion,
       modelName,
     } = JSON.parse(event.body || "{}");
@@ -179,14 +179,17 @@ exports.handler = async (event, context) => {
     - Content they want to avoid: ${avoidText || "No examples provided"}\n
     - Age/content rating preference: ${preferences.ageRating}\n\n
     Please recommend exactly ${limit} movies or TV shows that match these preferences. For each recommendation, provide:\n
-    1. The exact title\n
-    2. A brief reason why it matches their preferences (1-2 sentences)\n\n
-    Format your response as a JSON array with title and reason properties for each recommendation. Example:\n
+    1. The exact title as it appears in IMDB\n
+    2. The year of release in parentheses\n
+    3. The IMDB ID in square brackets - this is REQUIRED and MUST be in the format tt followed by numbers (e.g., tt0111161)\n
+    4. A brief reason why it matches their preferences (1-2 sentences)\n\n
+    Format your response as a JSON array with title, year, imdb_id, and reason properties for each recommendation. Example:\n
     [\n
-      {"title": "Movie Title", "reason": "Reason this matches their preferences"},\n
-      {"title": "Another Title", "reason": "Another reason"}\n
+      {"title": "The Shawshank Redemption", "year": "1994", "imdb_id": "tt0111161", "reason": "A powerful drama about hope and redemption that matches your preference for thoughtful storytelling."},\n
+      {"title": "Inception", "year": "2010", "imdb_id": "tt1375666", "reason": "A mind-bending sci-fi thriller that aligns with your interest in complex narratives."}\n
     ]\n
     \n
+    CRITICAL: The IMDB ID is REQUIRED for each recommendation and must be accurate for proper content identification.\n
     Only return the JSON array, no other text.`;
 
     // Construct the API endpoint URL

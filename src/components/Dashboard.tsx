@@ -168,7 +168,7 @@ const Dashboard = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ preferences, limit: 20 }),
+        body: JSON.stringify({ preferences, limit: 30 }), // Increased to 30 for even more filtering options
       });
 
       if (!response.ok) {

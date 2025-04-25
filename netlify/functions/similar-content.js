@@ -82,7 +82,7 @@ exports.handler = async (event, context) => {
     CRITICAL: For each recommendation, you MUST include:
     1. The EXACT title as it appears in IMDB
     2. The year in parentheses
-    3. The IMDB ID in square brackets
+    3. The IMDB ID in square brackets - this is REQUIRED and MUST be in the format tt followed by numbers (e.g., tt0111161)
     4. A brief reason why this content is similar to "${title}"
     
     Format each recommendation as follows:
@@ -94,7 +94,7 @@ exports.handler = async (event, context) => {
     
     IMPORTANT: Use the EXACT title spelling and formatting as it appears in IMDB.
     CRITICAL: Include the year in parentheses after each title.
-    CRITICAL: Include the IMDB ID in square brackets after the year.
+    CRITICAL: Include the IMDB ID in square brackets after the year - this is REQUIRED for accurate identification.
     CRITICAL: After the IMDB ID, include " - Reason: " followed by a specific explanation.`;
 
     // Construct the API endpoint URL

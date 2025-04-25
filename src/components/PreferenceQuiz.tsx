@@ -159,7 +159,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
         },
         body: JSON.stringify({
           preferences: aiServicePreferences,
-          limit: 10,
+          limit: 20, // Request 20 recommendations to allow for filtering
         }),
       });
 

@@ -124,7 +124,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
         similarTitle,
         "", // No overview provided in this simple flow
         "movie", // Default to movie, could be enhanced to ask for media type
-        10, // Request 10 recommendations for better results
+        20, // Request 20 recommendations to allow for filtering
       );
 
       if (similarContent.length === 0) {
@@ -189,7 +189,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
 
       const randomRecommendations = await getPersonalizedRecommendations(
         randomPreferences,
-        10, // Request 10 recommendations
+        20, // Request 20 recommendations to allow for filtering
       );
 
       if (randomRecommendations.length === 0) {
@@ -259,7 +259,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
       // Call the AI service to get personalized recommendations
       const personalizedRecommendations = await getPersonalizedRecommendations(
         preferences,
-        10, // Request 10 recommendations
+        20, // Request 20 recommendations to allow for filtering
       );
 
       if (personalizedRecommendations.length === 0) {
@@ -323,7 +323,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
 
       const personalizedRecommendations = await getPersonalizedRecommendations(
         savedPreferences,
-        10, // Request 10 recommendations
+        20, // Request 20 recommendations to allow for filtering
       );
 
       if (personalizedRecommendations.length === 0) {

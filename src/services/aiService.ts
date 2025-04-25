@@ -14,7 +14,7 @@ export async function getSimilarContentTitles(
   title: string,
   overview: string,
   mediaType: "movie" | "tv",
-  limit: number = 10,
+  limit: number = 20, // Increased to 20 to allow for filtering
 ): Promise<
   Array<{ title: string; reason: string; imdb_id?: string; year?: string }>
 > {
@@ -56,9 +56,13 @@ export async function getSimilarContentTitles(
       console.log(
         `[aiService] Received ${response.data.titles.length} similar titles from Netlify function (old format)`,
       );
-      return response.data.titles.map((title: string) => ({
-        title,
-        reason: "Similar content based on genre and themes",
+      return response.data.titles.map((title: any) => ({
+        title: title.title || title,
+        reason:
+          title.recommendationReason ||
+          "Similar content based on genre and themes",
+        imdb_id: title.imdb_id || null,
+        year: title.year || null,
       }));
     }
 
@@ -88,7 +92,7 @@ export async function getPersonalizedRecommendations(
     ageRating: string;
     language?: string;
   },
-  limit: number = 10,
+  limit: number = 20, // Increased to 20 to allow for filtering
 ): Promise<
   Array<{ title: string; reason: string; imdb_id?: string; year?: string }>
 > {
