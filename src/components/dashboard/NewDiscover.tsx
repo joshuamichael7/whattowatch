@@ -36,7 +36,8 @@ type QuestionStep =
   | "whatToWatchTime"
   | "whatToWatchFavorites"
   | "whatToWatchAvoid"
-  | "whatToWatchRatings";
+  | "whatToWatchRatings"
+  | "whatToWatchLanguage";
 
 const NewDiscover: React.FC<NewDiscoverProps> = () => {
   const [currentStep, setCurrentStep] = useState<QuestionStep>("initial");
@@ -54,6 +55,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
   const [favoriteContent, setFavoriteContent] = useState("");
   const [contentToAvoid, setContentToAvoid] = useState("");
   const [selectedRatings, setSelectedRatings] = useState<string[]>(["PG-13"]);
+  const [preferredLanguage, setPreferredLanguage] = useState("English");
 
   // Get user auth context to check if user is authenticated and has preferences
   const { user, profile, isAuthenticated } = useAuth();
@@ -80,6 +82,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
     setFavoriteContent("");
     setContentToAvoid("");
     setSelectedRatings(["PG-13"]);
+    setPreferredLanguage("English");
     setSimilarTitle("");
     setError(null);
     setRecommendations([]);
@@ -213,6 +216,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
           .map((item) => item.trim())
           .filter(Boolean),
         ageRating: selectedRatings[0] || "PG-13", // Use the first selected rating or default to PG-13
+        language: preferredLanguage || "English", // Include language preference
       };
 
       // Log the preferences being sent to the API for debugging
@@ -906,12 +910,12 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
               </Button>
               <Button
                 size="lg"
-                className="px-8 group transition-all duration-300"
-                onClick={handleWhatToWatchSubmit}
+                className="px-8"
+                onClick={() => setCurrentStep("whatToWatchLanguage")}
                 disabled={selectedRatings.length === 0}
               >
-                Get Recommendations
-                <Sparkles className="ml-2 h-5 w-5" />
+                Next
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </div>
           </motion.div>
@@ -935,14 +939,14 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-6">
               {[
                 "English",
-                "Spanish",
-                "French",
-                "German",
-                "Italian",
-                "Japanese",
                 "Korean",
+                "Spanish",
+                "Japanese",
+                "French",
                 "Chinese",
                 "Hindi",
+                "German",
+                "Italian",
                 "Any Language (with subtitles)",
               ].map((language) => (
                 <Button
