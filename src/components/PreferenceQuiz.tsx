@@ -268,7 +268,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <>
             <CardHeader>
               <CardTitle className="text-2xl font-heading font-bold">
-                What genres are you in the mood for?
+                What genres are you in the mood for tonight?
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -302,7 +302,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <>
             <CardHeader className="pb-2">
               <CardTitle className="text-2xl font-heading font-bold">
-                What are you in the mood to watch?
+                What kind of vibe are you looking for tonight?
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-2 font-medium">
                 Select all that apply
@@ -339,7 +339,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <>
             <CardHeader>
               <CardTitle className="text-2xl font-heading font-bold">
-                How much time do you have?
+                How much time do you have available tonight?
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -372,18 +372,17 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <>
             <CardHeader>
               <CardTitle className="text-2xl font-heading font-bold">
-                What content have you enjoyed?
+                What content are you thinking about watching tonight?
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-2">
-                List movies, TV shows, or genres you've enjoyed (comma
-                separated)
+                List movies, TV shows, or genres you've liked (comma separated)
               </p>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="grid w-full gap-1.5">
                   <Label htmlFor="favorite-content" className="font-medium">
-                    Your favorites
+                    Content you're considering
                   </Label>
                   <textarea
                     id="favorite-content"
@@ -405,17 +404,18 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <>
             <CardHeader>
               <CardTitle className="text-2xl font-heading font-bold">
-                What kind of content do you want to avoid?
+                What are you definitely NOT in the mood for tonight?
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-2">
-                List movies, TV shows, or genres you dislike (comma separated)
+                List movies, TV shows, or genres you don't want to see right now
+                (comma separated)
               </p>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="grid w-full gap-1.5">
                   <Label htmlFor="avoid-content" className="font-medium">
-                    Content to avoid
+                    Content to avoid tonight
                   </Label>
                   <textarea
                     id="avoid-content"
@@ -435,7 +435,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <>
             <CardHeader>
               <CardTitle className="text-2xl font-heading font-bold">
-                What ratings are acceptable?
+                What content ratings are you comfortable with tonight?
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-2">
                 Select all that apply
@@ -472,7 +472,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <>
             <CardHeader>
               <CardTitle className="text-2xl font-heading font-bold">
-                Do you have any language preferences?
+                Do you have any language preferences for tonight?
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -515,7 +515,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <>
             <CardHeader>
               <CardTitle className="text-2xl font-heading font-bold">
-                How recent should the content be?
+                How recent should tonight's content be?
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">

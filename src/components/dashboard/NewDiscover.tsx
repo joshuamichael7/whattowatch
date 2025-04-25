@@ -35,7 +35,8 @@ type QuestionStep =
   | "whatToWatchMood"
   | "whatToWatchTime"
   | "whatToWatchFavorites"
-  | "whatToWatchAvoid";
+  | "whatToWatchAvoid"
+  | "whatToWatchRatings";
 
 const NewDiscover: React.FC<NewDiscoverProps> = () => {
   const [currentStep, setCurrentStep] = useState<QuestionStep>("initial");
@@ -52,6 +53,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
   const [viewingTime, setViewingTime] = useState(90); // Default to 90 minutes
   const [favoriteContent, setFavoriteContent] = useState("");
   const [contentToAvoid, setContentToAvoid] = useState("");
+  const [selectedRatings, setSelectedRatings] = useState<string[]>(["PG-13"]);
 
   // Get user auth context to check if user is authenticated and has preferences
   const { user, profile, isAuthenticated } = useAuth();
@@ -77,6 +79,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
     setViewingTime(90);
     setFavoriteContent("");
     setContentToAvoid("");
+    setSelectedRatings(["PG-13"]);
     setSimilarTitle("");
     setError(null);
     setRecommendations([]);
@@ -208,7 +211,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
           .split(",")
           .map((item) => item.trim())
           .filter(Boolean),
-        ageRating: "PG-13", // Default value, could be enhanced with a selection step
+        ageRating: selectedRatings[0] || "PG-13", // Use the first selected rating or default to PG-13
       };
 
       // Log the preferences being sent to the API for debugging
@@ -516,7 +519,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
             className="text-center space-y-8 max-w-2xl mx-auto"
           >
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight font-heading">
-              What genres do you enjoy?
+              What genres are you in the mood for right now?
             </h1>
             <p className="text-xl text-muted-foreground">
               Select all that apply
@@ -594,7 +597,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
             className="text-center space-y-8 max-w-2xl mx-auto"
           >
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight font-heading">
-              What mood are you in today?
+              What kind of vibe are you looking for tonight?
             </h1>
             <p className="text-xl text-muted-foreground">
               Choose the vibe you're looking for
@@ -658,7 +661,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
             className="text-center space-y-8 max-w-2xl mx-auto"
           >
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight font-heading">
-              How much time do you have?
+              How much time do you have available tonight?
             </h1>
             <p className="text-xl text-muted-foreground">
               Select your preferred viewing time
@@ -762,10 +765,10 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
             className="text-center space-y-8 max-w-2xl mx-auto"
           >
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight font-heading">
-              What are some movies or shows you love?
+              What kind of content have you enjoyed in the past?
             </h1>
             <p className="text-xl text-muted-foreground">
-              Enter titles separated by commas (optional)
+              List movies, TV shows, or genres you've liked (comma separated)
             </p>
 
             <div className="pt-6">
@@ -810,10 +813,11 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
             className="text-center space-y-8 max-w-2xl mx-auto"
           >
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight font-heading">
-              Any content you want to avoid?
+              What are you definitely NOT in the mood for tonight?
             </h1>
             <p className="text-xl text-muted-foreground">
-              Enter titles or themes separated by commas (optional)
+              List movies, TV shows, or genres you want to avoid right now
+              (comma separated)
             </p>
 
             <div className="pt-6">
@@ -839,8 +843,69 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
               </Button>
               <Button
                 size="lg"
+                className="px-8"
+                onClick={() => setCurrentStep("whatToWatchRatings")}
+              >
+                Next
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </div>
+          </motion.div>
+        );
+
+      case "whatToWatchRatings":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="text-center space-y-8 max-w-2xl mx-auto"
+          >
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight font-heading">
+              What content ratings are you comfortable with tonight?
+            </h1>
+            <p className="text-xl text-muted-foreground">
+              Select all that apply
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6">
+              {["G", "PG", "PG-13", "R", "TV-Y", "TV-PG", "TV-14", "TV-MA"].map(
+                (rating) => (
+                  <Button
+                    key={rating}
+                    variant={
+                      selectedRatings.includes(rating) ? "default" : "outline"
+                    }
+                    className={`h-auto py-3 ${selectedRatings.includes(rating) ? "border-2 border-primary" : ""}`}
+                    onClick={() => {
+                      if (selectedRatings.includes(rating)) {
+                        setSelectedRatings(
+                          selectedRatings.filter((r) => r !== rating),
+                        );
+                      } else {
+                        setSelectedRatings([...selectedRatings, rating]);
+                      }
+                    }}
+                  >
+                    {rating}
+                  </Button>
+                ),
+              )}
+            </div>
+
+            <div className="flex gap-4 justify-center pt-6">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setCurrentStep("whatToWatchAvoid")}
+              >
+                Back
+              </Button>
+              <Button
+                size="lg"
                 className="px-8 group transition-all duration-300"
-                onClick={() => (window.location.href = "/dashboard")}
+                onClick={handleWhatToWatchSubmit}
+                disabled={selectedRatings.length === 0}
               >
                 Get Recommendations
                 <Sparkles className="ml-2 h-5 w-5" />
@@ -997,6 +1062,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
           </button>
         </motion.div>
       )}
+
       <div className="relative overflow-hidden">
         {/* Background gradient similar to homepage */}
         <div className="absolute inset-0 bg-gradient-radial from-primary/10 via-background to-background z-0" />
