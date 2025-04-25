@@ -1064,17 +1064,27 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
                     whileHover={{ scale: 1.02 }}
                     className="bg-card border border-border p-4 rounded-lg text-left hover:border-primary/50 transition-all"
                   >
-                    <h3 className="text-xl font-semibold flex items-center">
-                      <span className="mr-2">{rec.title}</span>
-                      <Link
-                        to={`/search?q=${encodeURIComponent(rec.title)}`}
-                        className="text-primary hover:text-primary/80 text-sm inline-flex items-center"
+                    <h3 className="text-xl font-semibold flex items-center justify-between">
+                      <span>{rec.title}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                        className="ml-2"
                       >
-                        <Search className="h-3 w-3 mr-1" />
-                        Find
-                      </Link>
+                        <Link
+                          to={
+                            rec.imdb_id
+                              ? `/movie/${rec.imdb_id}`
+                              : `/search?q=${encodeURIComponent(rec.title)}`
+                          }
+                        >
+                          <Film className="h-3 w-3 mr-1" />
+                          Details
+                        </Link>
+                      </Button>
                     </h3>
-                    <p className="text-muted-foreground">{rec.reason}</p>
+                    <p className="text-muted-foreground mt-2">{rec.reason}</p>
                   </motion.div>
                 ))
               ) : (

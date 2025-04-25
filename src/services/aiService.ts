@@ -15,7 +15,9 @@ export async function getSimilarContentTitles(
   overview: string,
   mediaType: "movie" | "tv",
   limit: number = 10,
-): Promise<Array<{ title: string; reason: string }>> {
+): Promise<
+  Array<{ title: string; reason: string; imdb_id?: string; year?: string }>
+> {
   try {
     console.log("[aiService] Using Netlify function for similar content");
     const response = await axios.post(
@@ -86,7 +88,9 @@ export async function getPersonalizedRecommendations(
     ageRating: string;
   },
   limit: number = 10,
-): Promise<Array<{ title: string; reason: string }>> {
+): Promise<
+  Array<{ title: string; reason: string; imdb_id?: string; year?: string }>
+> {
   try {
     console.log("[aiService] Using Netlify function for recommendations");
     const response = await axios.post(
