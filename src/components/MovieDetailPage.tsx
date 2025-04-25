@@ -50,6 +50,14 @@ const MovieDetailPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [fromRecommendations, setFromRecommendations] = useState(false);
 
+  // Check if user came from recommendations page
+  useEffect(() => {
+    // Check if there are recommendations in localStorage
+    const hasRecommendations =
+      localStorage.getItem("userRecommendations") !== null;
+    setFromRecommendations(hasRecommendations);
+  }, []);
+
   useEffect(() => {
     const fetchMovieDetails = async () => {
       if (!id) return;

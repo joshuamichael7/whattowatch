@@ -3,6 +3,7 @@ import { useRoutes, Routes, Route, Navigate } from "react-router-dom";
 import Home from "./components/home";
 import Dashboard from "./components/Dashboard";
 import MovieDetailPage from "./components/MovieDetailPage";
+import SimilarContentSearch from "./components/SimilarContentSearch";
 import routes from "tempo-routes";
 import { ThemeProvider } from "./components/theme-provider";
 import { ThemeToggle } from "./components/ui/theme-toggle";
@@ -35,6 +36,7 @@ function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/movie/:id" element={<MovieDetailPage />} />
               <Route path="/tv/:id" element={<MovieDetailPage />} />
+              <Route path="/search" element={<SimilarContentSearch />} />
               <Route path="/login" element={<Auth />} />
               <Route path="/register" element={<Auth />} />
               <Route path="/auth" element={<Auth />} />
@@ -55,6 +57,9 @@ function App() {
                 element={<SupabaseConnectionTest />}
               />
               <Route path="/user-dashboard" element={<UserDashboard />} />
+              {import.meta.env.VITE_TEMPO === "true" && (
+                <Route path="/tempobook/*" />
+              )}
             </Routes>
           </>
         </Suspense>

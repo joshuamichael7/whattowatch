@@ -44,7 +44,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
   const [similarTitle, setSimilarTitle] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [recommendations, setRecommendations] = useState<
-    Array<{ title: string; reason: string }>
+    Array<{ title: string; reason: string; imdb_id?: string; year?: string }>
   >([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,6 +63,25 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
 
   // Track screen size for responsive adjustments
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
+
+  // Check for saved recommendations on component mount
+  useEffect(() => {
+    const savedRecommendations = localStorage.getItem("userRecommendations");
+    if (savedRecommendations) {
+      try {
+        const parsedRecommendations = JSON.parse(savedRecommendations);
+        if (
+          Array.isArray(parsedRecommendations) &&
+          parsedRecommendations.length > 0
+        ) {
+          setRecommendations(parsedRecommendations);
+          setCurrentStep("results");
+        }
+      } catch (error) {
+        console.error("Error parsing saved recommendations:", error);
+      }
+    }
+  }, []);
 
   // Listen for window resize events
   useEffect(() => {
@@ -86,6 +105,9 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
     setSimilarTitle("");
     setError(null);
     setRecommendations([]);
+
+    // Clear saved recommendations
+    localStorage.removeItem("userRecommendations");
   };
 
   const handleSimilarTitleSubmit = async (e: React.FormEvent) => {
@@ -108,6 +130,12 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
       if (similarContent.length === 0) {
         throw new Error("No similar content found. Try a different title.");
       }
+
+      // Save recommendations to localStorage for persistence
+      localStorage.setItem(
+        "userRecommendations",
+        JSON.stringify(similarContent),
+      );
 
       setRecommendations(similarContent);
       setCurrentStep("results");
@@ -161,12 +189,18 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
 
       const randomRecommendations = await getPersonalizedRecommendations(
         randomPreferences,
-        5,
+        10, // Request 10 recommendations
       );
 
       if (randomRecommendations.length === 0) {
         throw new Error("No recommendations found. Please try again.");
       }
+
+      // Save recommendations to localStorage for persistence
+      localStorage.setItem(
+        "userRecommendations",
+        JSON.stringify(randomRecommendations),
+      );
 
       setRecommendations(randomRecommendations);
       setCurrentStep("results");
@@ -225,7 +259,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
       // Call the AI service to get personalized recommendations
       const personalizedRecommendations = await getPersonalizedRecommendations(
         preferences,
-        5,
+        10, // Request 10 recommendations
       );
 
       if (personalizedRecommendations.length === 0) {
@@ -233,6 +267,12 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
           "No recommendations found based on your preferences. Try adjusting your criteria.",
         );
       }
+
+      // Save recommendations to localStorage for persistence
+      localStorage.setItem(
+        "userRecommendations",
+        JSON.stringify(personalizedRecommendations),
+      );
 
       setRecommendations(personalizedRecommendations);
       setCurrentStep("results");
@@ -283,7 +323,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
 
       const personalizedRecommendations = await getPersonalizedRecommendations(
         savedPreferences,
-        5,
+        10, // Request 10 recommendations
       );
 
       if (personalizedRecommendations.length === 0) {
@@ -291,6 +331,12 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
           "No recommendations found based on your preferences. Try adjusting your preferences.",
         );
       }
+
+      // Save recommendations to localStorage for persistence
+      localStorage.setItem(
+        "userRecommendations",
+        JSON.stringify(personalizedRecommendations),
+      );
 
       setRecommendations(personalizedRecommendations);
       setCurrentStep("results");
@@ -1110,7 +1156,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
               <Button
                 size="lg"
                 className="px-8 group transition-all duration-300"
-                onClick={() => (window.location.href = "/dashboard")}
+                onClick={() => setCurrentStep("results")}
               >
                 View All Recommendations
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />

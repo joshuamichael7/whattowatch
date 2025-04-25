@@ -86,6 +86,7 @@ export async function getPersonalizedRecommendations(
     favoriteContent: string[];
     contentToAvoid: string[];
     ageRating: string;
+    language?: string;
   },
   limit: number = 10,
 ): Promise<
