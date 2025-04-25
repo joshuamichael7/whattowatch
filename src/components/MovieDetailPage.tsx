@@ -118,7 +118,61 @@ const MovieDetailPage = () => {
             console.log(
               `No match in Supabase, getting from OMDB by IMDB ID: ${id}`,
             );
-            movieData = await getContentById(id);
+            // Use the OMDB API directly with the i parameter
+            const params = new URLSearchParams({
+              i: id,
+              plot: "full",
+            });
+            const response = await fetch(
+              `/.netlify/functions/omdb?${params.toString()}`,
+            );
+            const data = await response.json();
+
+            if (data && data.Response === "True") {
+              // Format the OMDB data
+              movieData = {
+                id: data.imdbID,
+                imdb_id: data.imdbID,
+                title: data.Title,
+                poster_path: data.Poster !== "N/A" ? data.Poster : "",
+                media_type: data.Type === "movie" ? "movie" : "tv",
+                release_date:
+                  data.Released !== "N/A" ? data.Released : data.Year,
+                vote_average:
+                  data.imdbRating !== "N/A" ? parseFloat(data.imdbRating) : 0,
+                vote_count:
+                  data.imdbVotes !== "N/A"
+                    ? parseInt(data.imdbVotes.replace(/,/g, ""))
+                    : 0,
+                genre_ids: [],
+                genre_strings: data.Genre?.split(", ") || [],
+                overview: data.Plot !== "N/A" ? data.Plot : "",
+                content_rating: data.Rated !== "N/A" ? data.Rated : "",
+              };
+
+              // Store in Supabase for future use
+              try {
+                console.log(`Storing content in Supabase: ${movieData.title}`);
+                await supabase.from("content").insert({
+                  id: movieData.id,
+                  imdb_id: movieData.imdb_id,
+                  title: movieData.title,
+                  overview: movieData.overview,
+                  poster_path: movieData.poster_path,
+                  release_date: movieData.release_date,
+                  vote_average: movieData.vote_average,
+                  vote_count: movieData.vote_count,
+                  media_type: movieData.media_type,
+                  genre_strings: movieData.genre_strings,
+                  content_rating: movieData.content_rating,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                });
+              } catch (storeError) {
+                console.error("Error storing content in Supabase:", storeError);
+                // Continue even if storage fails
+              }
+            }
           }
         } else {
           // If it's not an IMDB ID, assume it's a title

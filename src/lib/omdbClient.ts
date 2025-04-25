@@ -2,6 +2,7 @@ import { getEnvVar } from "../lib/utils";
 import {
   getContentByIdFromSupabase,
   searchContentInSupabase,
+  getContentByImdbIdFromSupabase,
 } from "../lib/supabaseClient";
 
 // Use only regular Netlify functions for all OMDB API calls
@@ -490,9 +491,6 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     if (isImdbId) {
       // If it's an IMDB ID, try to find it by imdb_id field in Supabase
       console.log(`[omdbClient] Looking up IMDB ID: ${id} in Supabase`);
-      const { getContentByImdbIdFromSupabase } = await import(
-        "../lib/supabaseClient"
-      );
       supabaseContent = await getContentByImdbIdFromSupabase(id);
     } else {
       // Otherwise try to find it by UUID in Supabase only if it looks like a UUID
@@ -1561,263 +1559,58 @@ export async function getTrendingContent(
 
       if (supabaseResults && supabaseResults.length > 0) {
         console.log(
-          `[getTrendingContent] Using results from Supabase (may include curated content)`,
+          `[getTrendingContent] Using results from Supabase (${supabaseResults.length} items)`,
         );
-        if (supabaseResults.length > 0) {
-          console.log(
-            `[getTrendingContent] First result: ${supabaseResults[0].id}, ${supabaseResults[0].title}`,
-          );
-        }
         return supabaseResults;
       }
-
-      console.log(
-        `[getTrendingContent] No results from Supabase, falling back to Netlify function`,
-      );
     } catch (error) {
       console.error(
-        `[getTrendingContent] Error getting content from Supabase:`,
+        `[getTrendingContent] Error getting trending content from Supabase:`,
         error,
       );
-      console.log(
-        `[getTrendingContent] Falling back to Netlify function due to error`,
-      );
+      // Continue to fallback if Supabase fails
     }
   }
 
-  return getTrendingContentFallback(type, limit);
-}
-
-// Fallback function to get trending content using the regular Netlify function
-async function getTrendingContentFallback(
-  type?: "movie" | "tv",
-  limit = 8,
-): Promise<ContentItem[]> {
-  console.log(
-    `[getTrendingContentFallback] Fetching ${type || "all"} content using regular function`,
-  );
-  const startTime = performance.now();
-
+  // Fallback to Netlify function if Supabase fails or returns no results
   try {
-    // Use the regular Netlify function as fallback
-    const params = new URLSearchParams({
-      trending: "true",
-      limit: limit.toString(),
-    });
-
+    console.log(
+      `[getTrendingContent] Falling back to Netlify function for trending content`,
+    );
+    const params = new URLSearchParams();
     if (type) {
       params.append("type", type);
     }
+    params.append("limit", limit.toString());
 
-    // Fetch content from the regular function
-    console.log(
-      `[getTrendingContentFallback] Calling Netlify function with params: ${params.toString()}`,
+    const response = await fetch(
+      `/.netlify/functions/trending?${params.toString()}`,
     );
-    const response = await fetch(`${API_ENDPOINT}?${params.toString()}`);
-
     if (!response.ok) {
       throw new Error(`Function returned status: ${response.status}`);
     }
 
     const data = await response.json();
-    const endTime = performance.now();
-    console.log(
-      `[getTrendingContentFallback] API fetch completed in ${endTime - startTime}ms`,
-    );
+    if (!data || !data.results || !Array.isArray(data.results)) {
+      console.error(
+        `[getTrendingContent] Invalid response from Netlify function:`,
+        data,
+      );
+      return [];
+    }
 
-    return processTrendingResults(data, limit);
+    console.log(
+      `[getTrendingContent] Netlify function returned ${data.results.length} results`,
+    );
+    return data.results;
   } catch (error) {
     console.error(
-      `[getTrendingContentFallback] Error fetching content:`,
+      `[getTrendingContent] Error getting trending content from Netlify function:`,
       error,
     );
     return [];
   }
 }
 
-// Process trending results from API
-function processTrendingResults(data: any, limit: number): ContentItem[] {
-  // Check if we have results in the expected format
-  if (
-    data &&
-    data.results &&
-    Array.isArray(data.results) &&
-    data.results.length > 0
-  ) {
-    console.log(
-      `[getTrendingContentFallback] Received ${data.results.length} results`,
-    );
-
-    // Format the results to match ContentItem format
-    const formattedResults = data.results.map((item) => ({
-      id: item.id || item.imdbID,
-      title: item.title || item.Title,
-      poster_path:
-        item.poster_path || (item.Poster !== "N/A" ? item.Poster : ""),
-      media_type: item.media_type || (item.Type === "movie" ? "movie" : "tv"),
-      release_date: item.release_date || item.Year,
-      vote_average: item.vote_average || 0,
-      vote_count: item.vote_count || 0,
-      genre_ids: item.genre_ids || [],
-      overview: item.overview || "",
-    }));
-
-    // Filter out items without valid poster URLs or with suspicious titles
-    const validResults = formattedResults.filter((item) => {
-      // Check if poster URL is valid
-      const hasValidPoster =
-        item &&
-        item.poster_path &&
-        item.poster_path.trim() !== "" &&
-        !item.poster_path.includes("null") &&
-        item.poster_path !== "N/A";
-
-      // Check if title is suspicious (too long or contains multiple titles)
-      const hasSuspiciousTitle =
-        item?.title &&
-        (item.title.length > 50 ||
-          item.title.includes(",") ||
-          item.title.includes(";") ||
-          item.title.includes("|") ||
-          item.title.includes(" - "));
-
-      if (!hasValidPoster) {
-        console.log(
-          `[getSimilarContent] Filtering out item with invalid poster: ${item?.title || "unknown"}, poster: ${item?.poster_path || "none"}`,
-        );
-      }
-
-      if (hasSuspiciousTitle) {
-        console.log(
-          `[getSimilarContent] Filtering out item with suspicious title: ${item?.title}`,
-        );
-      }
-
-      return hasValidPoster && !hasSuspiciousTitle;
-    });
-
-    console.log(
-      `[getTrendingContentFallback] Filtered ${formattedResults.length - validResults.length} invalid items`,
-    );
-
-    return validResults;
-  }
-
-  return [];
-}
-
-// Helper function to update genre information for content items missing genres
-export async function updateMissingGenres(): Promise<{
-  updated: number;
-  failed: number;
-}> {
-  console.log(
-    "[updateMissingGenres] Starting to update content items with missing genres",
-  );
-
-  try {
-    // Import Supabase client
-    const { supabase } = await import("./supabaseClient");
-
-    // Find content without genres
-    const { data: contentWithoutGenres, error: findError } = await supabase.rpc(
-      "find_content_without_genres",
-    );
-
-    if (findError) {
-      console.error(
-        "[updateMissingGenres] Error finding content without genres:",
-        findError,
-      );
-      return { updated: 0, failed: 0 };
-    }
-
-    console.log(
-      `[updateMissingGenres] Found ${contentWithoutGenres.length} content items without genres`,
-    );
-
-    let updatedCount = 0;
-    let failedCount = 0;
-
-    // Process each item in batches to avoid rate limiting
-    for (let i = 0; i < contentWithoutGenres.length; i++) {
-      const item = contentWithoutGenres[i];
-      try {
-        // Get updated content from OMDB
-        console.log(
-          `[updateMissingGenres] Processing ${i + 1}/${contentWithoutGenres.length}: ${item.title}`,
-        );
-
-        // Use the imdb_id if available, otherwise use the title
-        let updatedContent;
-        if (item.imdb_id) {
-          updatedContent = await getContentById(item.imdb_id);
-        } else {
-          // Search by title and get the first result
-          const searchResults = await searchContent(
-            item.title,
-            item.media_type as any,
-          );
-          updatedContent =
-            searchResults.length > 0
-              ? await getContentById(searchResults[0].id)
-              : null;
-        }
-
-        if (
-          updatedContent &&
-          updatedContent.genre_strings &&
-          updatedContent.genre_strings.length > 0
-        ) {
-          // Update the content in Supabase
-          const { error: updateError } = await supabase.rpc(
-            "update_content_genres",
-            {
-              p_id: item.id,
-              p_genre_strings: updatedContent.genre_strings,
-              p_genre_ids: updatedContent.genre_ids,
-            },
-          );
-
-          if (updateError) {
-            console.error(
-              `[updateMissingGenres] Error updating genres for ${item.title}:`,
-              updateError,
-            );
-            failedCount++;
-          } else {
-            console.log(
-              `[updateMissingGenres] Successfully updated genres for ${item.title}`,
-            );
-            updatedCount++;
-          }
-        } else {
-          console.log(
-            `[updateMissingGenres] No genre information found for ${item.title}`,
-          );
-          failedCount++;
-        }
-
-        // Add a small delay to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      } catch (itemError) {
-        console.error(
-          `[updateMissingGenres] Error processing ${item.title}:`,
-          itemError,
-        );
-        failedCount++;
-      }
-    }
-
-    console.log(
-      `[updateMissingGenres] Completed: Updated ${updatedCount} items, Failed ${failedCount} items`,
-    );
-    return { updated: updatedCount, failed: failedCount };
-  } catch (error) {
-    console.error(
-      "[updateMissingGenres] Error updating missing genres:",
-      error,
-    );
-    return { updated: 0, failed: 0 };
-  }
-}
+// Import ContentItem type
+import { ContentItem } from "../types/omdb";

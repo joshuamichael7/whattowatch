@@ -280,6 +280,48 @@ export async function getContentByIdFromSupabase(
 }
 
 /**
+ * Get content by IMDB ID from Supabase
+ */
+export async function getContentByImdbIdFromSupabase(
+  imdbId: string,
+): Promise<ContentItem | null> {
+  try {
+    console.log(`[supabaseClient] Getting content by IMDB ID: ${imdbId}`);
+
+    const { data, error } = await supabase
+      .from("content")
+      .select("*")
+      .eq("imdb_id", imdbId)
+      .limit(1);
+
+    if (error) {
+      console.error(
+        `[supabaseClient] Error getting content by IMDB ID: ${imdbId}`,
+        error,
+      );
+      return null;
+    }
+
+    if (!data || data.length === 0) {
+      console.log(`[supabaseClient] No content found for IMDB ID: ${imdbId}`);
+      return null;
+    }
+
+    console.log(
+      `[supabaseClient] Found content for IMDB ID: ${imdbId}`,
+      data[0].title,
+    );
+    return data[0] as ContentItem;
+  } catch (error) {
+    console.error(
+      `[supabaseClient] Error getting content by IMDB ID: ${imdbId}`,
+      error,
+    );
+    return null;
+  }
+}
+
+/**
  * Add content to Supabase database
  */
 // Helper function to generate UUID
