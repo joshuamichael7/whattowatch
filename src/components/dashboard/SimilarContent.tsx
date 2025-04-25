@@ -24,20 +24,29 @@ const SimilarContent: React.FC<SimilarContentProps> = ({
 
   if (hasError) {
     return (
-      <div className="p-6 max-w-md mx-auto bg-card rounded-lg shadow-md">
-        <h2 className="text-xl font-bold mb-4 text-destructive">
+      <div className="p-6 max-w-md mx-auto bg-card rounded-lg shadow-md font-body">
+        <h2 className="text-xl font-bold mb-4 text-destructive font-heading">
           Something went wrong
         </h2>
-        <p className="mb-4 text-muted-foreground">
+        <p className="mb-4 text-muted-foreground font-body">
           There was an error loading the similar content feature.
         </p>
-        <Button onClick={handleReset}>Try again</Button>
+        <Button
+          onClick={handleReset}
+          className="transition-all duration-200 hover:scale-105 hover:shadow-md"
+        >
+          Try again
+        </Button>
       </div>
     );
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="font-body bg-background"
+    >
       <ErrorBoundary>
         <SimilarContentSearch
           onSelectItem={onSelectItem}

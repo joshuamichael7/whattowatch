@@ -48,7 +48,6 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
     releaseYearRange: { min: 1980, max: new Date().getFullYear() },
   });
 
-  // Add loading and error states for AI recommendations
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,13 +127,10 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
   };
 
   const handlePreferenceComplete = async () => {
-    // Reset error state and set loading to true
     setError(null);
     setIsLoading(true);
 
-    // Try to use enhanced recommendation engine if available
     try {
-      // Convert preferences to the format expected by the AI service
       const aiServicePreferences = {
         genres: preferences.genres,
         mood: preferences.moods.join(", "),
@@ -147,8 +143,8 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           .split(",")
           .map((item) => item.trim())
           .filter(Boolean),
-        ageRating: preferences.ageRatings[0] || "PG-13", // Use the first selected rating as primary
-        ageRatings: preferences.ageRatings, // Pass all selected age ratings
+        ageRating: preferences.ageRatings[0] || "PG-13",
+        ageRatings: preferences.ageRatings,
       };
 
       console.log(
@@ -156,7 +152,6 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
         aiServicePreferences,
       );
 
-      // Use Netlify function instead of client-side API call
       const response = await fetch("/.netlify/functions/ai-recommendations", {
         method: "POST",
         headers: {
@@ -175,7 +170,6 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
       const data = await response.json();
       const aiRecommendations = data.recommendations;
 
-      // If we got AI recommendations, add them to the preferences object
       if (aiRecommendations && aiRecommendations.length > 0) {
         console.log("Received AI recommendations:", aiRecommendations);
         const enhancedPreferences = {
@@ -197,10 +191,8 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
       setError(
         "Failed to get AI recommendations. Using default recommendations instead.",
       );
-      // Fall back to regular preferences if AI fails
     }
 
-    // Default behavior if AI recommendations fail or aren't available
     setIsLoading(false);
     onComplete({
       ...preferences,
@@ -271,64 +263,82 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
 
   const renderStep = () => {
     switch (currentStep) {
-      case 0: // Genre Preferences
+      case 0:
         return (
           <>
             <CardHeader>
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-2xl font-heading font-bold">
                 What genres do you enjoy?
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {genres.map((genre) => (
-                <div key={genre} className="flex items-center space-x-2">
+                <div
+                  key={genre}
+                  className="flex items-center space-x-2 hover:bg-accent/10 p-2 rounded-md transition-colors"
+                >
                   <Checkbox
                     id={`genre-${genre}`}
                     checked={preferences.genres.includes(genre)}
                     onCheckedChange={(checked) =>
                       handleGenreChange(genre, checked === true)
                     }
+                    className="border-primary/60"
                   />
-                  <Label htmlFor={`genre-${genre}`}>{genre}</Label>
+                  <Label
+                    htmlFor={`genre-${genre}`}
+                    className="font-medium cursor-pointer"
+                  >
+                    {genre}
+                  </Label>
                 </div>
               ))}
             </CardContent>
           </>
         );
 
-      case 1: // Mood Selection
+      case 1:
         return (
           <>
-            <CardHeader>
-              <CardTitle className="text-2xl">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-2xl font-heading font-bold">
                 What are you in the mood to watch?
               </CardTitle>
-              <p className="text-sm text-muted-foreground mt-2">
+              <p className="text-sm text-muted-foreground mt-2 font-medium">
                 Select all that apply
               </p>
             </CardHeader>
             <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {moods.map((mood) => (
-                <div key={mood} className="flex items-center space-x-2">
+                <div
+                  key={mood}
+                  className="flex items-center space-x-2 hover:bg-accent/10 p-2 rounded-md transition-colors"
+                >
                   <Checkbox
                     id={`mood-${mood}`}
                     checked={preferences.moods.includes(mood.toLowerCase())}
                     onCheckedChange={(checked) =>
                       handleMoodChange(mood.toLowerCase(), checked === true)
                     }
+                    className="border-primary/60"
                   />
-                  <Label htmlFor={`mood-${mood}`}>{mood}</Label>
+                  <Label
+                    htmlFor={`mood-${mood}`}
+                    className="font-medium cursor-pointer"
+                  >
+                    {mood}
+                  </Label>
                 </div>
               ))}
             </CardContent>
           </>
         );
 
-      case 2: // Viewing Time
+      case 2:
         return (
           <>
             <CardHeader>
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-2xl font-heading font-bold">
                 How much time do you have?
               </CardTitle>
             </CardHeader>
@@ -346,7 +356,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
                   onValueChange={handleViewingTimeChange}
                 />
               </div>
-              <div className="text-center font-medium">
+              <div className="text-center font-medium text-primary">
                 {preferences.viewingTime < 60
                   ? `${preferences.viewingTime} minutes`
                   : preferences.viewingTime >= 180
@@ -357,11 +367,11 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           </>
         );
 
-      case 3: // Favorite Content
+      case 3:
         return (
           <>
             <CardHeader>
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-2xl font-heading font-bold">
                 What content have you enjoyed?
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-2">
@@ -372,7 +382,9 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
             <CardContent>
               <div className="space-y-4">
                 <div className="grid w-full gap-1.5">
-                  <Label htmlFor="favorite-content">Your favorites</Label>
+                  <Label htmlFor="favorite-content" className="font-medium">
+                    Your favorites
+                  </Label>
                   <textarea
                     id="favorite-content"
                     value={preferences.favoriteContent}
@@ -388,11 +400,11 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           </>
         );
 
-      case 4: // Content to Avoid
+      case 4:
         return (
           <>
             <CardHeader>
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-2xl font-heading font-bold">
                 What content do you want to avoid?
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-2">
@@ -402,7 +414,9 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
             <CardContent>
               <div className="space-y-4">
                 <div className="grid w-full gap-1.5">
-                  <Label htmlFor="avoid-content">Content to avoid</Label>
+                  <Label htmlFor="avoid-content" className="font-medium">
+                    Content to avoid
+                  </Label>
                   <textarea
                     id="avoid-content"
                     value={preferences.contentToAvoid}
@@ -416,11 +430,11 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           </>
         );
 
-      case 5: // Age Rating
+      case 5:
         return (
           <>
             <CardHeader>
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-2xl font-heading font-bold">
                 What age ratings are acceptable?
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-2">
@@ -429,26 +443,35 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
             </CardHeader>
             <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {ageRatings.map((rating) => (
-                <div key={rating} className="flex items-center space-x-2">
+                <div
+                  key={rating}
+                  className="flex items-center space-x-2 hover:bg-accent/10 p-2 rounded-md transition-colors"
+                >
                   <Checkbox
                     id={`rating-${rating}`}
                     checked={preferences.ageRatings.includes(rating)}
                     onCheckedChange={(checked) =>
                       handleAgeRatingChange(rating, checked === true)
                     }
+                    className="border-primary/60"
                   />
-                  <Label htmlFor={`rating-${rating}`}>{rating}</Label>
+                  <Label
+                    htmlFor={`rating-${rating}`}
+                    className="font-medium cursor-pointer"
+                  >
+                    {rating}
+                  </Label>
                 </div>
               ))}
             </CardContent>
           </>
         );
 
-      case 6: // Language Preference
+      case 6:
         return (
           <>
             <CardHeader>
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-2xl font-heading font-bold">
                 Preferred language for content?
               </CardTitle>
             </CardHeader>
@@ -466,12 +489,20 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
                   "Korean",
                   "Any",
                 ].map((language) => (
-                  <div key={language} className="flex items-center space-x-2">
+                  <div
+                    key={language}
+                    className="flex items-center space-x-2 hover:bg-accent/10 p-2 rounded-md transition-colors"
+                  >
                     <RadioGroupItem
                       value={language}
                       id={`language-${language}`}
                     />
-                    <Label htmlFor={`language-${language}`}>{language}</Label>
+                    <Label
+                      htmlFor={`language-${language}`}
+                      className="font-medium cursor-pointer"
+                    >
+                      {language}
+                    </Label>
                   </div>
                 ))}
               </RadioGroup>
@@ -479,11 +510,11 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           </>
         );
 
-      case 7: // Release Year Range
+      case 7:
         return (
           <>
             <CardHeader>
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-2xl font-heading font-bold">
                 Release year range preference?
               </CardTitle>
             </CardHeader>
@@ -506,7 +537,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
                   minStepsBetweenThumbs={1}
                 />
               </div>
-              <div className="text-center font-medium">
+              <div className="text-center font-medium text-primary">
                 {`${preferences.releaseYearRange?.min || 1980} - ${preferences.releaseYearRange?.max || new Date().getFullYear()}`}
               </div>
             </CardContent>
@@ -519,10 +550,10 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4 bg-background">
+    <div className="w-full max-w-4xl mx-auto p-4 bg-background font-body">
       <Card className="w-full">
         <div className="px-6 pt-6">
-          <Progress value={progress} className="h-2" />
+          <Progress value={progress} className="h-2 bg-muted" />
           <div className="mt-2 text-sm text-muted-foreground text-right">
             Step {currentStep + 1} of {totalSteps}
           </div>
@@ -534,10 +565,13 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
           transition={{ duration: 0.3 }}
+          className="bg-card rounded-md shadow-md"
         >
           {renderStep()}
           {error && currentStep === totalSteps - 1 && (
-            <div className="px-6 py-2 text-sm text-red-500">{error}</div>
+            <div className="px-6 py-2 text-sm text-destructive bg-destructive/10 rounded-md mx-6">
+              {error}
+            </div>
           )}
         </motion.div>
 
@@ -553,6 +587,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <Button
             onClick={nextStep}
             disabled={currentStep === totalSteps - 1 && isLoading}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground transition-all duration-200"
           >
             {currentStep === totalSteps - 1 ? (
               isLoading ? (

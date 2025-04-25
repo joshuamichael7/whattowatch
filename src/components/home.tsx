@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Search as SearchIcon,
   Film,
   ListFilter,
   Loader2,
   RefreshCw,
+  Popcorn,
+  Tv,
+  Sparkles,
+  ArrowRight,
+  UserPlus,
+  X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import Header from "./layout/Header";
@@ -13,6 +19,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { initializeTheme, themeNames, ThemeOption } from "@/lib/themeManager";
 
 // Import the custom hook for trending content
 import { useTrendingContent } from "@/hooks/useTrendingContent";
@@ -44,6 +52,8 @@ const HomePage = () => {
   const [searchIsLoading, setSearchIsLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [hasPreferences, setHasPreferences] = useState(false);
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState<ThemeOption>("default");
 
   // Use the custom hook to fetch trending content
   const { trendingMovies, popularTVShows, isLoading, error, refetch } =
@@ -52,12 +62,25 @@ const HomePage = () => {
   // Get user auth context
   const { user, profile, isAuthenticated } = useAuth();
 
-  // Check if user has preferences
+  // Initialize theme and check user preferences
   useEffect(() => {
+    // Initialize theme with random selection
+    const theme = initializeTheme(true);
+    setCurrentTheme(theme);
+
+    // Show signup prompt for non-authenticated users (with a delay)
+    if (!isAuthenticated) {
+      const timer = setTimeout(() => {
+        setShowSignupPrompt(true);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+
+    // Check if user has preferences
     if (profile?.preferences) {
       setHasPreferences(true);
     }
-  }, [profile]);
+  }, [profile, isAuthenticated]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,38 +117,128 @@ const HomePage = () => {
       {/* Header */}
       <Header />
 
+      {/* Signup Prompt */}
+      <AnimatePresence>
+        {showSignupPrompt && !isAuthenticated && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-20 inset-x-0 z-50 flex justify-center px-4"
+          >
+            <div className="bg-card border border-primary/30 shadow-lg rounded-lg p-4 max-w-md w-full flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="bg-primary/20 p-2 rounded-full mr-3">
+                  <UserPlus className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">Create a free account</p>
+                  <p className="text-sm text-muted-foreground">
+                    Save your preferences and get better recommendations!
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="default" asChild>
+                  <Link to="/register">Sign Up</Link>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowSignupPrompt(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Hero Section */}
-      <section className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-secondary/20 z-0" />
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-radial from-primary/10 via-background to-background z-0" />
+
+        {/* Animated background elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <motion.div
+            className="absolute top-20 left-[10%] text-primary/20 opacity-30"
+            animate={{ y: [0, -15, 0], rotate: [0, 5, 0] }}
+            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <Film size={60} />
+          </motion.div>
+          <motion.div
+            className="absolute bottom-40 right-[15%] text-secondary/20 opacity-30"
+            animate={{ y: [0, 15, 0], rotate: [0, -5, 0] }}
+            transition={{
+              duration: 4,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: 1,
+            }}
+          >
+            <Tv size={50} />
+          </motion.div>
+          <motion.div
+            className="absolute top-1/2 right-[30%] text-accent/20 opacity-30"
+            animate={{ y: [0, 10, 0], rotate: [0, 10, 0] }}
+            transition={{
+              duration: 6,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: 0.5,
+            }}
+          >
+            <Popcorn size={40} />
+          </motion.div>
+        </div>
+
         <div className="container relative z-10 py-20 md:py-32">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="max-w-3xl space-y-4"
+            className="max-w-3xl mx-auto text-center space-y-6"
           >
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
-              Discover your next favorite movie or show
+            <Badge className="mb-4 px-3 py-1 text-sm bg-primary/20 text-primary border-primary/30">
+              {themeNames[currentTheme]} Theme
+            </Badge>
+
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight font-heading">
+              What are you in the mood to watch?
             </h1>
-            <p className="text-xl text-muted-foreground">
-              Get personalized recommendations based on your preferences and
-              favorites.
+
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Let AI help you find your next favorite movie or show based on
+              your unique taste.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+
+            <motion.div
+              className="flex flex-col sm:flex-row gap-4 pt-6 justify-center"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
               <Button
                 size="lg"
+                className="text-lg px-8 py-6 animate-pulse-glow group transition-all duration-300"
                 onClick={() => (window.location.href = "/dashboard")}
               >
-                What to Watch
+                <span>Start Now</span>
+                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </Button>
+
               <Button
                 size="lg"
                 variant="outline"
+                className="text-lg px-8 py-6 group transition-all duration-300"
                 onClick={() => (window.location.href = "/dashboard")}
               >
-                Find Similar Content
+                <Sparkles className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
+                <span>Find Similar</span>
               </Button>
-            </div>
+            </motion.div>
 
             {/* Preference Builder Prompt for users without preferences */}
             {isAuthenticated && !hasPreferences && (
@@ -133,9 +246,9 @@ const HomePage = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
-                className="mt-8 p-6 bg-card border border-border rounded-lg shadow-md"
+                className="mt-12 p-6 bg-card border border-primary/30 rounded-lg shadow-lg max-w-xl mx-auto"
               >
-                <h3 className="text-xl font-semibold mb-2">
+                <h3 className="text-xl font-semibold mb-2 font-heading">
                   Personalize Your Experience
                 </h3>
                 <p className="text-muted-foreground mb-4">
@@ -165,7 +278,7 @@ const HomePage = () => {
 
           <TabsContent value="discover" className="space-y-8">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold tracking-tight">
+              <h2 className="text-2xl font-bold tracking-tight font-heading">
                 Trending Now
               </h2>
               <div className="flex gap-2">
@@ -223,7 +336,7 @@ const HomePage = () => {
             <Separator className="my-8" />
 
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold tracking-tight">
+              <h2 className="text-2xl font-bold tracking-tight font-heading">
                 Popular TV Shows
               </h2>
               <Button variant="outline" size="sm">
@@ -269,7 +382,7 @@ const HomePage = () => {
 
           <TabsContent value="similar" className="space-y-6">
             <div className="max-w-3xl mx-auto">
-              <h2 className="text-2xl font-bold tracking-tight mb-4">
+              <h2 className="text-2xl font-bold tracking-tight mb-4 font-heading">
                 Find Similar Content
               </h2>
               <p className="text-muted-foreground mb-6">
@@ -283,15 +396,19 @@ const HomePage = () => {
                 <input
                   type="text"
                   placeholder="Search for a movie or TV show..."
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-12 w-full rounded-md border border-input bg-background px-4 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   value={searchValue}
                   onChange={(e) => setSearchValue(e.target.value)}
                 />
-                <Button type="submit" disabled={searchIsLoading}>
+                <Button
+                  type="submit"
+                  disabled={searchIsLoading}
+                  className="h-12 px-6"
+                >
                   {searchIsLoading ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                   ) : (
-                    <SearchIcon className="h-4 w-4 mr-2" />
+                    <SearchIcon className="h-5 w-5 mr-2" />
                   )}
                   Search
                 </Button>
@@ -342,7 +459,7 @@ const HomePage = () => {
               </div>
             ) : (
               <div className="mt-12 text-center text-muted-foreground">
-                <Film className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <Film className="h-16 w-16 mx-auto mb-4 opacity-50" />
                 <p>
                   Search for your favorite content to see similar
                   recommendations
@@ -353,7 +470,7 @@ const HomePage = () => {
 
           <TabsContent value="quiz" className="space-y-6">
             <div className="max-w-3xl mx-auto">
-              <h2 className="text-2xl font-bold tracking-tight mb-4">
+              <h2 className="text-2xl font-bold tracking-tight mb-4 font-heading">
                 What to Watch
               </h2>
               <p className="text-muted-foreground mb-6">
@@ -362,10 +479,10 @@ const HomePage = () => {
               </p>
               <Button
                 size="lg"
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto px-8 py-6 text-lg"
                 onClick={() => (window.location.href = "/dashboard")}
               >
-                What to Watch
+                Start Quiz
               </Button>
             </div>
 
@@ -395,14 +512,16 @@ const HomePage = () => {
         <div className="container py-8 md:py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="space-y-3">
-              <h3 className="text-lg font-semibold">MovieMatch</h3>
+              <h3 className="text-lg font-semibold font-heading">MovieMatch</h3>
               <p className="text-sm text-muted-foreground">
                 Discover your next favorite movie or TV show with personalized
                 recommendations.
               </p>
             </div>
             <div>
-              <h4 className="text-sm font-semibold mb-3">Navigation</h4>
+              <h4 className="text-sm font-semibold mb-3 font-heading">
+                Navigation
+              </h4>
               <ul className="space-y-2 text-sm">
                 <li>
                   <a
@@ -431,7 +550,9 @@ const HomePage = () => {
               </ul>
             </div>
             <div>
-              <h4 className="text-sm font-semibold mb-3">Features</h4>
+              <h4 className="text-sm font-semibold mb-3 font-heading">
+                Features
+              </h4>
               <ul className="space-y-2 text-sm">
                 <li>
                   <a
@@ -460,7 +581,7 @@ const HomePage = () => {
               </ul>
             </div>
             <div>
-              <h4 className="text-sm font-semibold mb-3">Legal</h4>
+              <h4 className="text-sm font-semibold mb-3 font-heading">Legal</h4>
               <ul className="space-y-2 text-sm">
                 <li>
                   <a
@@ -524,12 +645,12 @@ const MovieCard = ({
 
   return (
     <Link to={id ? `/movie/${id}` : "#"} className="block">
-      <Card className="overflow-hidden group cursor-pointer hover:shadow-md transition-shadow">
+      <Card className="overflow-hidden group cursor-pointer hover:shadow-lg transition-all duration-300 border-border/50 hover:border-primary/50">
         <div className="aspect-[2/3] relative overflow-hidden bg-muted">
           <img
             src={posterUrl}
             alt={title}
-            className="object-cover w-full h-full transition-transform group-hover:scale-105"
+            className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
             onError={(e) => {
               e.currentTarget.src =
                 "https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=500&q=80";
@@ -538,6 +659,7 @@ const MovieCard = ({
           <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm text-xs font-medium py-1 px-2 rounded-md">
             {rating}
           </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
         </div>
         <CardContent className="p-4">
           <h3 className="font-semibold truncate">{title}</h3>
@@ -563,12 +685,12 @@ const TVShowCard = ({
 
   return (
     <Link to={id ? `/tv/${id}` : "#"} className="block">
-      <Card className="overflow-hidden group cursor-pointer hover:shadow-md transition-shadow">
+      <Card className="overflow-hidden group cursor-pointer hover:shadow-lg transition-all duration-300 border-border/50 hover:border-primary/50">
         <div className="aspect-[2/3] relative overflow-hidden bg-muted">
           <img
             src={posterUrl}
             alt={title}
-            className="object-cover w-full h-full transition-transform group-hover:scale-105"
+            className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
             onError={(e) => {
               e.currentTarget.src =
                 "https://images.unsplash.com/photo-1594909122845-11baa439b7bf?w=500&q=80";
@@ -577,6 +699,7 @@ const TVShowCard = ({
           <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm text-xs font-medium py-1 px-2 rounded-md">
             {rating}
           </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
         </div>
         <CardContent className="p-4">
           <h3 className="font-semibold truncate">{title}</h3>
@@ -597,11 +720,11 @@ const FeatureCard = ({
   description?: string;
 }) => {
   return (
-    <Card className="p-6 flex flex-col items-center text-center">
-      <div className="p-3 rounded-full bg-primary/10 text-primary mb-4">
+    <Card className="p-6 flex flex-col items-center text-center hover:shadow-md transition-all duration-300 border-border/50 hover:border-primary/50 group">
+      <div className="p-3 rounded-full bg-primary/10 text-primary mb-4 group-hover:bg-primary/20 transition-colors duration-300">
         {icon}
       </div>
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
+      <h3 className="text-lg font-semibold mb-2 font-heading">{title}</h3>
       <p className="text-sm text-muted-foreground">{description}</p>
     </Card>
   );

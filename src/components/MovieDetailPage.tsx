@@ -83,16 +83,16 @@ const MovieDetailPage = () => {
 
   if (isLoading) {
     return (
-      <div className="container py-12 flex justify-center items-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="container py-12 flex justify-center items-center min-h-[50vh] font-body">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary animate-pulse-glow"></div>
       </div>
     );
   }
 
   if (error || !movie) {
     return (
-      <div className="container py-12 text-center min-h-[50vh]">
-        <h2 className="text-2xl font-bold mb-4">Error</h2>
+      <div className="container py-12 text-center min-h-[50vh] font-body">
+        <h2 className="text-2xl font-bold mb-4 font-heading">Error</h2>
         <p className="text-muted-foreground mb-6">
           {error || "Movie not found"}
         </p>
@@ -104,7 +104,7 @@ const MovieDetailPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background font-body">
       {/* Header */}
       <MovieDetailPageHeader title="MovieMatch" />
 
@@ -140,7 +140,7 @@ const MovieDetailPage = () => {
               navigate("/");
             }
           }}
-          className="mb-6"
+          className="mb-6 transition-all hover:shadow-md"
         >
           <div className="flex items-center">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -151,7 +151,7 @@ const MovieDetailPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-8">
           {/* Movie Poster */}
           <div>
-            <div className="rounded-lg overflow-hidden shadow-lg">
+            <div className="rounded-lg overflow-hidden shadow-lg transition-all hover:shadow-xl">
               {movie.poster_path ? (
                 <img
                   src={movie.poster_path}
@@ -169,11 +169,17 @@ const MovieDetailPage = () => {
             </div>
 
             <div className="mt-6 space-y-4">
-              <Button className="w-full" variant="default">
+              <Button
+                className="w-full animate-pulse-glow transition-all hover:shadow-md"
+                variant="default"
+              >
                 <Heart className="mr-2 h-4 w-4" />
                 Add to Watchlist
               </Button>
-              <Button className="w-full" variant="outline">
+              <Button
+                className="w-full transition-all hover:shadow-md"
+                variant="outline"
+              >
                 <Share2 className="mr-2 h-4 w-4" />
                 Share
               </Button>
@@ -192,7 +198,7 @@ const MovieDetailPage = () => {
               )}
             </div>
 
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">
+            <h1 className="text-3xl md:text-4xl font-bold mb-2 font-heading">
               {movie.title}
             </h1>
 
@@ -217,13 +223,17 @@ const MovieDetailPage = () => {
             </div>
 
             <div className="mb-6">
-              <h2 className="text-xl font-semibold mb-2">Overview</h2>
+              <h2 className="text-xl font-semibold mb-2 font-heading">
+                Overview
+              </h2>
               <p className="text-muted-foreground">{movie.overview}</p>
             </div>
 
             {movie.genre_strings && movie.genre_strings.length > 0 && (
               <div className="mb-6">
-                <h2 className="text-xl font-semibold mb-2">Genres</h2>
+                <h2 className="text-xl font-semibold mb-2 font-heading">
+                  Genres
+                </h2>
                 <div className="flex flex-wrap gap-2">
                   {movie.genre_strings.map((genre) => (
                     <Badge key={genre}>{genre}</Badge>
@@ -234,12 +244,19 @@ const MovieDetailPage = () => {
 
             {movie.streaming_providers && (
               <div className="mb-6">
-                <h2 className="text-xl font-semibold mb-2">Where to Watch</h2>
+                <h2 className="text-xl font-semibold mb-2 font-heading">
+                  Where to Watch
+                </h2>
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(
                     movie.streaming_providers as Record<string, any>,
                   ).map(([provider, url]) => (
-                    <Button key={provider} variant="outline" asChild>
+                    <Button
+                      key={provider}
+                      variant="outline"
+                      asChild
+                      className="transition-all hover:shadow-md"
+                    >
                       <a
                         href={url as string}
                         target="_blank"

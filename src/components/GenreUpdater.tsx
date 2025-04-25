@@ -127,7 +127,9 @@ const GenreUpdater: React.FC = () => {
             </div>
 
             <div className="mt-6">
-              <h3 className="text-sm font-medium mb-2">Update Details</h3>
+              <h3 className="text-sm font-medium mb-2 font-heading">
+                Update Details
+              </h3>
               <ScrollArea className="h-[300px] rounded-md border p-4">
                 <div className="space-y-2">
                   {result.details.map((item, index) => (

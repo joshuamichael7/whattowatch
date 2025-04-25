@@ -235,7 +235,7 @@ const SimilarContentSearch = ({
           "[DEBUG] No AI recommendations found despite canUseAi=true",
         );
         setAiError(
-          "AI recommendations were not available or could not be found in our database. Please try a different title.",
+          "AI recommendations were not available or could not be found in our database. Please try again later or try a different title.",
         );
       } else if (aiRecommendations.length > 0) {
         console.log(

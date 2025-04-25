@@ -620,36 +620,36 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex flex-col min-h-screen bg-background font-body">
       {/* Use the reusable Header component */}
       <Header title="What to Watch" />
 
       {/* Dashboard tabs */}
-      <div className="bg-white dark:bg-gray-800 shadow-sm">
+      <div className="bg-card shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 md:mb-0">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 md:mb-0 font-heading">
               Your Entertainment Dashboard
             </h1>
             <div className="flex space-x-2">
               <Button
                 variant={activeTab === "discover" ? "default" : "outline"}
                 onClick={() => setActiveTab("discover")}
-                className="text-sm"
+                className="text-sm transition-all duration-200 hover:scale-105"
               >
                 Discover
               </Button>
               <Button
                 variant={activeTab === "what-to-watch" ? "default" : "outline"}
                 onClick={() => setActiveTab("what-to-watch")}
-                className="text-sm"
+                className="text-sm transition-all duration-200 hover:scale-105"
               >
                 What to Watch
               </Button>
               <Button
                 variant={activeTab === "similar" ? "default" : "outline"}
                 onClick={() => setActiveTab("similar")}
-                className="text-sm"
+                className="text-sm transition-all duration-200 hover:scale-105"
               >
                 Find Similar
               </Button>
@@ -659,7 +659,7 @@ const Dashboard = () => {
                     activeTab === "recommendations" ? "default" : "outline"
                   }
                   onClick={() => setActiveTab("recommendations")}
-                  className="text-sm"
+                  className="text-sm transition-all duration-200 hover:scale-105"
                 >
                   Recommendations
                 </Button>
@@ -670,13 +670,15 @@ const Dashboard = () => {
       </div>
 
       {/* Main content area */}
-      <div className="flex-grow container mx-auto px-4 py-8">
+      <div className="flex-grow container mx-auto px-4 py-8 font-body">
         {/* Loading indicator */}
         {isLoading && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white dark:bg-gray-800 rounded-lg p-8 flex flex-col items-center">
-              <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-              <p className="text-lg font-medium">Finding perfect matches...</p>
+              <Loader2 className="h-12 w-12 animate-spin text-primary animate-pulse-glow mb-4" />
+              <p className="text-lg font-medium font-body">
+                Finding perfect matches...
+              </p>
             </div>
           </div>
         )}
@@ -706,7 +708,7 @@ const Dashboard = () => {
 
         {/* Recommendations tab */}
         {activeTab === "recommendations" && recommendations.length > 0 && (
-          <div className="flex flex-col md:flex-row gap-6">
+          <div className="flex flex-col md:flex-row gap-6 font-body">
             <div className="md:w-1/4 lg:w-1/5">
               <ContentFilters
                 initialFilters={filters}
@@ -722,7 +724,9 @@ const Dashboard = () => {
               />
             </div>
             <div className="flex-1">
-              <h2 className="text-2xl font-bold mb-6">Your Recommendations</h2>
+              <h2 className="text-2xl font-bold mb-6 font-heading">
+                Your Recommendations
+              </h2>
               <RecommendationGrid recommendations={recommendations} />
             </div>
           </div>
@@ -730,21 +734,27 @@ const Dashboard = () => {
 
         {/* Empty recommendations state */}
         {activeTab === "recommendations" && recommendations.length === 0 && (
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold mb-4">No Recommendations Yet</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <div className="text-center py-12 font-body">
+            <h2 className="text-2xl font-bold mb-4 font-heading">
+              No Recommendations Yet
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6 font-body">
               Use the "What to Watch" or "Find Similar" features to get
               personalized recommendations.
             </p>
             <div className="flex justify-center space-x-4">
               <Button
                 onClick={() => setActiveTab("what-to-watch")}
-                className="flex items-center"
+                className="flex items-center transition-all duration-200 hover:scale-105 animate-pulse-glow"
               >
                 <PlayCircle className="mr-2 h-5 w-5" />
                 Take the Quiz
               </Button>
-              <Button variant="outline" onClick={() => setActiveTab("similar")}>
+              <Button
+                variant="outline"
+                onClick={() => setActiveTab("similar")}
+                className="transition-all duration-200 hover:scale-105"
+              >
                 Find Similar Content
               </Button>
             </div>

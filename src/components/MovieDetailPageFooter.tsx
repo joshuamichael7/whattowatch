@@ -2,23 +2,25 @@ import React from "react";
 
 const MovieDetailPageFooter: React.FC = () => {
   return (
-    <footer className="border-t bg-muted/40">
+    <footer className="border-t bg-muted/40 font-body">
       <div className="container py-8 md:py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="space-y-3">
-            <h3 className="text-lg font-semibold">MovieMatch</h3>
+            <h3 className="text-lg font-semibold font-heading">MovieMatch</h3>
             <p className="text-sm text-muted-foreground">
               Discover your next favorite movie or TV show with personalized
               recommendations.
             </p>
           </div>
           <div>
-            <h4 className="text-sm font-semibold mb-3">Navigation</h4>
+            <h4 className="text-sm font-semibold mb-3 font-heading">
+              Navigation
+            </h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <a
                   href="/"
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   Home
                 </a>
@@ -26,7 +28,7 @@ const MovieDetailPageFooter: React.FC = () => {
               <li>
                 <a
                   href="/dashboard"
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   Discover
                 </a>
@@ -34,7 +36,7 @@ const MovieDetailPageFooter: React.FC = () => {
               <li>
                 <a
                   href="#"
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   About
                 </a>
@@ -42,12 +44,14 @@ const MovieDetailPageFooter: React.FC = () => {
             </ul>
           </div>
           <div>
-            <h4 className="text-sm font-semibold mb-3">Features</h4>
+            <h4 className="text-sm font-semibold mb-3 font-heading">
+              Features
+            </h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <a
                   href="#"
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   Preference Quiz
                 </a>
@@ -55,7 +59,7 @@ const MovieDetailPageFooter: React.FC = () => {
               <li>
                 <a
                   href="#"
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   Similar Content
                 </a>
@@ -63,7 +67,7 @@ const MovieDetailPageFooter: React.FC = () => {
               <li>
                 <a
                   href="#"
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   Content Filters
                 </a>
@@ -71,12 +75,12 @@ const MovieDetailPageFooter: React.FC = () => {
             </ul>
           </div>
           <div>
-            <h4 className="text-sm font-semibold mb-3">Legal</h4>
+            <h4 className="text-sm font-semibold mb-3 font-heading">Legal</h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <a
                   href="#"
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   Privacy Policy
                 </a>
@@ -84,7 +88,7 @@ const MovieDetailPageFooter: React.FC = () => {
               <li>
                 <a
                   href="#"
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   Terms of Service
                 </a>
@@ -92,7 +96,7 @@ const MovieDetailPageFooter: React.FC = () => {
               <li>
                 <a
                   href="#"
-                  className="text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   Cookie Policy
                 </a>

@@ -40,6 +40,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
   const [bio, setBio] = useState("");
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [contentPreferences, setContentPreferences] = useState<string[]>([]);
+  const [username, setUsername] = useState(""); // Added missing state variable
 
   // Load profile data
   useEffect(() => {
@@ -48,6 +49,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
       setBio(profile.bio || "");
       setNotificationsEnabled(profile.notifications_enabled || false);
       setContentPreferences(profile.content_preferences || []);
+      setUsername(profile.username || ""); // Initialize username
     }
   }, [profile]);
 
@@ -71,6 +73,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
         bio,
         notifications_enabled: notificationsEnabled,
         content_preferences: contentPreferences,
+        username: username, // Include username in update
       });
 
       if (error) {
@@ -109,24 +112,30 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
 
   if (!user || !profile) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex justify-center items-center h-64 font-body">
+        <Loader2 className="h-8 w-8 animate-spin text-primary animate-pulse-glow" />
       </div>
     );
   }
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
+    <Card className="w-full max-w-4xl mx-auto font-body">
       <CardHeader>
         <div className="flex justify-between items-center">
           <div>
-            <CardTitle className="text-2xl font-bold">Your Profile</CardTitle>
+            <CardTitle className="text-2xl font-bold font-heading">
+              Your Profile
+            </CardTitle>
             <CardDescription>
               Manage your account and preferences
             </CardDescription>
           </div>
           {onClose && (
-            <Button variant="ghost" onClick={onClose}>
+            <Button
+              variant="ghost"
+              onClick={onClose}
+              className="transition-all hover:shadow-md"
+            >
               Close
             </Button>
           )}
@@ -136,8 +145,18 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="preferences">Preferences</TabsTrigger>
+            <TabsTrigger
+              value="profile"
+              className="transition-all hover:shadow-md"
+            >
+              Profile
+            </TabsTrigger>
+            <TabsTrigger
+              value="preferences"
+              className="transition-all hover:shadow-md"
+            >
+              Preferences
+            </TabsTrigger>
           </TabsList>
 
           {error && (
@@ -201,12 +220,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
 
             <Button
               onClick={handleSaveProfile}
-              className="mt-4"
+              className="mt-4 transition-all hover:shadow-md animate-pulse-glow"
               disabled={isSaving}
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin animate-pulse-glow" />
                   Saving...
                 </>
               ) : (
@@ -220,7 +239,9 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
 
           <TabsContent value="preferences" className="space-y-6 mt-4">
             <div>
-              <h3 className="text-lg font-medium mb-2">Genre Preferences</h3>
+              <h3 className="text-lg font-medium mb-2 font-heading">
+                Genre Preferences
+              </h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Select genres you enjoy to get better recommendations
               </p>
@@ -260,12 +281,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
 
             <Button
               onClick={handleSaveProfile}
-              className="mt-4"
+              className="mt-4 transition-all hover:shadow-md"
               disabled={isSaving}
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin animate-pulse-glow" />
                   Saving...
                 </>
               ) : (
@@ -287,10 +308,11 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
           variant="destructive"
           onClick={handleSignOut}
           disabled={isLoading}
+          className="transition-all hover:shadow-md"
         >
           {isLoading ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4 animate-spin animate-pulse-glow" />
               Signing out...
             </>
           ) : (

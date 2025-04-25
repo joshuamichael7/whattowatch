@@ -164,9 +164,9 @@ const RecommendationGrid = ({
 
   if (isLoading) {
     return (
-      <div className="w-full h-96 flex items-center justify-center bg-background">
+      <div className="w-full h-96 flex items-center justify-center bg-background font-body">
         <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary animate-pulse-glow"></div>
           <p className="text-muted-foreground">
             Finding the perfect recommendations for you...
           </p>
@@ -176,9 +176,9 @@ const RecommendationGrid = ({
   }
 
   return (
-    <div className="w-full bg-background p-4 md:p-6">
+    <div className="w-full bg-background p-4 md:p-6 font-body">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <h2 className="text-2xl font-bold">
+        <h2 className="text-2xl font-bold font-heading">
           {userId
             ? `Recommended for ${userPreferences?.display_name || "You"}`
             : "Recommended for You"}
@@ -210,11 +210,13 @@ const RecommendationGrid = ({
 
       {filterVisible && (
         <div className="mb-6 p-4 border rounded-lg">
-          <h3 className="text-lg font-medium mb-4">Refine Results</h3>
+          <h3 className="text-lg font-medium mb-4 font-heading">
+            Refine Results
+          </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-2">
-              <h4 className="text-sm font-medium">Content Type</h4>
+              <h4 className="text-sm font-medium font-heading">Content Type</h4>
               <Tabs
                 defaultValue={typeFilter}
                 onValueChange={setTypeFilter}
@@ -230,7 +232,7 @@ const RecommendationGrid = ({
 
             <div className="space-y-2">
               <div className="flex justify-between">
-                <h4 className="text-sm font-medium">Rating</h4>
+                <h4 className="text-sm font-medium font-heading">Rating</h4>
                 <span className="text-sm text-muted-foreground">
                   {ratingFilter[0]} - {ratingFilter[1]}
                 </span>
@@ -246,7 +248,7 @@ const RecommendationGrid = ({
 
             <div className="space-y-2">
               <div className="flex justify-between">
-                <h4 className="text-sm font-medium">Year</h4>
+                <h4 className="text-sm font-medium font-heading">Year</h4>
                 <span className="text-sm text-muted-foreground">
                   {yearFilter[0]} - {yearFilter[1]}
                 </span>
@@ -272,13 +274,15 @@ const RecommendationGrid = ({
 
       {recommendations.length === 0 ? (
         <div className="text-center py-12">
-          <h3 className="text-xl font-medium mb-2">No recommendations found</h3>
+          <h3 className="text-xl font-medium mb-2 font-heading">
+            No recommendations found
+          </h3>
           <p className="text-muted-foreground">
             Try adjusting your preferences or filters
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 font-body">
           {recommendations.map((item) => (
             <Card
               key={item.id}
@@ -314,7 +318,7 @@ const RecommendationGrid = ({
                 </div>
 
                 <CardHeader className="p-3 pb-0">
-                  <CardTitle className="text-base line-clamp-1">
+                  <CardTitle className="text-base line-clamp-1 font-heading">
                     {item.title}
                   </CardTitle>
                   <CardDescription className="flex items-center gap-2">
@@ -398,7 +402,7 @@ const RecommendationGrid = ({
                     {selectedItem && (
                       <>
                         <DialogHeader>
-                          <DialogTitle className="flex items-center gap-2">
+                          <DialogTitle className="flex items-center gap-2 font-heading">
                             {selectedItem.title}
                             <Badge
                               variant={
@@ -455,14 +459,18 @@ const RecommendationGrid = ({
 
                           <div className="space-y-4">
                             <div>
-                              <h4 className="font-medium mb-1">Synopsis</h4>
+                              <h4 className="font-medium mb-1 font-heading">
+                                Synopsis
+                              </h4>
                               <p className="text-sm text-muted-foreground">
                                 {selectedItem.synopsis}
                               </p>
                             </div>
 
                             <div>
-                              <h4 className="font-medium mb-1">Genres</h4>
+                              <h4 className="font-medium mb-1 font-heading">
+                                Genres
+                              </h4>
                               <div className="flex flex-wrap gap-1">
                                 {selectedItem.genres &&
                                   Array.isArray(selectedItem.genres) &&
@@ -477,7 +485,7 @@ const RecommendationGrid = ({
                             {selectedItem.streamingOn &&
                               selectedItem.streamingOn.length > 0 && (
                                 <div>
-                                  <h4 className="font-medium mb-1">
+                                  <h4 className="font-medium mb-1 font-heading">
                                     Available on
                                   </h4>
                                   <div className="flex flex-wrap gap-1">
@@ -489,10 +497,10 @@ const RecommendationGrid = ({
                               )}
 
                             <div>
-                              <h4 className="font-medium mb-1">
+                              <h4 className="font-medium mb-1 font-heading">
                                 Why we recommend this
                               </h4>
-                              <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md italic">
+                              <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md italic font-body">
                                 {selectedItem.recommendationReason}
                               </p>
                             </div>
