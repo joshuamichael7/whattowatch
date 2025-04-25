@@ -101,10 +101,25 @@ const WatchlistButton: React.FC<WatchlistButtonProps> = ({
           variant: "default",
         });
       } else {
+        // Get content details to get media_type
+        const { data: contentData, error: contentError } = await supabase
+          .from("content")
+          .select("title, poster_path, media_type")
+          .eq("id", contentId)
+          .single();
+
+        if (contentError) {
+          console.error("Error fetching content details:", contentError);
+          throw contentError;
+        }
+
         // Add to watchlist
         const { error } = await supabase.from("watchlist").insert({
           user_id: userId,
           content_id: contentId,
+          title: contentData?.title || "",
+          poster_path: contentData?.poster_path || "",
+          media_type: contentData?.media_type || "movie",
           added_at: new Date().toISOString(),
         });
 
