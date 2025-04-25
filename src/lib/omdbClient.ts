@@ -1139,45 +1139,6 @@ async function processAiRecommendations(
       }
 
       // We already tried IMDB ID at the beginning, so we don't need this section anymore
-
-          // Format the OMDB data directly
-          const contentItem: ContentItem = {
-            id: data.imdbID || generateUUID(),
-            title: data.Title,
-            poster_path: data.Poster !== "N/A" ? data.Poster : "",
-            media_type: data.Type === "movie" ? "movie" : "tv",
-            release_date: data.Released !== "N/A" ? data.Released : data.Year,
-            vote_average:
-              data.imdbRating !== "N/A" ? parseFloat(data.imdbRating) : 0,
-            vote_count:
-              data.imdbVotes !== "N/A"
-                ? parseInt(data.imdbVotes.replace(/,/g, ""))
-                : 0,
-            genre_ids: [],
-            overview: data.Plot !== "N/A" ? data.Plot : "",
-            aiRecommended: true,
-            recommendationReason:
-              aiTitle.recommendationReason ||
-              `AI recommended based on similarity to "${originalContent.title}"`,
-          };
-
-          // Only add if it has a valid poster
-          if (
-            contentItem.poster_path &&
-            contentItem.poster_path !== "N/A" &&
-            !contentItem.poster_path.includes("null")
-          ) {
-            results.push(contentItem);
-            console.log(
-              `[processAiRecommendations] Found "${contentItem.title}" in OMDB by IMDB ID`,
-            );
-          } else {
-            console.log(
-              `[processAiRecommendations] Skipping "${contentItem.title}" - invalid poster URL`,
-            );
-          }
-        }
-      }
     } catch (error) {
       console.error(`[DEBUG] Error processing "${aiTitle.title}":`, error);
     }
