@@ -211,6 +211,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
     "Drama",
     "Fantasy",
     "Horror",
+    "K-Drama",
     "Mystery",
     "Romance",
     "Sci-Fi",
@@ -515,8 +516,56 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <>
             <CardHeader>
               <CardTitle className="text-2xl font-heading font-bold">
+                Do you have any language preferences for tonight?
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup
+                value={preferences.languagePreference}
+                onValueChange={handleLanguageChange}
+                className="grid grid-cols-2 gap-4"
+              >
+                {[
+                  "English",
+                  "Korean",
+                  "Spanish",
+                  "Japanese",
+                  "French",
+                  "Chinese",
+                  "Hindi",
+                  "Any",
+                ].map((language) => (
+                  <div
+                    key={language}
+                    className="flex items-center space-x-2 hover:bg-accent/10 p-2 rounded-md transition-colors"
+                  >
+                    <RadioGroupItem
+                      value={language}
+                      id={`language-${language}`}
+                    />
+                    <Label
+                      htmlFor={`language-${language}`}
+                      className="font-medium cursor-pointer"
+                    >
+                      {language}
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            </CardContent>
+          </>
+        );
+
+      case 8:
+        return (
+          <>
+            <CardHeader>
+              <CardTitle className="text-2xl font-heading font-bold">
                 How recent should tonight's content be?
               </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Select the year range for your recommendations
+              </p>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">

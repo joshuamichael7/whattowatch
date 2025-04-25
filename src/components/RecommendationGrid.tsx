@@ -92,14 +92,10 @@ const RecommendationGrid = ({
   const [yearFilter, setYearFilter] = useState([1950, 2023]);
   const [typeFilter, setTypeFilter] = useState("all");
 
-  // Example of using omdbClient with useDirectApi flag and user preferences
   useEffect(() => {
-    // This is just an example of how you might use the omdbClient with the useDirectApi flag
-    // Actual implementation would depend on specific requirements
     const fetchAdditionalDetails = async (itemId: string) => {
       try {
         const details = await getContentById(itemId);
-        // Process details as needed
         console.log(
           "Fetched details using useDirectApi:",
           useDirectApi,
@@ -110,13 +106,11 @@ const RecommendationGrid = ({
       }
     };
 
-    // Example: fetch details for the first item if available
     if (recommendations.length > 0 && selectedItem) {
       fetchAdditionalDetails(selectedItem.id);
     }
   }, [selectedItem, useDirectApi]);
 
-  // Log user preferences when they change
   useEffect(() => {
     if (userId && userPreferences) {
       console.log(`Loading recommendations for user ${userId}`);
@@ -136,14 +130,12 @@ const RecommendationGrid = ({
     setFilterVisible(false);
   };
 
-  // Helper function to get the best available poster image
   const getPosterImage = (item: RecommendationItem) => {
     console.log(`Getting poster for ${item.title}:`, {
       poster: item.poster,
       poster_path: item.poster_path,
     });
 
-    // Try all possible poster sources in order of preference
     if (item.poster && item.poster !== "N/A" && !item.poster.includes("null")) {
       console.log(`Using poster: ${item.poster}`);
       return item.poster;
@@ -157,7 +149,6 @@ const RecommendationGrid = ({
       return item.poster_path;
     }
 
-    // Return a default placeholder if no valid poster is found
     console.log(`No valid poster found for ${item.title}, using placeholder`);
     return "https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=800&q=80";
   };
@@ -283,19 +274,19 @@ const RecommendationGrid = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 font-body">
-          {recommendations.map((item) => (
+          {recommendations.map((rec) => (
             <Card
-              key={item.id}
+              key={rec.id}
               className="overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow"
             >
               <Link
-                to={`/${item.type}/${item.id}`}
+                to={`/movie/${encodeURIComponent(rec.title)}`}
                 className="flex flex-col h-full"
               >
                 <div className="relative aspect-[2/3] overflow-hidden bg-muted">
                   <img
-                    src={getPosterImage(item)}
-                    alt={`${item.title} poster`}
+                    src={getPosterImage(rec)}
+                    alt={`${rec.title} poster`}
                     className="object-cover w-full h-full"
                     onError={(e) => {
                       e.currentTarget.src =
@@ -304,32 +295,32 @@ const RecommendationGrid = ({
                   />
                   <div className="absolute top-2 right-2">
                     <Badge
-                      variant={item.type === "movie" ? "default" : "secondary"}
+                      variant={rec.type === "movie" ? "default" : "secondary"}
                       className="flex items-center gap-1"
                     >
-                      {item.type === "movie" ? (
+                      {rec.type === "movie" ? (
                         <Film size={12} />
                       ) : (
                         <Tv size={12} />
                       )}
-                      {item.type === "movie" ? "Movie" : "TV"}
+                      {rec.type === "movie" ? "Movie" : "TV"}
                     </Badge>
                   </div>
                 </div>
 
                 <CardHeader className="p-3 pb-0">
                   <CardTitle className="text-base line-clamp-1 font-heading">
-                    {item.title}
+                    {rec.title}
                   </CardTitle>
                   <CardDescription className="flex items-center gap-2">
-                    <span>{item.year}</span>
-                    {item.rating > 0 && (
+                    <span>{rec.year}</span>
+                    {rec.rating > 0 && (
                       <span className="flex items-center">
                         <Star
                           size={14}
                           className="fill-yellow-400 text-yellow-400 mr-1"
                         />
-                        {item.rating.toFixed(1)}
+                        {rec.rating.toFixed(1)}
                       </span>
                     )}
                   </CardDescription>
@@ -337,9 +328,9 @@ const RecommendationGrid = ({
 
                 <CardContent className="p-3 pt-2 flex-grow">
                   <div className="flex flex-wrap gap-1 mb-2">
-                    {item.genres &&
-                      Array.isArray(item.genres) &&
-                      item.genres.slice(0, 2).map((genre) => (
+                    {rec.genres &&
+                      Array.isArray(rec.genres) &&
+                      rec.genres.slice(0, 2).map((genre) => (
                         <Badge
                           key={genre}
                           variant="outline"
@@ -348,16 +339,16 @@ const RecommendationGrid = ({
                           {genre}
                         </Badge>
                       ))}
-                    {item.genres &&
-                      Array.isArray(item.genres) &&
-                      item.genres.length > 2 && (
+                    {rec.genres &&
+                      Array.isArray(rec.genres) &&
+                      rec.genres.length > 2 && (
                         <Badge variant="outline" className="text-xs">
-                          +{item.genres.length - 2}
+                          +{rec.genres.length - 2}
                         </Badge>
                       )}
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">
-                    {item.synopsis}
+                    {rec.synopsis}
                   </p>
                 </CardContent>
               </Link>
@@ -365,25 +356,25 @@ const RecommendationGrid = ({
               <CardFooter className="p-3 pt-0">
                 <div className="flex gap-2 w-full mb-2">
                   <UserFeedbackButton
-                    contentId={item.id}
+                    contentId={rec.id}
                     isPositive={true}
                     variant="outline"
                     size="sm"
                     className="flex-1"
                     showText={false}
                     onFeedbackSubmitted={(success) => {
-                      if (success) onFeedbackSubmit(item.id, true);
+                      if (success) onFeedbackSubmit(rec.id, true);
                     }}
                   />
                   <UserFeedbackButton
-                    contentId={item.id}
+                    contentId={rec.id}
                     isPositive={false}
                     variant="outline"
                     size="sm"
                     className="flex-1"
                     showText={false}
                     onFeedbackSubmitted={(success) => {
-                      if (success) onFeedbackSubmit(item.id, false);
+                      if (success) onFeedbackSubmit(rec.id, false);
                     }}
                   />
                 </div>
@@ -392,7 +383,7 @@ const RecommendationGrid = ({
                     <Button
                       variant="outline"
                       className="w-full"
-                      onClick={() => setSelectedItem(item)}
+                      onClick={() => setSelectedItem(rec)}
                     >
                       <Info size={16} className="mr-2" />
                       Details
@@ -560,7 +551,6 @@ const RecommendationGrid = ({
   );
 };
 
-// Sample data for demonstration
 const defaultRecommendations: RecommendationItem[] = [
   {
     id: "1",

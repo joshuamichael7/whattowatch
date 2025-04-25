@@ -99,7 +99,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
         similarTitle,
         "", // No overview provided in this simple flow
         "movie", // Default to movie, could be enhanced to ask for media type
-        5, // Limit to 5 recommendations
+        10, // Request 10 recommendations for better results
       );
 
       if (similarContent.length === 0) {
@@ -153,6 +153,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
         favoriteContent: [],
         contentToAvoid: [],
         ageRating: "PG-13",
+        language: "English", // Default language for random recommendations
       };
 
       const randomRecommendations = await getPersonalizedRecommendations(
@@ -273,6 +274,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
             .map((item) => item.trim())
             .filter(Boolean) || [],
         ageRating: profile.preferences.ageRatings?.[0] || "PG-13",
+        language: profile.preferences.languagePreference || "English",
       };
 
       const personalizedRecommendations = await getPersonalizedRecommendations(
@@ -538,6 +540,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
                 "Fantasy",
                 "History",
                 "Horror",
+                "K-Drama",
                 "Music",
                 "Mystery",
                 "Romance",
@@ -906,6 +909,68 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
                 className="px-8 group transition-all duration-300"
                 onClick={handleWhatToWatchSubmit}
                 disabled={selectedRatings.length === 0}
+              >
+                Get Recommendations
+                <Sparkles className="ml-2 h-5 w-5" />
+              </Button>
+            </div>
+          </motion.div>
+        );
+
+      case "whatToWatchLanguage":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="text-center space-y-8 max-w-2xl mx-auto"
+          >
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight font-heading">
+              What language do you prefer for tonight's content?
+            </h1>
+            <p className="text-xl text-muted-foreground">
+              Select your preferred language
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-6">
+              {[
+                "English",
+                "Spanish",
+                "French",
+                "German",
+                "Italian",
+                "Japanese",
+                "Korean",
+                "Chinese",
+                "Hindi",
+                "Any Language (with subtitles)",
+              ].map((language) => (
+                <Button
+                  key={language}
+                  variant={
+                    preferredLanguage === language ? "default" : "outline"
+                  }
+                  className={`h-auto py-3 ${preferredLanguage === language ? "border-2 border-primary" : ""}`}
+                  onClick={() => setPreferredLanguage(language)}
+                >
+                  {language}
+                </Button>
+              ))}
+            </div>
+
+            <div className="flex gap-4 justify-center pt-6">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setCurrentStep("whatToWatchRatings")}
+              >
+                Back
+              </Button>
+              <Button
+                size="lg"
+                className="px-8 group transition-all duration-300"
+                onClick={handleWhatToWatchSubmit}
+                disabled={!preferredLanguage}
               >
                 Get Recommendations
                 <Sparkles className="ml-2 h-5 w-5" />
