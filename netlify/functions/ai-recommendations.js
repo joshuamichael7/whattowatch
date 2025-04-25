@@ -218,41 +218,54 @@ exports.handler = async (event, context) => {
       },
     );
 
-    // Parse the response to extract the JSON
+    // Extract the generated text from the response
     const responseText = response.data.candidates[0].content.parts[0].text;
+    console.log("Raw response text:", responseText.substring(0, 100) + "...");
 
-    // Extract JSON from the response (handling potential text before/after the JSON)
-    let jsonStr = responseText.trim();
-
-    // Find the start and end of the JSON array
-    const startIdx = jsonStr.indexOf("[");
-    const endIdx = jsonStr.lastIndexOf("]") + 1;
-
-    if (startIdx >= 0 && endIdx > startIdx) {
-      jsonStr = jsonStr.substring(startIdx, endIdx);
+    // Extract JSON from the response
+    let jsonMatch = responseText.match(/\[\s*\{.*\}\s*\]/s);
+    if (!jsonMatch) {
+      // Try to find JSON with different pattern
+      jsonMatch = responseText.match(
+        /\{\s*"recommendations"\s*:\s*\[.*\]\s*\}/s,
+      );
     }
 
-    try {
-      const recommendations = JSON.parse(jsonStr);
-      console.log(
-        `Generated ${recommendations.length} personalized recommendations`,
-      );
+    if (jsonMatch) {
+      const jsonStr = jsonMatch[0];
+      console.log(`Extracted JSON: ${jsonStr}`);
 
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({ recommendations }),
-      };
-    } catch (parseError) {
-      console.error("Error parsing JSON from Gemini response:", parseError);
-      console.log("Raw response:", responseText);
+      try {
+        const recommendations = JSON.parse(jsonStr);
+        console.log(
+          `Generated ${recommendations.length} personalized recommendations`,
+        );
 
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ recommendations }),
+        };
+      } catch (parseError) {
+        console.error("Error parsing JSON from Gemini response:", parseError);
+        console.log("Raw response:", responseText);
+
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({
+            error: "Error parsing AI response",
+            rawResponse: responseText,
+          }),
+        };
+      }
+    } else {
+      console.error("No JSON found in response text:", responseText);
       return {
         statusCode: 500,
         headers,
         body: JSON.stringify({
-          error: "Error parsing AI response",
-          rawResponse: responseText,
+          error: "No JSON found in response",
         }),
       };
     }

@@ -41,11 +41,11 @@ exports.handler = async (event, context) => {
     const {
       title,
       overview,
-      mediaType,
-      limit = 10,
-      apiVersion,
-      modelName,
-    } = JSON.parse(event.body || "{}");
+      mediaType = "movie",
+      limit = 20,
+      apiVersion = "v1beta",
+      modelName = "gemini-1.5-flash",
+    } = event.body ? JSON.parse(event.body) : {};
 
     if (!title || !overview) {
       return {
