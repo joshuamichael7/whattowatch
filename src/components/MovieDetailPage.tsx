@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -14,11 +14,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { getContentById } from "@/lib/omdbClient";
+import { getContentById, searchContent } from "@/lib/omdbClient";
+import { supabase } from "@/lib/supabaseClient";
 import { ContentItem } from "@/types/omdb";
 import MovieDetailPageHeader from "@/components/MovieDetailPageHeader";
 import MovieDetailPageFooter from "@/components/MovieDetailPageFooter";
 import SimilarContentCarousel from "@/components/SimilarContentCarousel";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/components/ui/use-toast";
 
 const genreMap: Record<number, string> = {
   28: "Action",
@@ -45,18 +48,47 @@ const genreMap: Record<number, string> = {
 const MovieDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [movie, setMovie] = useState<ContentItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fromRecommendations, setFromRecommendations] = useState(false);
+  const [isInWatchlist, setIsInWatchlist] = useState(false);
+  const { user, isAuthenticated } = useAuth();
 
   // Check if user came from recommendations page
   useEffect(() => {
     // Check if there are recommendations in localStorage
     const hasRecommendations =
       localStorage.getItem("userRecommendations") !== null;
-    setFromRecommendations(hasRecommendations);
-  }, []);
+
+    // Check if the location state indicates we came from recommendations
+    const fromLocationState = location.state?.fromRecommendations === true;
+
+    setFromRecommendations(hasRecommendations || fromLocationState);
+  }, [location]);
+
+  // Check if movie is in user's watchlist
+  useEffect(() => {
+    const checkWatchlist = async () => {
+      if (!isAuthenticated || !user || !movie) return;
+
+      try {
+        const { data } = await supabase
+          .from("watchlist")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("content_id", movie.id)
+          .single();
+
+        setIsInWatchlist(!!data);
+      } catch (error) {
+        console.error("Error checking watchlist:", error);
+      }
+    };
+
+    checkWatchlist();
+  }, [movie, user, isAuthenticated]);
 
   useEffect(() => {
     const fetchMovieDetails = async () => {
@@ -66,18 +98,72 @@ const MovieDetailPage = () => {
       setError(null);
 
       try {
-        const movieData = await getContentById(id);
+        // Check if id is an IMDB ID (starts with tt) or a title
+        let movieData;
+
+        if (id.startsWith("tt")) {
+          console.log(`Looking up content by IMDB ID: ${id}`);
+          // First try to get from Supabase by IMDB ID
+          const { data: supabaseResults } = await supabase
+            .from("content")
+            .select("*")
+            .eq("imdb_id", id)
+            .limit(1);
+
+          if (supabaseResults && supabaseResults.length > 0) {
+            console.log(`Found content in Supabase by IMDB ID: ${id}`);
+            movieData = supabaseResults[0];
+          } else {
+            // If not found in Supabase, get from OMDB directly
+            console.log(
+              `No match in Supabase, getting from OMDB by IMDB ID: ${id}`,
+            );
+            movieData = await getContentById(id);
+          }
+        } else {
+          // If it's not an IMDB ID, assume it's a title
+          const decodedTitle = decodeURIComponent(id);
+          console.log(`Looking up content by title: ${decodedTitle}`);
+
+          // Try to find exact match in Supabase first
+          const { data: supabaseResults } = await supabase
+            .from("content")
+            .select("*")
+            .ilike("title", decodedTitle)
+            .limit(1);
+
+          if (supabaseResults && supabaseResults.length > 0) {
+            console.log(
+              `Found exact match in Supabase for title: ${decodedTitle}`,
+            );
+            movieData = supabaseResults[0];
+          } else {
+            // If not found in Supabase, search OMDB
+            console.log(
+              `No match in Supabase, searching OMDB for: ${decodedTitle}`,
+            );
+            const searchResults = await searchContent(decodedTitle);
+
+            if (searchResults && searchResults.length > 0) {
+              // Get the first result's full details
+              console.log(
+                `Found ${searchResults.length} results in OMDB, getting details for first match`,
+              );
+              movieData = await getContentById(searchResults[0].id);
+            }
+          }
+        }
 
         if (!movieData) {
-          throw new Error("Movie not found");
+          throw new Error("Content not found");
         }
 
         setMovie(movieData as ContentItem);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to load movie details",
+          err instanceof Error ? err.message : "Failed to load content details",
         );
-        console.error("Error fetching movie details:", err);
+        console.error("Error fetching content details:", err);
       } finally {
         setIsLoading(false);
       }
@@ -85,6 +171,61 @@ const MovieDetailPage = () => {
 
     fetchMovieDetails();
   }, [id]);
+
+  const handleAddToWatchlist = async (movie: ContentItem) => {
+    if (!isAuthenticated || !user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to add items to your watchlist",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      if (isInWatchlist) {
+        // Remove from watchlist
+        const { error } = await supabase
+          .from("watchlist")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("content_id", movie.id);
+
+        if (error) throw error;
+
+        setIsInWatchlist(false);
+        toast({
+          title: "Removed from watchlist",
+          description: `${movie.title} has been removed from your watchlist`,
+        });
+      } else {
+        // Add to watchlist
+        const { error } = await supabase.from("watchlist").insert({
+          user_id: user.id,
+          content_id: movie.id,
+          title: movie.title,
+          poster_path: movie.poster_path,
+          media_type: movie.media_type,
+          added_at: new Date().toISOString(),
+        });
+
+        if (error) throw error;
+
+        setIsInWatchlist(true);
+        toast({
+          title: "Added to watchlist",
+          description: `${movie.title} has been added to your watchlist`,
+        });
+      }
+    } catch (error) {
+      console.error("Error updating watchlist:", error);
+      toast({
+        title: "Error",
+        description: "There was a problem updating your watchlist",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -167,12 +308,14 @@ const MovieDetailPage = () => {
 
             <div className="mt-6 space-y-4">
               <Button
-                className="w-full animate-pulse-glow transition-all hover:shadow-md"
-                variant="default"
+                className={`w-full transition-all hover:shadow-md ${isInWatchlist ? "" : "animate-pulse-glow"}`}
+                variant={isInWatchlist ? "secondary" : "default"}
                 onClick={() => handleAddToWatchlist(movie)}
               >
-                <Heart className="mr-2 h-4 w-4" />
-                Add to Watchlist
+                <Heart
+                  className={`mr-2 h-4 w-4 ${isInWatchlist ? "fill-current" : ""}`}
+                />
+                {isInWatchlist ? "Remove from Watchlist" : "Add to Watchlist"}
               </Button>
               <Button
                 className="w-full transition-all hover:shadow-md"

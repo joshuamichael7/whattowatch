@@ -1119,11 +1119,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
                         className="ml-2"
                       >
                         <Link
-                          to={
-                            rec.imdb_id
-                              ? `/movie/${rec.imdb_id}`
-                              : `/search?q=${encodeURIComponent(rec.title)}`
-                          }
+                          to={`/movie/${rec.imdb_id || encodeURIComponent(rec.title)}`}
                           state={{ fromRecommendations: true }}
                         >
                           <Film className="h-3 w-3 mr-1" />

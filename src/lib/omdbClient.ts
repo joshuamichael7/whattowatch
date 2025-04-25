@@ -481,8 +481,33 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
   try {
     console.log(`[omdbClient] Getting content details for ID: ${id}`);
 
+    // Check if the ID is an IMDB ID (starts with 'tt' followed by numbers)
+    const isImdbId = id.startsWith("tt") && /^tt\d+$/.test(id);
+
     // First, try to get content from Supabase
-    const supabaseContent = await getContentByIdFromSupabase(id);
+    let supabaseContent = null;
+
+    if (isImdbId) {
+      // If it's an IMDB ID, try to find it by imdb_id field in Supabase
+      console.log(`[omdbClient] Looking up IMDB ID: ${id} in Supabase`);
+      const { getContentByImdbIdFromSupabase } = await import(
+        "../lib/supabaseClient"
+      );
+      supabaseContent = await getContentByImdbIdFromSupabase(id);
+    } else {
+      // Otherwise try to find it by UUID in Supabase only if it looks like a UUID
+      // This is a fallback for content already in our database with UUIDs
+      const uuidPattern =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidPattern.test(id)) {
+        console.log(`[omdbClient] Looking up UUID: ${id} in Supabase`);
+        supabaseContent = await getContentByIdFromSupabase(id);
+      } else {
+        console.log(
+          `[omdbClient] ID ${id} is not an IMDB ID or UUID, treating as title`,
+        );
+      }
+    }
 
     // If we have content from Supabase, return it
     if (supabaseContent) {
@@ -496,10 +521,18 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     console.log(
       `[omdbClient] Content not found in Supabase, falling back to OMDB API`,
     );
-    const params = new URLSearchParams({
-      i: id,
-      plot: "full",
-    });
+
+    // Use the appropriate parameter based on whether it's an IMDB ID or not
+    const params = new URLSearchParams();
+
+    if (isImdbId) {
+      params.append("i", id);
+    } else {
+      // If not an IMDB ID, assume it's a title
+      params.append("t", id);
+    }
+
+    params.append("plot", "full");
 
     const data = await fetchFromOmdb(params);
     if (!data) return null;
@@ -507,8 +540,12 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     // Use the helper function to format OMDB data
     const contentItem = formatOMDBData(data);
 
-    // Ensure the ID is set to the IMDB ID for consistency
-    contentItem.id = data.imdbID;
+    // Store the original IMDB ID for reference
+    const imdbId = data.imdbID;
+
+    // Generate a UUID for the database
+    contentItem.id = generateUUID();
+    contentItem.imdb_id = imdbId;
 
     // Add these fields for UI compatibility but they won't be saved to the database
     contentItem.poster = data.Poster !== "N/A" ? data.Poster : "";
@@ -518,13 +555,7 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     // Try to add this content to Supabase for future use
     try {
       // Verify we have all required fields before attempting to add to Supabase
-      if (contentItem && contentItem.title && contentItem.id) {
-        // Ensure the ID is a UUID and not an IMDB ID
-        if (contentItem.id.startsWith("tt") && /^tt\d+$/.test(contentItem.id)) {
-          console.log(`[omdbClient] ID is an IMDB ID, generating a new UUID`);
-          contentItem.id = generateUUID();
-        }
-
+      if (contentItem && contentItem.title && contentItem.imdb_id) {
         const { addContentToSupabase } = await import("../lib/supabaseClient");
         // Log the content item for debugging
         console.log(
