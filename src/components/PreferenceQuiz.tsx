@@ -268,7 +268,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <>
             <CardHeader>
               <CardTitle className="text-2xl font-heading font-bold">
-                What genres do you enjoy?
+                What genres are you in the mood for?
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -405,7 +405,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <>
             <CardHeader>
               <CardTitle className="text-2xl font-heading font-bold">
-                What content do you want to avoid?
+                What kind of content do you want to avoid?
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-2">
                 List movies, TV shows, or genres you dislike (comma separated)
@@ -435,7 +435,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <>
             <CardHeader>
               <CardTitle className="text-2xl font-heading font-bold">
-                What age ratings are acceptable?
+                What ratings are acceptable?
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-2">
                 Select all that apply
@@ -472,7 +472,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <>
             <CardHeader>
               <CardTitle className="text-2xl font-heading font-bold">
-                Preferred language for content?
+                Do you have any language preferences?
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -515,7 +515,7 @@ const PreferenceFinder: React.FC<PreferenceFinderProps> = ({
           <>
             <CardHeader>
               <CardTitle className="text-2xl font-heading font-bold">
-                Release year range preference?
+                How recent should the content be?
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">

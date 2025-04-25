@@ -340,10 +340,10 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
                 <Button
                   size="lg"
                   className="text-lg px-4 sm:px-8 py-4 sm:py-6 group transition-all duration-300 w-full"
-                  onClick={() => goToNextStep("similar")}
+                  onClick={() => setCurrentStep("similar")}
                 >
                   <Search className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
-                  <span>Find Similar</span>
+                  <span>Find Similar Content</span>
                 </Button>
               </motion.div>
 
@@ -358,10 +358,10 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
                 <Button
                   size="lg"
                   className="text-lg px-4 sm:px-8 py-4 sm:py-6 group transition-all duration-300 w-full"
-                  onClick={() => goToNextStep("whatToWatch")}
+                  onClick={() => setCurrentStep("whatToWatch")}
                 >
                   <ListFilter className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
-                  <span>What to Watch</span>
+                  <span>Personalized Picks</span>
                 </Button>
               </motion.div>
 
@@ -825,7 +825,7 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
                 autoFocus
               />
               <p className="text-sm text-muted-foreground mt-2">
-                We'll make sure to exclude these from your recommendations
+                We'll make sure to exclude these from tonight's recommendations
               </p>
             </div>
 
@@ -976,12 +976,6 @@ const NewDiscover: React.FC<NewDiscoverProps> = () => {
       default:
         return null;
     }
-  };
-
-  const goToNextStep = (nextStep, delay = 300) => {
-    setTimeout(() => {
-      setCurrentStep(nextStep);
-    }, delay);
   };
 
   return (
