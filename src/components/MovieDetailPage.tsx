@@ -61,19 +61,15 @@ const MovieDetailPage = () => {
     null,
   );
 
-  // Check if user came from recommendations page
   useEffect(() => {
-    // Check if there are recommendations in localStorage
     const hasRecommendations =
       localStorage.getItem("userRecommendations") !== null;
 
-    // Check if the location state indicates we came from recommendations
     const fromLocationState = location.state?.fromRecommendations === true;
 
     setFromRecommendations(hasRecommendations || fromLocationState);
   }, [location]);
 
-  // Check if movie is in user's watchlist
   useEffect(() => {
     const checkWatchlist = async () => {
       if (!isAuthenticated || !user || !movie) return;
@@ -104,12 +100,10 @@ const MovieDetailPage = () => {
       setVerificationStatus("Starting verification process...");
 
       try {
-        // Check if id is an IMDB ID (starts with tt) or a title
         let movieData;
 
         if (id.startsWith("tt")) {
           console.log(`Looking up content by IMDB ID: ${id}`);
-          // First try to get from Supabase by IMDB ID
           const { data: supabaseResults } = await supabase
             .from("content")
             .select("*")
@@ -120,11 +114,9 @@ const MovieDetailPage = () => {
             console.log(`Found content in Supabase by IMDB ID: ${id}`);
             movieData = supabaseResults[0];
           } else {
-            // If not found in Supabase, get from OMDB directly
             console.log(
               `No match in Supabase, getting from OMDB by IMDB ID: ${id}`,
             );
-            // Use the OMDB API directly with the i parameter
             const params = new URLSearchParams({
               i: id,
               plot: "full",
@@ -135,7 +127,6 @@ const MovieDetailPage = () => {
             const data = await response.json();
 
             if (data && data.Response === "True") {
-              // Format the OMDB data
               movieData = {
                 id: data.imdbID,
                 imdb_id: data.imdbID,
@@ -156,7 +147,6 @@ const MovieDetailPage = () => {
                 content_rating: data.Rated !== "N/A" ? data.Rated : "",
               };
 
-              // Store in Supabase for future use
               try {
                 console.log(`Storing content in Supabase: ${movieData.title}`);
                 await supabase.from("content").insert({
@@ -176,16 +166,13 @@ const MovieDetailPage = () => {
                 });
               } catch (storeError) {
                 console.error("Error storing content in Supabase:", storeError);
-                // Continue even if storage fails
               }
             }
           }
         } else {
-          // If it's not an IMDB ID, assume it's a title
           const decodedTitle = decodeURIComponent(id);
           console.log(`Looking up content by title: ${decodedTitle}`);
 
-          // Try to find exact match in Supabase first
           const { data: supabaseResults } = await supabase
             .from("content")
             .select("*")
@@ -198,14 +185,12 @@ const MovieDetailPage = () => {
             );
             movieData = supabaseResults[0];
           } else {
-            // If not found in Supabase, search OMDB
             console.log(
               `No match in Supabase, searching OMDB for: ${decodedTitle}`,
             );
             const searchResults = await searchContent(decodedTitle);
 
             if (searchResults && searchResults.length > 0) {
-              // Get the first result's full details
               console.log(
                 `Found ${searchResults.length} results in OMDB, getting details for first match`,
               );
@@ -218,13 +203,37 @@ const MovieDetailPage = () => {
           throw new Error("Content not found");
         }
 
-        // Always run verification for any content to ensure we have the right match
-        // This is especially important for AI recommendations
         setVerificationStatus("Verifying content details...");
         console.log(`Running verification for: ${movieData.title}`);
 
+        const isLikelyKoreanContent =
+          movieData.isKoreanContent ||
+          (movieData.recommendationReason &&
+            movieData.recommendationReason.toLowerCase().includes("korean")) ||
+          (movieData.title &&
+            [
+              "Kingdom",
+              "Vagabond",
+              "Healer",
+              "Signal",
+              "Stranger",
+              "Voice",
+              "Extracurricular",
+              "My Name",
+              "The K2",
+              "Lawless Lawyer",
+            ].some((title) => movieData.title.includes(title)));
+
+        console.log(
+          `Media type for ${movieData.title}: ${movieData.media_type}`,
+        );
+
+        if (isLikelyKoreanContent) {
+          console.log(`Detected likely Korean content: ${movieData.title}`);
+          movieData.media_type = "tv";
+        }
+
         try {
-          // Log the movie data before verification
           console.log("Movie data before verification:", {
             title: movieData.title,
             synopsis: movieData.synopsis || movieData.overview,
@@ -233,6 +242,8 @@ const MovieDetailPage = () => {
               (movieData.release_date
                 ? movieData.release_date.substring(0, 4)
                 : null),
+            isKoreanContent: isLikelyKoreanContent,
+            mediaType: movieData.media_type,
           });
 
           const verifiedMovie = await verifyRecommendationWithOmdb(movieData);
@@ -285,7 +296,6 @@ const MovieDetailPage = () => {
 
     try {
       if (isInWatchlist) {
-        // Remove from watchlist
         const { error } = await supabase
           .from("watchlist")
           .delete()
@@ -300,7 +310,6 @@ const MovieDetailPage = () => {
           description: `${movie.title} has been removed from your watchlist`,
         });
       } else {
-        // Add to watchlist
         const { error } = await supabase.from("watchlist").insert({
           user_id: user.id,
           content_id: movie.id,

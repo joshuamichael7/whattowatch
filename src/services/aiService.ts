@@ -678,18 +678,38 @@ export async function verifyRecommendationWithOmdb(
 async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
   if (!omdbResults || omdbResults.length === 0) return null;
 
-  const aiTitle = aiItem.title;
-  const aiSynopsis = aiItem.synopsis || aiItem.overview || "";
-  const aiYear = aiItem.year;
+  // First, check if we're looking for a Korean drama/show
+  const isKoreanContent =
+    aiItem.title &&
+    (aiItem.reason?.toLowerCase().includes("korean") ||
+      aiItem.recommendationReason?.toLowerCase().includes("korean") ||
+      aiItem.synopsis?.toLowerCase().includes("korean"));
 
-  console.log(
-    `[findBestMatch] Finding best match for "${aiTitle}" among ${omdbResults.length} results`,
-  );
-
-  // First, filter by year if available
+  // Filter by year if available
   let candidates = omdbResults;
-  if (aiYear) {
-    const yearMatches = omdbResults.filter((result) => {
+
+  // Define aiSynopsis for use in similarity comparison
+  const aiSynopsis = aiItem.synopsis || aiItem.overview || "";
+
+  // Define aiYear for filtering
+  const aiYear =
+    aiItem.year ||
+    (aiItem.release_date ? aiItem.release_date.substring(0, 4) : null);
+
+  // If we're looking for Korean content, prioritize TV shows
+  if (isKoreanContent) {
+    const tvShows = omdbResults.filter((result) => result.Type === "series");
+    if (tvShows.length > 0) {
+      console.log(
+        `[findBestMatch] Found ${tvShows.length} TV shows for Korean content "${aiItem.title}"`,
+      );
+      candidates = tvShows;
+    }
+  }
+
+  // Then filter by year if available
+  if (aiYear && candidates.length > 1) {
+    const yearMatches = candidates.filter((result) => {
       // Handle year ranges like "2019–2022" in TV shows
       const resultYear = result.Year.split("–")[0];
       return resultYear === aiYear.toString();
@@ -718,7 +738,9 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
         console.log(
           `[findBestMatch] "${details.Title}" (${details.Year}) - Similarity: ${similarity.toFixed(2)}`,
         );
-
+        console.log(
+          `[findBestMatch] Comparing:\nAI Synopsis: "${aiSynopsis.substring(0, 100)}..."\nOMDB Plot: "${details.Plot.substring(0, 100)}..."`,
+        );
         detailedCandidates.push({
           id: details.imdbID,
           imdb_id: details.imdbID,
@@ -817,10 +839,27 @@ async function findBestMatchWithSynopsis(
     `[findBestMatchWithSynopsis] Finding best match for "${aiTitle}" among ${omdbResults.length} results`,
   );
 
-  // First, filter by year if available
+  // First, check if we're looking for a Korean drama/show
+  const isKoreanContent =
+    aiTitle && aiSynopsis.toLowerCase().includes("korean");
+
+  // Filter by year if available
   let candidates = omdbResults;
-  if (aiYear) {
-    const yearMatches = omdbResults.filter((result) => {
+
+  // If we're looking for Korean content, prioritize TV shows
+  if (isKoreanContent) {
+    const tvShows = omdbResults.filter((result) => result.Type === "series");
+    if (tvShows.length > 0) {
+      console.log(
+        `[findBestMatchWithSynopsis] Found ${tvShows.length} TV shows for Korean content "${aiTitle}"`,
+      );
+      candidates = tvShows;
+    }
+  }
+
+  // Then filter by year if available
+  if (aiYear && candidates.length > 1) {
+    const yearMatches = candidates.filter((result) => {
       // Handle year ranges like "2019–2022" in TV shows
       const resultYear = result.Year.split("–")[0];
       return resultYear === aiYear.toString();
@@ -849,7 +888,9 @@ async function findBestMatchWithSynopsis(
         console.log(
           `[findBestMatchWithSynopsis] "${details.Title}" (${details.Year}) - Similarity: ${similarity.toFixed(2)}`,
         );
-
+        console.log(
+          `[findBestMatchWithSynopsis] Comparing:\nAI Synopsis: "${aiSynopsis.substring(0, 100)}..."\nOMDB Plot: "${details.Plot.substring(0, 100)}..."`,
+        );
         detailedCandidates.push({
           id: details.imdbID,
           imdb_id: details.imdbID,
