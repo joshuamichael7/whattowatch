@@ -678,64 +678,18 @@ export async function verifyRecommendationWithOmdb(
 async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
   if (!omdbResults || omdbResults.length === 0) return null;
 
-  // First, check if we're looking for a Korean drama/show
-  const knownKdramas = [
-    "Vagabond",
-    "Healer",
-    "City Hunter",
-    "Signal",
-    "Kingdom",
-    "Extracurricular",
-    "The K2",
-    "Lawless Lawyer",
-    "Strangers from Hell",
-    "Mouse",
-    "Taxi Driver",
-    "Through the Darkness",
-    "Defendant",
-    "Remember: War of the Son",
-  ];
-
-  // Define aiSynopsis for use in similarity comparison
+  // Get the synopsis from the AI item
   const aiSynopsis = aiItem.synopsis || aiItem.overview || "";
   const aiTitle = aiItem.title || "";
 
-  // Extract base title without year if present
-  let baseTitle = aiTitle;
-  let extractedYear = null;
-  const yearMatch = aiTitle.match(/(.*?)\s*\((\d{4})\)/);
-  if (yearMatch) {
-    baseTitle = yearMatch[1].trim();
-    extractedYear = yearMatch[2];
-    console.log(
-      `[findBestMatch] Extracted base title "${baseTitle}" and year "${extractedYear}" from "${aiTitle}"`,
-    );
-  }
-
-  const isLikelySeries =
-    aiSynopsis.toLowerCase().includes("series") ||
-    aiSynopsis.toLowerCase().includes("episode") ||
-    aiSynopsis.toLowerCase().includes("season");
-
-  // Force media type to TV for known K-dramas
-  const isKdrama = knownKdramas.some(
-    (kdrama) =>
-      baseTitle.toLowerCase().includes(kdrama.toLowerCase()) ||
-      aiTitle.toLowerCase().includes(kdrama.toLowerCase()),
-  );
-
-  if (isKdrama) {
-    console.log(
-      `[findBestMatch] Forcing media type to TV for known K-drama: ${aiTitle}`,
-    );
-    aiItem.media_type = "tv";
-  }
-
-  // Define aiYear for filtering
+  // Extract year if available
   const aiYear =
-    extractedYear ||
     aiItem.year ||
     (aiItem.release_date ? aiItem.release_date.substring(0, 4) : null);
+
+  console.log(
+    `[findBestMatch] Finding best match for "${aiTitle}" among ${omdbResults.length} results`,
+  );
 
   // Get full details for each candidate to compare plots
   const detailedCandidates: ContentItem[] = [];
@@ -748,8 +702,7 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
     try {
       const details = await getFullDetails(candidate.imdbID);
       if (details && details.Plot && details.Plot !== "N/A") {
-        // Make sure we're using the AI synopsis, not the OMDB plot
-        // First try to get the synopsis from originalAiData if available
+        // Get the AI synopsis to compare
         const aiSynopsisToCompare =
           aiItem.originalAiData?.synopsis ||
           aiItem.synopsis ||
@@ -770,31 +723,6 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
           `[findBestMatch] Comparing:\nAI Synopsis: "${aiSynopsisToCompare.substring(0, 100)}..."\nOMDB Plot: "${omdbPlot.substring(0, 100)}..."`,
         );
 
-        // Boost similarity score for Korean dramas and exact title matches
-        let boostedSimilarity = similarity;
-
-        // Boost for title match
-        if (
-          details.Title.toLowerCase().includes(baseTitle.toLowerCase()) ||
-          baseTitle.toLowerCase().includes(details.Title.toLowerCase())
-        ) {
-          boostedSimilarity += 0.2;
-          console.log(
-            `[findBestMatch] Boosting similarity score for title match: +0.2`,
-          );
-        }
-
-        // Boost for year match
-        if (aiYear && details.Year && details.Year.includes(aiYear)) {
-          boostedSimilarity += 0.1;
-          console.log(
-            `[findBestMatch] Boosting similarity score for year match: +0.1`,
-          );
-        }
-
-        // Cap at 1.0
-        boostedSimilarity = Math.min(boostedSimilarity, 1.0);
-
         detailedCandidates.push({
           id: details.imdbID,
           imdb_id: details.imdbID,
@@ -812,7 +740,7 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
           overview: details.Plot,
           content_rating: details.Rated !== "N/A" ? details.Rated : "",
           year: details.Year,
-          similarityScore: boostedSimilarity,
+          similarityScore: similarity,
           recommendationReason:
             aiItem.recommendationReason || aiItem.reason || null,
         });
@@ -838,60 +766,7 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
     return detailedCandidates[0];
   }
 
-  // If no detailed candidates were found, try a direct search with the title
-  if (omdbResults.length === 0) {
-    console.log(
-      `[findBestMatch] No results found, trying direct title search for: "${baseTitle}"`,
-    );
-    try {
-      // Try direct title search
-      const params = new URLSearchParams({
-        t: baseTitle,
-        plot: "full",
-      });
-
-      // Add year if available
-      if (aiYear) {
-        params.append("y", aiYear);
-      }
-
-      const response = await fetch(
-        `/.netlify/functions/omdb?${params.toString()}`,
-      );
-      const data = await response.json();
-
-      if (data && data.Response === "True") {
-        console.log(
-          `[findBestMatch] Found direct match for "${baseTitle}": ${data.Title} (${data.Year})`,
-        );
-        return {
-          id: data.imdbID,
-          imdb_id: data.imdbID,
-          title: data.Title,
-          poster_path: data.Poster !== "N/A" ? data.Poster : "",
-          media_type: data.Type === "movie" ? "movie" : "tv",
-          vote_average:
-            data.imdbRating !== "N/A" ? parseFloat(data.imdbRating) : 0,
-          vote_count:
-            data.imdbVotes !== "N/A"
-              ? parseInt(data.imdbVotes.replace(/,/g, ""))
-              : 0,
-          genre_ids: [],
-          genre_strings: data.Genre?.split(", ") || [],
-          overview: data.Plot,
-          content_rating: data.Rated !== "N/A" ? data.Rated : "",
-          year: data.Year,
-          similarityScore: 0.8, // High confidence for direct match
-          recommendationReason:
-            aiItem.recommendationReason || aiItem.reason || null,
-        };
-      }
-    } catch (error) {
-      console.error(`[findBestMatch] Error with direct title search:`, error);
-    }
-  }
-
-  // If still no match, fall back to the first result
+  // If no detailed candidates were found, fall back to the first result
   if (omdbResults.length > 0) {
     try {
       const details = await getFullDetails(omdbResults[0].imdbID);
@@ -914,8 +789,6 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
           content_rating: details.Rated !== "N/A" ? details.Rated : "",
           year: details.Year,
           similarityScore: 0,
-          recommendationReason:
-            aiItem.recommendationReason || aiItem.reason || null,
         };
       }
     } catch (error) {

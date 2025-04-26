@@ -318,6 +318,8 @@ async function searchFromOmdb(
   type?: "movie" | "series" | "all",
 ): Promise<ContentItem[]> {
   try {
+    // No special handling for content types - let OMDB determine the type
+
     // Handle Korean drama titles with year in parentheses
     let searchQuery = query;
     let searchYear = null;

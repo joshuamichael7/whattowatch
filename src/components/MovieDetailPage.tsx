@@ -190,14 +190,36 @@ const MovieDetailPage = () => {
           // Use the original year from AI if available
           if (movieData.originalAiData.year) {
             movieData.year = movieData.originalAiData.year;
-          }
-          // Use the original media type from AI if available
-          if (movieData.originalAiData?.media_type) {
             console.log(
-              `Using original media type from AI data: ${movieData.originalAiData.media_type}`,
+              `Using original year from AI data: ${movieData.originalAiData.year}`,
             );
-            movieData.media_type = movieData.originalAiData.media_type;
           }
+        }
+
+        // For Korean dramas, force media type to TV
+        const knownKdramas = [
+          "Vagabond",
+          "Healer",
+          "Signal",
+          "Kingdom",
+          "Extracurricular",
+          "Lawless Lawyer",
+          "Strangers from Hell",
+          "Mouse",
+          "Taxi Driver",
+          "Beyond Evil",
+          "My Name",
+        ];
+
+        const isKdrama = knownKdramas.some((kdrama) =>
+          movieData.title.toLowerCase().includes(kdrama.toLowerCase()),
+        );
+
+        if (isKdrama) {
+          console.log(
+            `Forcing media_type to TV for known K-drama: ${movieData.title}`,
+          );
+          movieData.media_type = "tv";
         }
 
         try {
