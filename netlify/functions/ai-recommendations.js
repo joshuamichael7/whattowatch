@@ -220,22 +220,11 @@ exports.handler = async (event, context) => {
     // Try to find JSON array directly - this should be the most common case
     const jsonArrayMatch = responseText.match(/\[\s*\{[\s\S]*\}\s*\]/s);
     if (jsonArrayMatch) {
-      extractedJson = jsonArrayMatch[0].trim();
-    } else {
-      // Try to find JSON in code blocks
-      const codeBlockMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
-      if (codeBlockMatch && codeBlockMatch[1]) {
-        extractedJson = codeBlockMatch[1].trim();
-      } else {
-        // Try to find JSON with another pattern
-        const jsonObjMatch = responseText.match(
-          /\{\s*"recommendations"\s*:\s*\[[\s\S]*\]\s*\}/s,
-        );
-        if (jsonObjMatch) {
-          extractedJson = jsonObjMatch[0].trim();
-        }
-      }
+      extractedJson = jsonArrayMatch[0];
     }
+
+    // Initialize array for manual extraction results
+    const manualItems = [];
 
     if (extractedJson) {
       console.log(
@@ -243,45 +232,48 @@ exports.handler = async (event, context) => {
       );
 
       try {
-        const parsedData = JSON.parse(extractedJson);
+        // Try to parse the extracted JSON
+        let parsedData;
+        try {
+          parsedData = JSON.parse(extractedJson);
+        } catch (initialParseError) {
+          // If parsing fails, try to clean the JSON string
+          console.log(
+            "Initial JSON parsing failed, attempting to clean JSON string",
+          );
+          const cleanedJson = extractedJson
+            .replace(/\\n/g, " ")
+            .replace(/\\r/g, "")
+            .replace(/\\t/g, " ")
+            .replace(/\\'/g, "'")
+            .replace(/\\\\(?!")/g, "\\"); // Keep escape for double quotes
+
+          parsedData = JSON.parse(cleanedJson);
+        }
+
+        // Determine if we have an array or an object with recommendations
         const recommendations = Array.isArray(parsedData)
           ? parsedData
           : parsedData.recommendations;
 
         if (recommendations && recommendations.length > 0) {
           console.log(
-            `Generated ${recommendations.length} personalized recommendations`,
+            `Successfully parsed ${recommendations.length} recommendations from AI response`,
           );
 
-          // Validate recommendations against user preferences
-          const validatedRecommendations = validateRecommendations(
-            recommendations,
-            preferences,
-          );
-
-          if (validatedRecommendations.length > 0) {
-            return {
-              statusCode: 200,
-              headers,
-              body: JSON.stringify({
-                recommendations: validatedRecommendations,
-              }),
-            };
-          } else {
-            console.log("No recommendations passed validation");
-            // Fall through to error handling
-          }
+          // Return the recommendations directly without validation
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+              recommendations: recommendations,
+            }),
+          };
         } else {
           console.error("No recommendations found in parsed data");
         }
       } catch (parseError) {
-        console.error("Error parsing JSON from Gemini response:", parseError);
-        console.log(
-          "Raw response (first 500 chars):",
-          responseText.substring(0, 500),
-        );
-
-        // Continue to fallback methods
+        console.error("Error parsing extracted JSON:", parseError);
       }
     }
 
@@ -290,11 +282,9 @@ exports.handler = async (event, context) => {
 
     // Try to manually extract recommendations as a last resort
     try {
-      const manualItems = [];
       const lines = responseText.split("\n");
 
       // First try to extract complete JSON objects
-      const jsonObjects = [];
       let currentObject = "";
       let inObject = false;
       let bracketCount = 0;
@@ -433,10 +423,23 @@ exports.handler = async (event, context) => {
           }
         }
       }
+
+      // If we found any items through manual extraction, return them
+      if (manualItems.length > 0) {
+        console.log(`Manually extracted ${manualItems.length} recommendations`);
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            recommendations: manualItems,
+          }),
+        };
+      }
     } catch (manualError) {
       console.error("Error during manual extraction:", manualError);
     }
 
+    // If we get here, we couldn't extract any recommendations
     return {
       statusCode: 500,
       headers,
