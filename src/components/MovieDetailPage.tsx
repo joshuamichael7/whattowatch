@@ -402,7 +402,7 @@ const MovieDetailPage = () => {
               <span className="block text-sm mt-1">
                 This is an AI-recommended title.{" "}
                 {movie.verified
-                  ? "Details have been verified."
+                  ? `Details have been verified with ${movie.similarityScore ? (movie.similarityScore * 100).toFixed(0) + "% " : ""}confidence.`
                   : "Some details may not be accurate."}
               </span>
             )}
