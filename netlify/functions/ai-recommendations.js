@@ -182,15 +182,14 @@ exports.handler = async (event, context) => {
     Please recommend exactly ${limit} movies or TV shows that match these preferences. For each recommendation, provide:\n
     1. The exact title as it appears in IMDB\n
     2. The year of release in parentheses\n
-    3. The IMDB ID in square brackets - this is REQUIRED and MUST be in the format tt followed by numbers (e.g., tt0111161)\n
-    4. A brief reason why it matches their preferences (1-2 sentences)\n\n
-    Format your response as a JSON array with title, year, imdb_id, and reason properties for each recommendation. Example:\n
+    3. A brief reason why it matches their preferences (1-2 sentences)\n\n
+    Format your response as a JSON array with title, year, and reason properties for each recommendation. Example:\n
     [\n
-      {"title": "The Shawshank Redemption", "year": "1994", "imdb_id": "tt0111161", "reason": "A powerful drama about hope and redemption that matches your preference for thoughtful storytelling."},\n
-      {"title": "Inception", "year": "2010", "imdb_id": "tt1375666", "reason": "A mind-bending sci-fi thriller that aligns with your interest in complex narratives."}\n
+      {"title": "The Shawshank Redemption", "year": "1994", "reason": "A powerful drama about hope and redemption that matches your preference for thoughtful storytelling."},\n
+      {"title": "Inception", "year": "2010", "reason": "A mind-bending sci-fi thriller that aligns with your interest in complex narratives."}\n
     ]\n
     \n
-    CRITICAL: The IMDB ID is REQUIRED for each recommendation and must be accurate for proper content identification.\n
+    IMPORTANT: Make sure the titles are accurate and match real movies or TV shows.\n
     Only return the JSON array, no other text.`;
 
     // Construct the API endpoint URL
@@ -308,11 +307,13 @@ exports.handler = async (event, context) => {
       const lines = responseText.split("\n");
 
       for (const line of lines) {
-        // Look for patterns like: {"title": "Movie Name", "year": "2021", "imdb_id": "tt12345", "reason": "..."},
+        // Look for patterns like: {"title": "Movie Name", "year": "2021", "imdb_id": "tt12345", "director": "...", "actors": "...", "reason": "..."},
         if (line.includes('"title"') && line.includes('"reason"')) {
           const titleMatch = line.match(/"title"\s*:\s*"([^"]+)"/);
           const yearMatch = line.match(/"year"\s*:\s*"([^"]+)"/);
           const imdbMatch = line.match(/"imdb_id"\s*:\s*"([^"]+)"/);
+          const directorMatch = line.match(/"director"\s*:\s*"([^"]+)"/);
+          const actorsMatch = line.match(/"actors"\s*:\s*"([^"]+)"/);
           const reasonMatch = line.match(/"reason"\s*:\s*"([^"]+)"/);
 
           if (titleMatch && reasonMatch) {
@@ -320,6 +321,8 @@ exports.handler = async (event, context) => {
               title: titleMatch[1],
               year: yearMatch ? yearMatch[1] : null,
               imdb_id: imdbMatch ? imdbMatch[1] : null,
+              director: directorMatch ? directorMatch[1] : null,
+              actors: actorsMatch ? actorsMatch[1] : null,
               reason: reasonMatch[1],
             });
           }

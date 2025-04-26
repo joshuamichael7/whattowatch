@@ -80,23 +80,19 @@ exports.handler = async (event, context) => {
     Please provide exactly ${limit} titles of movies AND TV shows that are similar in plot, themes, tone, and style. 
     Consider factors like genre, setting, character dynamics, and emotional impact.
     
-    CRITICAL: For each recommendation, you MUST include:
-    1. The EXACT title as it appears in IMDB
-    2. The year in parentheses
-    3. The IMDB ID in square brackets - this is REQUIRED and MUST be in the format tt followed by numbers (e.g., tt0111161)
-    4. A brief reason why this content is similar to "${title}"
+    CRITICAL: Format your response as a JSON array with the following properties for each recommendation:
+    - title: The EXACT title as it appears in IMDB
+    - year: The year of release
+    - reason: A brief explanation of why this content is similar
     
-    Format each recommendation as follows:
-    1. Title (Year) [IMDB_ID] - Reason: Your specific explanation
-    
-    For example:
-    1. Parks and Recreation (2009) [tt1266020] - Reason: Mockumentary workplace comedy with quirky characters and similar humor style
-    2. Brooklyn Nine-Nine (2013) [tt2467372] - Reason: Ensemble workplace comedy with similar character dynamics
+    Example JSON format:
+    [
+      {"title": "Parks and Recreation", "year": "2009", "reason": "Mockumentary workplace comedy with quirky characters and similar humor style"},
+      {"title": "Brooklyn Nine-Nine", "year": "2013", "reason": "Ensemble workplace comedy with similar character dynamics"}
+    ]
     
     IMPORTANT: Use the EXACT title spelling and formatting as it appears in IMDB.
-    CRITICAL: Include the year in parentheses after each title.
-    CRITICAL: Include the IMDB ID in square brackets after the year - this is REQUIRED for accurate identification.
-    CRITICAL: After the IMDB ID, include " - Reason: " followed by a specific explanation.`;
+    CRITICAL: Only return the JSON array, no other text.`;
 
     // Construct the API endpoint URL
     const apiEndpoint = `https://generativelanguage.googleapis.com/${defaultConfig.apiVersion}/models/${defaultConfig.modelName}:generateContent`;

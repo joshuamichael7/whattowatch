@@ -497,8 +497,18 @@ export async function getPersonalizedRecommendations(
     // Validate each recommendation against OMDB
     const validatedRecommendations: ContentItem[] = [];
 
+    // Add more logging to see what we're getting from the API
+    console.log(
+      `[getPersonalizedRecommendations] First few recommendations:`,
+      data.recommendations.slice(0, 3).map((r) => ({
+        title: r.title,
+        year: r.year,
+        imdb_id: r.imdb_id || r.imdbID,
+      })),
+    );
+
     for (const item of data.recommendations) {
-      // Skip items without title or IMDB ID
+      // Skip items without title
       if (!item.title) {
         console.log(
           `[getPersonalizedRecommendations] Skipping item with missing title`,
@@ -513,6 +523,8 @@ export async function getPersonalizedRecommendations(
         title: item.title,
         year: item.year,
         imdb_id: imdbId,
+        director: item.director,
+        actors: item.actors,
         reason: item.reason,
       });
 
