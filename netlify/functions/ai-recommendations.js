@@ -295,7 +295,7 @@ exports.handler = async (event, context) => {
 
       for (const line of lines) {
         // Look for patterns like: {"title": "Movie Name", "year": "2021", "reason": "...", "synopsis": "..."},
-        if (line.includes('"title"') && line.includes('"reason"')) {
+        if (line.includes('"title"')) {
           const titleMatch = line.match(/"title"\s*:\s*"([^"]+)"/);
           const yearMatch = line.match(/"year"\s*:\s*"([^"]+)"/);
           const imdbMatch = line.match(/"imdb_id"\s*:\s*"([^"]+)"/);
@@ -304,14 +304,14 @@ exports.handler = async (event, context) => {
           const reasonMatch = line.match(/"reason"\s*:\s*"([^"]+)"/);
           const synopsisMatch = line.match(/"synopsis"\s*:\s*"([^"]+)"/);
 
-          if (titleMatch && reasonMatch) {
+          if (titleMatch) {
             manualItems.push({
               title: titleMatch[1],
               year: yearMatch ? yearMatch[1] : null,
               imdb_id: imdbMatch ? imdbMatch[1] : null,
               director: directorMatch ? directorMatch[1] : null,
               actors: actorsMatch ? actorsMatch[1] : null,
-              reason: reasonMatch[1],
+              reason: reasonMatch ? reasonMatch[1] : "Matches your preferences",
               synopsis: synopsisMatch ? synopsisMatch[1] : null,
             });
           }

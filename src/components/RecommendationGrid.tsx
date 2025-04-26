@@ -277,7 +277,7 @@ const RecommendationGrid = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 font-body">
           {recommendations.map((rec) => (
             <Card
-              key={rec.id}
+              key={rec.id || rec.title} // Use title as fallback if id is null
               className="overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow"
             >
               <Link
@@ -307,6 +307,13 @@ const RecommendationGrid = ({
                       {rec.type === "movie" ? "Movie" : "TV"}
                     </Badge>
                   </div>
+                  {rec.needsVerification && (
+                    <div className="absolute bottom-2 left-2">
+                      <Badge variant="outline" className="bg-background/70">
+                        AI Recommended
+                      </Badge>
+                    </div>
+                  )}
                 </div>
 
                 <CardHeader className="p-3 pb-0">
@@ -511,7 +518,7 @@ const RecommendationGrid = ({
                                 asChild
                               >
                                 <Link
-                                  to={`/${selectedItem.type}/${selectedItem.imdb_id || selectedItem.id}`}
+                                  to={`/${selectedItem.type}/${selectedItem.imdb_id || selectedItem.id || encodeURIComponent(selectedItem.title)}`}
                                 >
                                   <ExternalLink size={16} />
                                   View Details

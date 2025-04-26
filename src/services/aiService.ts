@@ -144,12 +144,10 @@ export async function getSimilarContentTitles(
       `[getSimilarContentTitles] Received ${data.titles.length} recommendations`,
     );
 
-    // Convert recommendations to ContentItem format without validation
+    // Convert recommendations to ContentItem format
     const recommendations: ContentItem[] = [];
-    const validationPromises: Promise<boolean>[] = [];
-    const validItems: any[] = [];
 
-    // First, validate all recommendations
+    // Process each AI recommendation
     for (const item of data.titles) {
       // Skip items without title
       if (!item.title) {
@@ -159,102 +157,176 @@ export async function getSimilarContentTitles(
         continue;
       }
 
-      // Validate the recommendation
-      const validationPromise = validateRecommendation({
-        title: item.title,
-        year: item.year,
-        synopsis: item.synopsis,
-      }).then((isValid) => {
-        if (isValid) {
-          validItems.push(item);
-        }
-        return isValid;
-      });
+      console.log(`[getSimilarContentTitles] Processing "${item.title}"`);
 
-      validationPromises.push(validationPromise);
-    }
-
-    // Wait for all validations to complete
-    await Promise.all(validationPromises);
-
-    console.log(
-      `[getSimilarContentTitles] ${validItems.length} items passed validation`,
-    );
-
-    // Convert valid items to ContentItem format
-    for (const item of validItems) {
-      const imdbId = item.imdb_id || item.imdbID || generateUUID();
-
-      // Log OMDB validation attempt
-      console.log(
-        `[getSimilarContentTitles] Validating with OMDB: "${item.title}"`,
-      );
-
-      // Search OMDB for this title
       try {
-        const omdbResponse = await fetch(
+        // Search OMDB for potential matches
+        const searchResponse = await fetch(
           `/.netlify/functions/omdb?s=${encodeURIComponent(item.title)}`,
         );
-        const omdbData = await omdbResponse.json();
+        if (!searchResponse.ok) {
+          console.error(
+            `[getSimilarContentTitles] OMDB search failed for "${item.title}": ${searchResponse.status}`,
+          );
+          continue;
+        }
 
+        const searchData = await searchResponse.json();
         console.log(
-          `[getSimilarContentTitles] OMDB search results for "${item.title}":`,
-          omdbData.Response === "True"
-            ? `Found ${omdbData.Search?.length} results`
+          `[getSimilarContentTitles] OMDB search for "${item.title}":`,
+          searchData.Response === "True"
+            ? `Found ${searchData.Search?.length} results`
             : "No results",
         );
 
-        // If we found a match in OMDB, use its IMDB ID
-        let realImdbId = imdbId;
-        let posterUrl = item.poster || "";
-
         if (
-          omdbData.Response === "True" &&
-          omdbData.Search &&
-          omdbData.Search.length > 0
+          searchData.Response !== "True" ||
+          !searchData.Search ||
+          searchData.Search.length === 0
         ) {
-          // Find best match by title
-          const bestMatch = omdbData.Search.find(
-            (result) => result.Title.toLowerCase() === item.title.toLowerCase(),
+          console.log(
+            `[getSimilarContentTitles] No OMDB results for "${item.title}", trying simplified search`,
           );
 
-          if (bestMatch) {
-            console.log(
-              `[getSimilarContentTitles] Found exact OMDB match for "${item.title}": ${bestMatch.imdbID}`,
+          // Try simplified search with just the first word
+          const simplifiedTitle = item.title.split(" ")[0];
+          if (simplifiedTitle && simplifiedTitle.length > 2) {
+            const simplifiedResponse = await fetch(
+              `/.netlify/functions/omdb?s=${encodeURIComponent(simplifiedTitle)}`,
             );
-            realImdbId = bestMatch.imdbID;
-            if (bestMatch.Poster && bestMatch.Poster !== "N/A") {
-              posterUrl = bestMatch.Poster;
+            if (simplifiedResponse.ok) {
+              const simplifiedData = await simplifiedResponse.json();
+
+              if (
+                simplifiedData.Response === "True" &&
+                simplifiedData.Search &&
+                simplifiedData.Search.length > 0
+              ) {
+                console.log(
+                  `[getSimilarContentTitles] Found ${simplifiedData.Search.length} results with simplified search "${simplifiedTitle}"`,
+                );
+
+                // Find best match among simplified results
+                const bestMatch = await findBestMatch(
+                  item,
+                  simplifiedData.Search,
+                );
+
+                if (bestMatch) {
+                  // Create ContentItem from best match
+                  const contentItem: ContentItem = {
+                    id: bestMatch.imdbID || item.title,
+                    imdb_id: bestMatch.imdbID,
+                    title: bestMatch.Title || item.title,
+                    poster_path:
+                      bestMatch.Poster && bestMatch.Poster !== "N/A"
+                        ? bestMatch.Poster
+                        : "",
+                    media_type: bestMatch.Type === "movie" ? "movie" : "tv",
+                    vote_average: bestMatch.imdbRating
+                      ? parseFloat(bestMatch.imdbRating)
+                      : 0,
+                    vote_count: bestMatch.imdbVotes
+                      ? parseInt(bestMatch.imdbVotes.replace(/,/g, ""))
+                      : 0,
+                    genre_ids: [],
+                    overview: bestMatch.Plot || item.synopsis || "",
+                    synopsis: item.synopsis || bestMatch.Plot || "",
+                    recommendationReason:
+                      item.recommendationReason ||
+                      item.reason ||
+                      `Similar to ${title}`,
+                    year: bestMatch.Year || item.year,
+                    aiRecommended: true,
+                  };
+
+                  recommendations.push(contentItem);
+                  console.log(
+                    `[getSimilarContentTitles] Added "${contentItem.title}" from simplified search`,
+                  );
+                }
+              }
             }
           }
-        }
 
-        // Convert to ContentItem format with real IMDB ID if found
-        recommendations.push({
-          id: realImdbId,
-          imdb_id: realImdbId.startsWith("tt") ? realImdbId : undefined,
-          title: item.title,
-          poster_path: posterUrl,
-          media_type: mediaType,
-          vote_average: parseFloat(item.rating || "0") || 0,
-          vote_count: 0,
-          genre_ids: [],
-          overview: item.synopsis || "",
-          synopsis: item.synopsis || "",
-          recommendationReason:
-            item.recommendationReason || item.reason || `Similar to ${title}`,
-          year: item.year,
-          aiRecommended: true,
-        });
+          // If we still couldn't find a match, add the original AI recommendation
+          if (
+            !recommendations.some(
+              (r) => r.title.toLowerCase() === item.title.toLowerCase(),
+            )
+          ) {
+            const fallbackItem: ContentItem = {
+              id: item.title,
+              title: item.title,
+              poster_path: item.poster || "",
+              media_type: mediaType,
+              vote_average: parseFloat(item.rating || "0") || 0,
+              vote_count: 0,
+              genre_ids: [],
+              overview: item.synopsis || "",
+              synopsis: item.synopsis || "",
+              recommendationReason:
+                item.recommendationReason ||
+                item.reason ||
+                `Similar to ${title}`,
+              year: item.year,
+              aiRecommended: true,
+              needsVerification: true,
+              originalAiData: item,
+            };
+
+            recommendations.push(fallbackItem);
+            console.log(
+              `[getSimilarContentTitles] Added original AI recommendation for "${item.title}" as fallback`,
+            );
+          }
+        } else {
+          // We have OMDB search results, find the best match
+          const bestMatch = await findBestMatch(item, searchData.Search);
+
+          if (bestMatch) {
+            // Create ContentItem from best match
+            const contentItem: ContentItem = {
+              id: bestMatch.imdbID || item.title,
+              imdb_id: bestMatch.imdbID,
+              title: bestMatch.Title || item.title,
+              poster_path:
+                bestMatch.Poster && bestMatch.Poster !== "N/A"
+                  ? bestMatch.Poster
+                  : "",
+              media_type: bestMatch.Type === "movie" ? "movie" : "tv",
+              vote_average: bestMatch.imdbRating
+                ? parseFloat(bestMatch.imdbRating)
+                : 0,
+              vote_count: bestMatch.imdbVotes
+                ? parseInt(bestMatch.imdbVotes.replace(/,/g, ""))
+                : 0,
+              genre_ids: [],
+              overview: bestMatch.Plot || item.synopsis || "",
+              synopsis: item.synopsis || bestMatch.Plot || "",
+              recommendationReason:
+                item.recommendationReason ||
+                item.reason ||
+                `Similar to ${title}`,
+              year: bestMatch.Year || item.year,
+              aiRecommended: true,
+            };
+
+            recommendations.push(contentItem);
+            console.log(
+              `[getSimilarContentTitles] Added "${contentItem.title}" from OMDB search`,
+            );
+          }
+        }
       } catch (error) {
         console.error(
-          `[getSimilarContentTitles] Error validating with OMDB:`,
+          `[getSimilarContentTitles] Error processing "${item.title}":`,
           error,
         );
 
-        // Still add the recommendation even if OMDB validation fails
-        recommendations.push({
-          id: imdbId,
+        // Add the original AI recommendation as fallback
+        const fallbackItem: ContentItem = {
+          id: item.title,
           title: item.title,
           poster_path: item.poster || "",
           media_type: mediaType,
@@ -267,54 +339,19 @@ export async function getSimilarContentTitles(
             item.recommendationReason || item.reason || `Similar to ${title}`,
           year: item.year,
           aiRecommended: true,
-        });
+          needsVerification: true,
+          originalAiData: item,
+        };
+
+        recommendations.push(fallbackItem);
+        console.log(
+          `[getSimilarContentTitles] Added original AI recommendation for "${item.title}" due to error`,
+        );
       }
 
       // Stop once we have enough recommendations
       if (recommendations.length >= limit) {
         break;
-      }
-    }
-
-    // If we don't have enough recommendations, include some unvalidated ones
-    if (
-      recommendations.length < limit &&
-      data.titles.length > validItems.length
-    ) {
-      console.log(
-        `[getSimilarContentTitles] Adding unvalidated recommendations to meet minimum count`,
-      );
-
-      for (const item of data.titles) {
-        // Skip items that were already validated and added
-        if (validItems.includes(item)) continue;
-
-        // Skip items without title
-        if (!item.title) continue;
-
-        const imdbId = item.imdb_id || item.imdbID || generateUUID();
-
-        // Convert to ContentItem format
-        recommendations.push({
-          id: imdbId,
-          title: item.title,
-          poster_path: item.poster || "",
-          media_type: mediaType,
-          vote_average: parseFloat(item.rating || "0") || 0,
-          vote_count: 0,
-          genre_ids: [],
-          overview: item.synopsis || "",
-          synopsis: item.synopsis || "",
-          recommendationReason:
-            item.recommendationReason || item.reason || `Similar to ${title}`,
-          year: item.year,
-          aiRecommended: true,
-        });
-
-        // Stop once we have enough recommendations
-        if (recommendations.length >= limit) {
-          break;
-        }
       }
     }
 
@@ -407,7 +444,8 @@ export async function getPersonalizedRecommendations(
         continue;
       }
 
-      const imdbId = item.imdb_id || item.imdbID || generateUUID();
+      // Don't generate UUID, just use the title as the ID if no IMDB ID is available
+      const imdbId = item.imdb_id || item.imdbID || null;
 
       // Log each item's fields for debugging
       console.log(`Processing recommendation: ${item.title}`, {
@@ -418,9 +456,8 @@ export async function getPersonalizedRecommendations(
         imdb_id: imdbId,
       });
 
-      // Convert to ContentItem format
       recommendations.push({
-        id: imdbId,
+        id: imdbId, // Only use IMDB ID if available, otherwise null
         title: item.title,
         poster_path: item.poster || "",
         media_type: item.type === "movie" ? "movie" : "tv",
@@ -432,6 +469,8 @@ export async function getPersonalizedRecommendations(
         recommendationReason: item.reason || "Matches your preferences",
         year: item.year,
         aiRecommended: true,
+        needsVerification: true, // Flag that this needs verification
+        originalAiData: item, // Store original AI data for verification
       });
 
       // Stop once we have enough recommendations
@@ -454,12 +493,214 @@ export async function getPersonalizedRecommendations(
 }
 
 /**
- * Generate a UUID for the id field when IMDB ID is not available
+ * Calculate similarity between two text strings
+ * @param text1 First text string
+ * @param text2 Second text string
+ * @returns Similarity score between 0 and 1
  */
-function generateUUID(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0,
-      v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+function calculateTextSimilarity(text1: string, text2: string): number {
+  if (!text1 || !text2) return 0;
+
+  // Normalize texts: lowercase, remove punctuation, extra spaces
+  const normalize = (text: string): string => {
+    return text
+      .toLowerCase()
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  };
+
+  const normalizedText1 = normalize(text1);
+  const normalizedText2 = normalize(text2);
+
+  // Create word sets
+  const words1 = new Set(
+    normalizedText1.split(/\s+/).filter((w) => w.length > 2),
+  );
+  const words2 = new Set(
+    normalizedText2.split(/\s+/).filter((w) => w.length > 2),
+  );
+
+  if (words1.size === 0 || words2.size === 0) return 0;
+
+  // Calculate intersection
+  let intersection = 0;
+  for (const word of words1) {
+    if (words2.has(word)) intersection++;
+  }
+
+  // Jaccard similarity: intersection / union
+  const union = words1.size + words2.size - intersection;
+  return intersection / union;
+}
+
+/**
+ * Verify a recommendation by comparing AI data with OMDB results
+ * @param item The recommendation item to verify
+ * @returns A verified ContentItem with OMDB data or the original item if verification fails
+ */
+export async function verifyRecommendationWithOmdb(
+  item: ContentItem,
+): Promise<ContentItem | null> {
+  try {
+    console.log(`[verifyRecommendationWithOmdb] Verifying "${item.title}"`);
+
+    // Get the original AI data if available
+    const aiTitle = item.title;
+    const aiSynopsis = item.synopsis || item.overview || "";
+    const aiYear = item.year;
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    // Search OMDB by title
+    const searchQuery = aiYear ? `${aiTitle} ${aiYear}` : aiTitle;
+    console.log(
+      `[verifyRecommendationWithOmdb] Searching OMDB for: "${searchQuery}"`,
+    );
+
+    const searchResponse = await fetch(
+      `/.netlify/functions/omdb?s=${encodeURIComponent(searchQuery)}`,
+    );
+
+    if (!searchResponse.ok) {
+      console.error(
+        `[verifyRecommendationWithOmdb] OMDB search failed: ${searchResponse.status}`,
+      );
+      return item; // Return original item on error
+    }
+
+    const searchData = await searchResponse.json();
+
+    if (
+      searchData.Response !== "True" ||
+      !searchData.Search ||
+      searchData.Search.length === 0
+    ) {
+      console.log(
+        `[verifyRecommendationWithOmdb] No results found for "${aiTitle}", returning original item`,
+      );
+      return item;
+    }
+
+    console.log(
+      `[verifyRecommendationWithOmdb] Found ${searchData.Search.length} results for "${aiTitle}"`,
+    );
+
+    // Get full details for all potential matches to compare plots
+    const potentialMatches = [];
+
+    // Limit to first 5 results to avoid too many API calls
+    const resultsToCheck = searchData.Search.slice(0, 5);
+
+    for (const result of resultsToCheck) {
+      try {
+        console.log(
+          `[verifyRecommendationWithOmdb] Getting details for "${result.Title}" (${result.Year})`,
+        );
+
+        const detailResponse = await fetch(
+          `/.netlify/functions/omdb?i=${encodeURIComponent(result.imdbID)}&plot=full`,
+        );
+
+        if (!detailResponse.ok) continue;
+
+        const detailData = await detailResponse.json();
+        if (detailData && detailData.Response === "True" && detailData.Plot) {
+          potentialMatches.push({
+            ...detailData,
+            similarityScore: calculateTextSimilarity(
+              aiSynopsis,
+              detailData.Plot,
+            ),
+          });
+        }
+      } catch (error) {
+        console.error(
+          `[verifyRecommendationWithOmdb] Error getting details for ${result.Title}:`,
+          error,
+        );
+      }
+    }
+
+    // Sort by similarity score
+    potentialMatches.sort((a, b) => b.similarityScore - a.similarityScore);
+
+    // Log all potential matches with their similarity scores
+    potentialMatches.forEach((match, index) => {
+      console.log(
+        `[verifyRecommendationWithOmdb] Match #${index + 1}: "${match.Title}" (${match.Year}) - Similarity: ${match.similarityScore.toFixed(2)}`,
+      );
+      console.log(`  AI Synopsis: "${aiSynopsis.substring(0, 100)}..."`);
+      console.log(`  OMDB Plot: "${match.Plot.substring(0, 100)}..."`);
+    });
+
+    // Use the best match if it has a reasonable similarity score
+    if (potentialMatches.length > 0) {
+      const bestMatch = potentialMatches[0];
+
+      // Consider it a good match if similarity is above threshold or it's the only result with exact title match
+      const isGoodMatch =
+        bestMatch.similarityScore > 0.15 ||
+        (potentialMatches.length === 1 &&
+          bestMatch.Title.toLowerCase() === aiTitle.toLowerCase());
+
+      if (isGoodMatch) {
+        console.log(
+          `[verifyRecommendationWithOmdb] Using best match: "${bestMatch.Title}" with similarity score ${bestMatch.similarityScore.toFixed(2)}`,
+        );
+
+        // Return updated item with OMDB data
+        return {
+          ...item,
+          id: bestMatch.imdbID,
+          imdb_id: bestMatch.imdbID,
+          title: bestMatch.Title,
+          poster_path:
+            bestMatch.Poster && bestMatch.Poster !== "N/A"
+              ? bestMatch.Poster
+              : item.poster_path,
+          media_type: bestMatch.Type === "movie" ? "movie" : "tv",
+          vote_average: bestMatch.imdbRating
+            ? parseFloat(bestMatch.imdbRating)
+            : item.vote_average,
+          vote_count: bestMatch.imdbVotes
+            ? parseInt(bestMatch.imdbVotes.replace(/,/g, ""))
+            : item.vote_count,
+          overview: bestMatch.Plot || item.overview,
+          synopsis: item.synopsis || bestMatch.Plot, // Keep AI synopsis but use OMDB plot as fallback
+          year: bestMatch.Year || item.year,
+          content_rating:
+            bestMatch.Rated !== "N/A" ? bestMatch.Rated : undefined,
+          needsVerification: false,
+          verified: true,
+          aiTitle: aiTitle, // Store original AI title for reference
+          aiSynopsis: aiSynopsis, // Store original AI synopsis for reference
+          similarityScore: bestMatch.similarityScore,
+        };
+      } else {
+        console.log(
+          `[verifyRecommendationWithOmdb] Best match similarity score too low: ${bestMatch.similarityScore.toFixed(2)}, using original item`,
+        );
+      }
+    }
+
+    // If no good match found, return the original item
+    return item;
+  } catch (error) {
+    console.error(
+      `[verifyRecommendationWithOmdb] Error verifying "${item.title}":`,
+      error,
+    );
+    return item;
+  }
+}
+
+async function findBestMatch(
+  item: any,
+  searchResults: any[],
+): Promise<any | null> {
+  // Implementation would go here
+  return null; // Placeholder
 }
