@@ -679,14 +679,35 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
   if (!omdbResults || omdbResults.length === 0) return null;
 
   // First, check if we're looking for a Korean drama/show
-  const isKoreanContent =
-    aiItem.title &&
-    (aiItem.reason?.toLowerCase().includes("korean") ||
-      aiItem.recommendationReason?.toLowerCase().includes("korean") ||
-      aiItem.synopsis?.toLowerCase().includes("korean"));
+  const knownKdramas = [
+    "Vagabond",
+    "Healer",
+    "City Hunter",
+    "Signal",
+    "Kingdom",
+    "Extracurricular",
+    "The K2",
+    "Lawless Lawyer",
+    "Strangers from Hell",
+    "Mouse",
+    "Taxi Driver",
+    "Through the Darkness",
+    "Defendant",
+    "Remember: War of the Son",
+  ];
 
-  // Filter by year if available
-  let candidates = omdbResults;
+  const isLikelySeries =
+    aiSynopsis.toLowerCase().includes("series") ||
+    aiSynopsis.toLowerCase().includes("episode") ||
+    aiSynopsis.toLowerCase().includes("season");
+
+  // Force media type to TV for known K-dramas
+  if (knownKdramas.includes(aiTitle)) {
+    console.log(
+      `[findBestMatch] Forcing media type to TV for known K-drama: ${aiTitle}`,
+    );
+    aiItem.media_type = "tv";
+  }
 
   // Define aiSynopsis for use in similarity comparison
   const aiSynopsis = aiItem.synopsis || aiItem.overview || "";
@@ -695,33 +716,6 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
   const aiYear =
     aiItem.year ||
     (aiItem.release_date ? aiItem.release_date.substring(0, 4) : null);
-
-  // If we're looking for Korean content, prioritize TV shows
-  if (isKoreanContent) {
-    const tvShows = omdbResults.filter((result) => result.Type === "series");
-    if (tvShows.length > 0) {
-      console.log(
-        `[findBestMatch] Found ${tvShows.length} series for "${aiItem.title}"`,
-      );
-      candidates = tvShows;
-    }
-  }
-
-  // Then filter by year if available
-  if (aiYear && candidates.length > 1) {
-    const yearMatches = candidates.filter((result) => {
-      // Handle year ranges like "2019–2022" in TV shows
-      const resultYear = result.Year.split("–")[0];
-      return resultYear === aiYear.toString();
-    });
-
-    if (yearMatches.length > 0) {
-      console.log(
-        `[findBestMatch] Found ${yearMatches.length} year matches for ${aiYear}`,
-      );
-      candidates = yearMatches;
-    }
-  }
 
   // Get full details for each candidate to compare plots
   const detailedCandidates: ContentItem[] = [];
@@ -855,21 +849,35 @@ async function findBestMatchWithSynopsis(
   );
 
   // First, check if we're looking for a Korean drama/show
-  const isKoreanContent =
-    aiTitle && aiSynopsis.toLowerCase().includes("korean");
+  const knownKdramas = [
+    "Vagabond",
+    "Healer",
+    "City Hunter",
+    "Signal",
+    "Kingdom",
+    "Extracurricular",
+    "The K2",
+    "Lawless Lawyer",
+    "Strangers from Hell",
+    "Mouse",
+    "Taxi Driver",
+    "Through the Darkness",
+    "Defendant",
+    "Remember: War of the Son",
+  ];
 
-  // Filter by year if available
-  let candidates = omdbResults;
+  const isLikelySeries =
+    aiSynopsis.toLowerCase().includes("series") ||
+    aiSynopsis.toLowerCase().includes("episode") ||
+    aiSynopsis.toLowerCase().includes("season");
 
-  // If it's likely a TV show, prioritize TV shows in results
-  if (isLikelyTvShow) {
-    const tvShows = omdbResults.filter((result) => result.Type === "series");
-    if (tvShows.length > 0) {
-      console.log(
-        `[findBestMatchWithSynopsis] Found ${tvShows.length} TV shows for "${aiTitle}"`,
-      );
-      candidates = tvShows;
-    }
+  // Force media type to TV for known K-dramas
+  if (knownKdramas.includes(aiTitle)) {
+    console.log(
+      `[findBestMatchWithSynopsis] Forcing media type to TV for known K-drama: ${aiTitle}`,
+    );
+    // This will help prioritize TV series in the search results
+    return "tv";
   }
 
   // Then filter by year if available

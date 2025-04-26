@@ -293,38 +293,83 @@ exports.handler = async (event, context) => {
       const manualItems = [];
       const lines = responseText.split("\n");
 
-      for (const line of lines) {
-        // Look for patterns like: {"title": "Movie Name", "year": "2021", "reason": "...", "synopsis": "..."},
-        if (line.includes('"title"')) {
-          const titleMatch = line.match(/"title"\s*:\s*"([^"]+)"/);
-          const yearMatch = line.match(/"year"\s*:\s*"([^"]+)"/);
-          const imdbMatch = line.match(/"imdb_id"\s*:\s*"([^"]+)"/);
-          const directorMatch = line.match(/"director"\s*:\s*"([^"]+)"/);
-          const actorsMatch = line.match(/"actors"\s*:\s*"([^"]+)"/);
-          const reasonMatch = line.match(/"reason"\s*:\s*"([^"]+)"/);
-          const synopsisMatch = line.match(/"synopsis"\s*:\s*"([^"]+)"/);
+      // First try to extract complete JSON objects
+      const jsonObjects = [];
+      let currentObject = "";
+      let inObject = false;
 
-          if (titleMatch) {
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (trimmedLine.startsWith("{") && !inObject) {
+          inObject = true;
+          currentObject = trimmedLine;
+        } else if (inObject) {
+          currentObject += trimmedLine;
+          if (trimmedLine.endsWith(",") || trimmedLine.endsWith("}")) {
+            if (currentObject.endsWith(",")) {
+              currentObject = currentObject.slice(0, -1);
+            }
+            try {
+              const obj = JSON.parse(currentObject);
+              jsonObjects.push(obj);
+            } catch (e) {
+              // Not a complete object yet
+            }
+            if (trimmedLine.endsWith("}")) {
+              inObject = false;
+              currentObject = "";
+            }
+          }
+        }
+      }
+
+      // If we found complete objects, use them
+      if (jsonObjects.length > 0) {
+        console.log(`Extracted ${jsonObjects.length} complete JSON objects`);
+        for (const obj of jsonObjects) {
+          if (obj.title) {
             manualItems.push({
-              title: titleMatch[1],
-              year: yearMatch ? yearMatch[1] : null,
-              imdb_id: imdbMatch ? imdbMatch[1] : null,
-              director: directorMatch ? directorMatch[1] : null,
-              actors: actorsMatch ? actorsMatch[1] : null,
-              reason: reasonMatch ? reasonMatch[1] : "Matches your preferences",
-              synopsis: synopsisMatch ? synopsisMatch[1] : null,
+              title: obj.title,
+              year: obj.year || null,
+              imdb_id: obj.imdb_id || null,
+              director: obj.director || null,
+              actors: obj.actors || null,
+              reason: obj.reason || "Matches your preferences",
+              synopsis: obj.synopsis || null,
             });
           }
         }
       }
 
-      if (manualItems.length > 0) {
-        console.log(`Manually extracted ${manualItems.length} recommendations`);
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({ recommendations: manualItems }),
-        };
+      // If we couldn't extract complete objects, fall back to regex matching
+      if (manualItems.length === 0) {
+        console.log("Falling back to regex extraction");
+        for (const line of lines) {
+          // Look for patterns like: {"title": "Movie Name", "year": "2021", "reason": "...", "synopsis": "..."},
+          if (line.includes('"title"')) {
+            const titleMatch = line.match(/"title"\s*:\s*"([^"]+)"/);
+            const yearMatch = line.match(/"year"\s*:\s*"([^"]+)"/);
+            const imdbMatch = line.match(/"imdb_id"\s*:\s*"([^"]+)"/);
+            const directorMatch = line.match(/"director"\s*:\s*"([^"]+)"/);
+            const actorsMatch = line.match(/"actors"\s*:\s*"([^"]+)"/);
+            const reasonMatch = line.match(/"reason"\s*:\s*"([^"]+)"/);
+            const synopsisMatch = line.match(/"synopsis"\s*:\s*"([^"]+)"/);
+
+            if (titleMatch) {
+              manualItems.push({
+                title: titleMatch[1],
+                year: yearMatch ? yearMatch[1] : null,
+                imdb_id: imdbMatch ? imdbMatch[1] : null,
+                director: directorMatch ? directorMatch[1] : null,
+                actors: actorsMatch ? actorsMatch[1] : null,
+                reason: reasonMatch
+                  ? reasonMatch[1]
+                  : "Matches your preferences",
+                synopsis: synopsisMatch ? synopsisMatch[1] : null,
+              });
+            }
+          }
+        }
       }
     } catch (manualError) {
       console.error("Error during manual extraction:", manualError);

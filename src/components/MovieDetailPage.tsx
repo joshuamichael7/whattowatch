@@ -225,6 +225,13 @@ const MovieDetailPage = () => {
           if (movieData.originalAiData.year) {
             movieData.year = movieData.originalAiData.year;
           }
+          // Use the original media type from AI if available
+          if (movieData.originalAiData?.media_type) {
+            console.log(
+              `Using original media type from AI data: ${movieData.originalAiData.media_type}`,
+            );
+            movieData.media_type = movieData.originalAiData.media_type;
+          }
         }
 
         try {
