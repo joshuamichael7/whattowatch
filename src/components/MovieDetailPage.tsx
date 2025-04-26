@@ -101,163 +101,114 @@ const MovieDetailPage = () => {
 
       try {
         let movieData;
+        let verifiedMovie = null;
 
-        if (id.startsWith("tt")) {
-          console.log(`Looking up content by IMDB ID: ${id}`);
-          console.log(`Getting from OMDB by IMDB ID: ${id}`);
-          const params = new URLSearchParams({
-            i: id,
-            plot: "full",
-          });
-          const response = await fetch(
-            `/.netlify/functions/omdb?${params.toString()}`,
-          );
-          const data = await response.json();
-
-          if (data && data.Response === "True") {
-            movieData = {
-              id: data.imdbID,
-              imdb_id: data.imdbID,
-              title: data.Title,
-              poster_path: data.Poster !== "N/A" ? data.Poster : "",
-              media_type: data.Type === "movie" ? "movie" : "tv",
-              release_date: data.Released !== "N/A" ? data.Released : data.Year,
-              vote_average:
-                data.imdbRating !== "N/A" ? parseFloat(data.imdbRating) : 0,
-              vote_count:
-                data.imdbVotes !== "N/A"
-                  ? parseInt(data.imdbVotes.replace(/,/g, ""))
-                  : 0,
-              genre_ids: [],
-              genre_strings: data.Genre?.split(", ") || [],
-              overview: data.Plot !== "N/A" ? data.Plot : "",
-              content_rating: data.Rated !== "N/A" ? data.Rated : "",
-            };
-          }
-        } else {
+        // First, check if this is from an AI recommendation that needs verification
+        if (!id.startsWith("tt")) {
+          // If not an IMDB ID, it's likely a title that needs verification
           const decodedTitle = decodeURIComponent(id);
           console.log(`Looking up content by title: ${decodedTitle}`);
           console.log(`Searching OMDB for: ${decodedTitle}`);
 
-          const { data: supabaseResults } = await supabase
-            .from("content")
-            .select("*")
-            .ilike("title", decodedTitle)
-            .limit(1);
+          // Get search results
+          const searchResults = await searchContent(decodedTitle);
 
-          if (supabaseResults && supabaseResults.length > 0) {
+          if (searchResults && searchResults.length > 0) {
             console.log(
-              `Found exact match in Supabase for title: ${decodedTitle}`,
+              `Found ${searchResults.length} results in OMDB for title search`,
             );
-            movieData = supabaseResults[0];
-          } else {
-            console.log(
-              `No match in Supabase, searching OMDB for: ${decodedTitle}`,
-            );
-            const searchResults = await searchContent(decodedTitle);
 
-            if (searchResults && searchResults.length > 0) {
-              console.log(
-                `Found ${searchResults.length} results in OMDB, getting details for first match`,
+            // Create a temporary movie data object for verification
+            const tempMovieData = {
+              title: decodedTitle,
+              synopsis: "", // We might not have a synopsis yet
+              overview: "",
+              media_type: "movie", // Default to movie, will be updated during verification
+            };
+
+            setVerificationStatus("Verifying content with OMDB...");
+
+            // Try to verify with the first search result
+            try {
+              // Get full details for the first result to use for verification
+              const firstResult = await getContentById(searchResults[0].id);
+
+              if (firstResult) {
+                // Use the overview from the first result for verification
+                tempMovieData.synopsis = firstResult.overview || "";
+                tempMovieData.overview = firstResult.overview || "";
+
+                console.log("Verifying content with OMDB first...");
+                verifiedMovie =
+                  await verifyRecommendationWithOmdb(tempMovieData);
+
+                if (
+                  verifiedMovie &&
+                  verifiedMovie.verified &&
+                  verifiedMovie.imdb_id
+                ) {
+                  console.log(`Successfully verified: ${verifiedMovie.title}`);
+                  console.log("Verification details:", {
+                    originalTitle: decodedTitle,
+                    verifiedTitle: verifiedMovie.title,
+                    similarityScore: verifiedMovie.similarityScore,
+                    imdbId: verifiedMovie.imdb_id,
+                  });
+
+                  setVerificationStatus("Content verified, loading details...");
+
+                  // Now that we have a verified IMDB ID, use it to get the full details
+                  console.log(
+                    `Loading full details using verified IMDB ID: ${verifiedMovie.imdb_id}`,
+                  );
+                  movieData = await getContentById(verifiedMovie.imdb_id);
+                } else {
+                  console.log(
+                    `Could not verify: ${decodedTitle}, using first search result`,
+                  );
+                  setVerificationStatus(
+                    "Could not verify content, using best match",
+                  );
+                  movieData = firstResult;
+                }
+              } else {
+                console.log(
+                  `No details found for first search result, using basic search result`,
+                );
+                movieData = searchResults[0];
+              }
+            } catch (verifyError) {
+              console.error("Error during verification:", verifyError);
+              setVerificationStatus(
+                "Verification failed, using search results",
               );
-              movieData = await getContentById(searchResults[0].id);
+              movieData = searchResults[0];
             }
-          }
-        }
-
-        if (!movieData) {
-          throw new Error("Content not found");
-        }
-
-        setVerificationStatus("Verifying content details...");
-        console.log(`Running verification for: ${movieData.title}`);
-
-        // Check if we have original AI data with a synopsis
-        const hasOriginalAiData =
-          movieData.originalAiData && movieData.originalAiData.synopsis;
-
-        console.log(
-          `Media type for ${movieData.title}: ${movieData.media_type}`,
-        );
-
-        // If we have original AI data, use it for verification
-        if (hasOriginalAiData) {
-          console.log(
-            `Using original AI data for verification: ${movieData.title}`,
-          );
-          // Make sure we're using the original synopsis from AI for verification
-          movieData.synopsis = movieData.originalAiData.synopsis;
-          // Use the original year from AI if available
-          if (movieData.originalAiData.year) {
-            movieData.year = movieData.originalAiData.year;
-            console.log(
-              `Using original year from AI data: ${movieData.originalAiData.year}`,
-            );
-          }
-        }
-
-        // For Korean dramas, force media type to TV
-        const knownKdramas = [
-          "Vagabond",
-          "Healer",
-          "Signal",
-          "Kingdom",
-          "Extracurricular",
-          "Lawless Lawyer",
-          "Strangers from Hell",
-          "Mouse",
-          "Taxi Driver",
-          "Beyond Evil",
-          "My Name",
-        ];
-
-        const isKdrama = knownKdramas.some((kdrama) =>
-          movieData.title.toLowerCase().includes(kdrama.toLowerCase()),
-        );
-
-        if (isKdrama) {
-          console.log(
-            `Forcing media_type to TV for known K-drama: ${movieData.title}`,
-          );
-          movieData.media_type = "tv";
-        }
-
-        try {
-          console.log("Movie data before verification:", {
-            title: movieData.title,
-            synopsis: movieData.synopsis || movieData.overview,
-            year:
-              movieData.year ||
-              (movieData.release_date
-                ? movieData.release_date.substring(0, 4)
-                : null),
-            mediaType: movieData.media_type,
-          });
-
-          const verifiedMovie = await verifyRecommendationWithOmdb(movieData);
-
-          if (verifiedMovie && verifiedMovie.verified) {
-            console.log(`Successfully verified: ${verifiedMovie.title}`);
-            console.log("Verification details:", {
-              originalTitle: movieData.title,
-              verifiedTitle: verifiedMovie.title,
-              similarityScore: verifiedMovie.similarityScore,
-              imdbId: verifiedMovie.imdb_id,
-            });
-            setVerificationStatus("Recommendation verified");
-            movieData = verifiedMovie;
           } else {
-            console.log(
-              `Could not verify: ${movieData.title}, using original data`,
-            );
-            setVerificationStatus("Using original recommendation data");
+            throw new Error("Content not found");
           }
+        } else {
+          // If it's already an IMDB ID, just get the content directly
+          console.log(`Looking up content by IMDB ID: ${id}`);
+          movieData = await getContentById(id);
 
-          setMovie(movieData as ContentItem);
-        } catch (verifyError) {
-          console.error("Error verifying recommendation:", verifyError);
-          setVerificationStatus("Verification failed, using original data");
-          setMovie(movieData as ContentItem);
+          if (!movieData) {
+            throw new Error("Content not found");
+          }
+        }
+
+        // Set the movie data
+        setMovie(movieData as ContentItem);
+
+        // Update verification status for display
+        if (verifiedMovie && verifiedMovie.verified) {
+          setVerificationStatus(
+            `Content verified with ${(verifiedMovie.similarityScore || 0) * 100}% confidence`,
+          );
+        } else if (id.startsWith("tt")) {
+          setVerificationStatus("Using IMDB data directly");
+        } else {
+          setVerificationStatus("Using best available match");
         }
       } catch (err) {
         setError(

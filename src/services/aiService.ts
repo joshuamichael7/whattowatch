@@ -545,7 +545,7 @@ export async function verifyRecommendationWithOmdb(
   try {
     console.log(`[verifyRecommendationWithOmdb] Verifying "${item.title}"`);
 
-    // Get the original AI data if available
+    // Get the AI synopsis and title
     const aiTitle = item.title;
     const aiSynopsis = item.synopsis || item.overview || "";
     const aiYear =
@@ -682,10 +682,13 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
   const aiSynopsis = aiItem.synopsis || aiItem.overview || "";
   const aiTitle = aiItem.title || "";
 
-  // Extract year if available
-  const aiYear =
-    aiItem.year ||
-    (aiItem.release_date ? aiItem.release_date.substring(0, 4) : null);
+  // If no synopsis, we can't compare
+  if (!aiSynopsis) {
+    console.log(
+      `[findBestMatch] No synopsis available for "${aiTitle}", can't compare`,
+    );
+    return null;
+  }
 
   console.log(
     `[findBestMatch] Finding best match for "${aiTitle}" among ${omdbResults.length} results`,
@@ -703,11 +706,7 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
       const details = await getFullDetails(candidate.imdbID);
       if (details && details.Plot && details.Plot !== "N/A") {
         // Get the AI synopsis to compare
-        const aiSynopsisToCompare =
-          aiItem.originalAiData?.synopsis ||
-          aiItem.synopsis ||
-          aiItem.overview ||
-          "";
+        const aiSynopsisToCompare = aiSynopsis;
         const omdbPlot = details.Plot;
 
         // Calculate similarity between AI synopsis and OMDB plot
@@ -764,36 +763,6 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
       `[findBestMatch] Best match: "${detailedCandidates[0].title}" with score ${detailedCandidates[0].similarityScore}`,
     );
     return detailedCandidates[0];
-  }
-
-  // If no detailed candidates were found, fall back to the first result
-  if (omdbResults.length > 0) {
-    try {
-      const details = await getFullDetails(omdbResults[0].imdbID);
-      if (details) {
-        return {
-          id: details.imdbID,
-          imdb_id: details.imdbID,
-          title: details.Title,
-          poster_path: details.Poster !== "N/A" ? details.Poster : "",
-          media_type: details.Type === "movie" ? "movie" : "tv",
-          vote_average:
-            details.imdbRating !== "N/A" ? parseFloat(details.imdbRating) : 0,
-          vote_count:
-            details.imdbVotes !== "N/A"
-              ? parseInt(details.imdbVotes.replace(/,/g, ""))
-              : 0,
-          genre_ids: [],
-          genre_strings: details.Genre?.split(", ") || [],
-          overview: details.Plot,
-          content_rating: details.Rated !== "N/A" ? details.Rated : "",
-          year: details.Year,
-          similarityScore: 0,
-        };
-      }
-    } catch (error) {
-      console.error(`[findBestMatch] Error getting fallback details:`, error);
-    }
   }
 
   return null;
