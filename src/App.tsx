@@ -54,6 +54,10 @@ function App() {
               <Route path="/admin-debug" element={<AdminRoleDebugger />} />
               <Route path="/debug" element={<DebugPanel />} />
               <Route
+                path="/debug-recommendations"
+                element={<DebugRecommendations />}
+              />
+              <Route
                 path="/supabase-test"
                 element={<SupabaseConnectionTest />}
               />

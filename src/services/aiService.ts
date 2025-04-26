@@ -322,6 +322,11 @@ export async function getPersonalizedRecommendations(
       })),
     );
 
+    // Log the raw recommendations from the API with full details
+    console.log("========== RAW AI RECOMMENDATIONS ==========");
+    console.log(JSON.stringify(data.recommendations, null, 2));
+    console.log("===========================================");
+
     // Convert recommendations to ContentItem format
     const recommendations: ContentItem[] = [];
 
@@ -335,6 +340,15 @@ export async function getPersonalizedRecommendations(
       }
 
       const imdbId = item.imdb_id || item.imdbID || generateUUID();
+
+      // Log each item's fields for debugging
+      console.log(`Processing recommendation: ${item.title}`, {
+        title: item.title,
+        year: item.year,
+        synopsis: item.synopsis,
+        reason: item.reason,
+        imdb_id: imdbId,
+      });
 
       // Convert to ContentItem format
       recommendations.push({

@@ -1,18 +1,25 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPersonalizedRecommendations } from "@/services/aiService";
 
 const DebugRecommendations = () => {
   const [rawResponse, setRawResponse] = useState<any>(null);
+  const [omdbResponse, setOmdbResponse] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    handleDebugRequest();
+  }, []);
 
   const handleDebugRequest = async () => {
     setIsLoading(true);
     setError(null);
 
     try {
+      console.log("Starting debug request to AI recommendations API");
+
       // Sample preferences
       const preferences = {
         genres: ["Drama"],
@@ -22,6 +29,8 @@ const DebugRecommendations = () => {
         contentToAvoid: ["Horror"],
         ageRating: "PG-13",
       };
+
+      console.log("Sending preferences to AI API:", preferences);
 
       // Make direct request to the Netlify function
       const response = await fetch("/.netlify/functions/ai-recommendations", {
@@ -36,7 +45,64 @@ const DebugRecommendations = () => {
       });
 
       const data = await response.json();
+      console.log("Raw AI API response:", data);
       setRawResponse(data);
+
+      // If we have recommendations, test OMDB lookup for the first one
+      if (data.recommendations && data.recommendations.length > 0) {
+        const firstRec = data.recommendations[0];
+        console.log("Testing OMDB lookup for:", firstRec.title);
+
+        // Try to look up the first recommendation in OMDB
+        const omdbResponse = await fetch(
+          `/.netlify/functions/omdb?s=${encodeURIComponent(firstRec.title)}`,
+        );
+        const omdbData = await omdbResponse.json();
+        console.log("OMDB response for title search:", omdbData);
+        setOmdbResponse(omdbData);
+
+        // If we found a match, get the full details
+        if (omdbData.Search && omdbData.Search.length > 0) {
+          const firstMatch = omdbData.Search[0];
+          console.log("First OMDB match:", firstMatch);
+
+          // Get full details
+          const detailResponse = await fetch(
+            `/.netlify/functions/omdb?i=${firstMatch.imdbID}&plot=full`,
+          );
+          const detailData = await detailResponse.json();
+          console.log("OMDB detail response:", detailData);
+
+          // Compare synopsis with plot
+          if (firstRec.synopsis && detailData.Plot) {
+            console.log("AI Synopsis:", firstRec.synopsis);
+            console.log("OMDB Plot:", detailData.Plot);
+
+            // Simple word overlap comparison
+            const aiWords = firstRec.synopsis
+              .toLowerCase()
+              .split(/\W+/)
+              .filter((w) => w.length > 3);
+            const omdbWords = detailData.Plot.toLowerCase()
+              .split(/\W+/)
+              .filter((w) => w.length > 3);
+
+            const aiWordSet = new Set(aiWords);
+            const omdbWordSet = new Set(omdbWords);
+
+            let overlap = 0;
+            for (const word of aiWordSet) {
+              if (omdbWordSet.has(word)) overlap++;
+            }
+
+            const similarity =
+              overlap / Math.max(1, Math.min(aiWordSet.size, omdbWordSet.size));
+            console.log(
+              `Synopsis similarity score: ${similarity.toFixed(2)} (${overlap} words overlap)`,
+            );
+          }
+        }
+      }
     } catch (err) {
       console.error("Error in debug request:", err);
       setError(err instanceof Error ? err.message : "Unknown error occurred");
@@ -106,6 +172,45 @@ const DebugRecommendations = () => {
                 <h3 className="font-medium mb-2">Full Response:</h3>
                 <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-md overflow-auto text-xs">
                   {JSON.stringify(rawResponse, null, 2)}
+                </pre>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {omdbResponse && (
+        <Card>
+          <CardHeader>
+            <CardTitle>OMDB Response</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-auto max-h-[600px]">
+              <h3 className="font-medium mb-2">
+                OMDB Search Results ({omdbResponse.Search?.length || 0}):
+              </h3>
+
+              {omdbResponse.Search?.map((rec: any, index: number) => (
+                <div key={index} className="mb-4 p-4 border rounded-md">
+                  <p>
+                    <strong>Title:</strong> {rec.Title}
+                  </p>
+                  <p>
+                    <strong>Year:</strong> {rec.Year}
+                  </p>
+                  <p>
+                    <strong>IMDB ID:</strong> {rec.imdbID}
+                  </p>
+                  <p>
+                    <strong>Plot:</strong> {rec.Plot || "<missing>"}
+                  </p>
+                </div>
+              ))}
+
+              <div className="mt-6">
+                <h3 className="font-medium mb-2">Full OMDB Response:</h3>
+                <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-md overflow-auto text-xs">
+                  {JSON.stringify(omdbResponse, null, 2)}
                 </pre>
               </div>
             </div>

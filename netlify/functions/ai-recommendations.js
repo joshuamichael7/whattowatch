@@ -209,6 +209,11 @@ exports.handler = async (event, context) => {
       responseText.substring(0, 100) + "...",
     );
 
+    // Log the full response for debugging
+    console.log("========== FULL GEMINI API RESPONSE ==========");
+    console.log(responseText);
+    console.log("==============================================");
+
     // Extract JSON from the response
     let extractedJson = null;
 

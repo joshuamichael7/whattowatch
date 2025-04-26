@@ -179,7 +179,9 @@ const Dashboard = () => {
       const aiRecs = data.recommendations || [];
 
       if (aiRecs && aiRecs.length > 0) {
-        console.log("AI recommendations received:", aiRecs);
+        console.log("========== AI RECOMMENDATIONS FROM QUIZ ==========");
+        console.log(JSON.stringify(aiRecs, null, 2));
+        console.log("===========================================");
 
         // Convert AI recommendations to ContentItem format
         const aiBasedRecommendations = await Promise.all(
