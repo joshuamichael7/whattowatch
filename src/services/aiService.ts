@@ -701,7 +701,7 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
     const tvShows = omdbResults.filter((result) => result.Type === "series");
     if (tvShows.length > 0) {
       console.log(
-        `[findBestMatch] Found ${tvShows.length} TV shows for Korean content "${aiItem.title}"`,
+        `[findBestMatch] Found ${tvShows.length} series for "${aiItem.title}"`,
       );
       candidates = tvShows;
     }
@@ -861,12 +861,12 @@ async function findBestMatchWithSynopsis(
   // Filter by year if available
   let candidates = omdbResults;
 
-  // If we're looking for Korean content, prioritize TV shows
-  if (isKoreanContent) {
+  // If it's likely a TV show, prioritize TV shows in results
+  if (isLikelyTvShow) {
     const tvShows = omdbResults.filter((result) => result.Type === "series");
     if (tvShows.length > 0) {
       console.log(
-        `[findBestMatchWithSynopsis] Found ${tvShows.length} TV shows for Korean content "${aiTitle}"`,
+        `[findBestMatchWithSynopsis] Found ${tvShows.length} TV shows for "${aiTitle}"`,
       );
       candidates = tvShows;
     }

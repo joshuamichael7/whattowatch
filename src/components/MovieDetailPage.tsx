@@ -236,7 +236,6 @@ const MovieDetailPage = () => {
               (movieData.release_date
                 ? movieData.release_date.substring(0, 4)
                 : null),
-            isKoreanContent: isLikelyKoreanContent,
             mediaType: movieData.media_type,
           });
 
