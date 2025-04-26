@@ -149,23 +149,27 @@ exports.handler = async (event, context) => {
 
     // Extract titles and reasons
     const titles = json.titles.map((title) => {
-        title: item.title,
-        year: item.year || null,
-        imdb_id: item.imdb_id || null,
-        aiRecommended: true,
-        recommendationReason: item.reason || "Similar in style and themes",
-      }));
+        return {
+          title: item.title,
+          year: item.year || null,
+          imdb_id: item.imdb_id || null,
+          aiRecommended: true,
+          recommendationReason: item.reason || "Similar in style and themes"
+        };
+      });
       
       console.log(`Generated ${titles.length} similar titles for "${title}"`);
 
       // Log the extracted titles with reasons for debugging
-      console.log(
-        "Extracted titles with detailed reasons:",
-        titles.map(
-          (t) =>
-            `${t.title} (${t.year || "unknown"}) [${t.imdb_id || "no ID"}] - Reason: ${t.recommendationReason.substring(0, 50)}...`,
-        ),
-      );
+      if (titles.length > 0) {
+        console.log(
+          "Extracted titles with detailed reasons:",
+          titles.slice(0, 3).map(
+            (t) =>
+              `${t.title} (${t.year || "unknown"}) [${t.imdb_id || "no ID"}] - Reason: ${t.recommendationReason?.substring(0, 50)}...`,
+          ),
+        );
+      }
 
       return {
         statusCode: 200,
@@ -179,8 +183,8 @@ exports.handler = async (event, context) => {
         headers,
         body: JSON.stringify({
           error: "Error parsing extracted JSON",
-          rawResponse: responseText,
-          extractedJson: extractedJson
+          rawResponse: responseText.substring(0, 1000),
+          extractedJson: extractedJson.substring(0, 1000)
         }),
       };
     }

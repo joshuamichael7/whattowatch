@@ -255,27 +255,69 @@ exports.handler = async (event, context) => {
         };
       } catch (parseError) {
         console.error("Error parsing JSON from Gemini response:", parseError);
-        console.log("Raw response:", responseText);
+        console.log(
+          "Raw response (first 500 chars):",
+          responseText.substring(0, 500),
+        );
 
         return {
           statusCode: 500,
           headers,
           body: JSON.stringify({
             error: "Error parsing AI response",
-            rawResponse: responseText,
+            rawResponse: responseText.substring(0, 1000),
           }),
         };
       }
-    } else {
-      console.error("No JSON found in response text:", responseText);
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({
-          error: "No JSON found in response",
-        }),
-      };
     }
+
+    // If we get here, we couldn't extract valid JSON
+    console.error("No valid JSON found in response text");
+
+    // Try to manually extract recommendations as a last resort
+    try {
+      const manualItems = [];
+      const lines = responseText.split("\n");
+
+      for (const line of lines) {
+        // Look for patterns like: {"title": "Movie Name", "year": "2021", "imdb_id": "tt12345", "reason": "..."},
+        if (line.includes('"title"') && line.includes('"reason"')) {
+          const titleMatch = line.match(/"title"\s*:\s*"([^"]+)"/);
+          const yearMatch = line.match(/"year"\s*:\s*"([^"]+)"/);
+          const imdbMatch = line.match(/"imdb_id"\s*:\s*"([^"]+)"/);
+          const reasonMatch = line.match(/"reason"\s*:\s*"([^"]+)"/);
+
+          if (titleMatch && reasonMatch) {
+            manualItems.push({
+              title: titleMatch[1],
+              year: yearMatch ? yearMatch[1] : null,
+              imdb_id: imdbMatch ? imdbMatch[1] : null,
+              reason: reasonMatch[1],
+            });
+          }
+        }
+      }
+
+      if (manualItems.length > 0) {
+        console.log(`Manually extracted ${manualItems.length} recommendations`);
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ recommendations: manualItems }),
+        };
+      }
+    } catch (manualError) {
+      console.error("Error during manual extraction:", manualError);
+    }
+
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({
+        error: "No JSON found in response",
+        rawResponse: responseText.substring(0, 1000),
+      }),
+    };
   } catch (error) {
     console.error("Error calling Gemini API:", error);
 
