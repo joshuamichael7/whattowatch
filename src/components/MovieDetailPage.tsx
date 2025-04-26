@@ -206,31 +206,25 @@ const MovieDetailPage = () => {
         setVerificationStatus("Verifying content details...");
         console.log(`Running verification for: ${movieData.title}`);
 
-        const isLikelyKoreanContent =
-          movieData.isKoreanContent ||
-          (movieData.recommendationReason &&
-            movieData.recommendationReason.toLowerCase().includes("korean")) ||
-          (movieData.title &&
-            [
-              "Kingdom",
-              "Vagabond",
-              "Healer",
-              "Signal",
-              "Stranger",
-              "Voice",
-              "Extracurricular",
-              "My Name",
-              "The K2",
-              "Lawless Lawyer",
-            ].some((title) => movieData.title.includes(title)));
+        // Check if we have original AI data with a synopsis
+        const hasOriginalAiData =
+          movieData.originalAiData && movieData.originalAiData.synopsis;
 
         console.log(
           `Media type for ${movieData.title}: ${movieData.media_type}`,
         );
 
-        if (isLikelyKoreanContent) {
-          console.log(`Detected likely Korean content: ${movieData.title}`);
-          movieData.media_type = "tv";
+        // If we have original AI data, use it for verification
+        if (hasOriginalAiData) {
+          console.log(
+            `Using original AI data for verification: ${movieData.title}`,
+          );
+          // Make sure we're using the original synopsis from AI for verification
+          movieData.synopsis = movieData.originalAiData.synopsis;
+          // Use the original year from AI if available
+          if (movieData.originalAiData.year) {
+            movieData.year = movieData.originalAiData.year;
+          }
         }
 
         try {

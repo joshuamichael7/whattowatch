@@ -734,13 +734,28 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
     try {
       const details = await getFullDetails(candidate.imdbID);
       if (details && details.Plot && details.Plot !== "N/A") {
-        const similarity = calculateTextSimilarity(aiSynopsis, details.Plot);
+        // Make sure we're using the AI synopsis, not the OMDB plot
+        // First try to get the synopsis from originalAiData if available
+        const aiSynopsisToCompare =
+          aiItem.originalAiData?.synopsis ||
+          aiItem.synopsis ||
+          aiItem.overview ||
+          "";
+        const omdbPlot = details.Plot;
+
+        // Calculate similarity between AI synopsis and OMDB plot
+        const similarity = calculateTextSimilarity(
+          aiSynopsisToCompare,
+          omdbPlot,
+        );
+
         console.log(
           `[findBestMatch] "${details.Title}" (${details.Year}) - Similarity: ${similarity.toFixed(2)}`,
         );
         console.log(
-          `[findBestMatch] Comparing:\nAI Synopsis: "${aiSynopsis.substring(0, 100)}..."\nOMDB Plot: "${details.Plot.substring(0, 100)}..."`,
+          `[findBestMatch] Comparing:\nAI Synopsis: "${aiSynopsisToCompare.substring(0, 100)}..."\nOMDB Plot: "${omdbPlot.substring(0, 100)}..."`,
         );
+
         detailedCandidates.push({
           id: details.imdbID,
           imdb_id: details.imdbID,
