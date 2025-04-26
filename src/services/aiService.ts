@@ -646,6 +646,16 @@ export async function verifyRecommendationWithOmdb(
         (potentialMatches.length === 1 &&
           bestMatch.Title.toLowerCase() === aiTitle.toLowerCase());
 
+      console.log(`[verifyRecommendationWithOmdb] Best match evaluation:`, {
+        title: bestMatch.Title,
+        year: bestMatch.Year,
+        imdbId: bestMatch.imdbID,
+        similarityScore: bestMatch.similarityScore,
+        isGoodMatch: isGoodMatch,
+        exactTitleMatch:
+          bestMatch.Title.toLowerCase() === aiTitle.toLowerCase(),
+      });
+
       if (isGoodMatch) {
         console.log(
           `[verifyRecommendationWithOmdb] Using best match: "${bestMatch.Title}" with similarity score ${bestMatch.similarityScore.toFixed(2)}`,

@@ -223,9 +223,27 @@ const MovieDetailPage = () => {
           console.log(`Verifying AI recommendation: ${movieData.title}`);
 
           try {
+            // Log the movie data before verification
+            console.log("Movie data before verification:", {
+              title: movieData.title,
+              synopsis: movieData.synopsis || movieData.overview,
+              year:
+                movieData.year ||
+                (movieData.release_date
+                  ? movieData.release_date.substring(0, 4)
+                  : null),
+            });
+
             const verifiedMovie = await verifyRecommendationWithOmdb(movieData);
+
             if (verifiedMovie && verifiedMovie.verified) {
               console.log(`Successfully verified: ${verifiedMovie.title}`);
+              console.log("Verification details:", {
+                originalTitle: movieData.title,
+                verifiedTitle: verifiedMovie.title,
+                similarityScore: verifiedMovie.similarityScore,
+                imdbId: verifiedMovie.imdb_id,
+              });
               setVerificationStatus("Recommendation verified");
               movieData = verifiedMovie;
             } else {

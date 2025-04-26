@@ -359,8 +359,13 @@ const RecommendationGrid = ({
                     {rec.synopsis || rec.overview || "No synopsis available"}
                   </p>
                   <p className="text-xs text-primary-foreground mt-1 bg-primary/10 p-1 rounded line-clamp-2 font-medium">
-                    {rec.recommendationReason || ""}
+                    {rec.recommendationReason || "Matches your preferences"}
                   </p>
+                  {rec.imdb_id && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      IMDB: {rec.imdb_id}
+                    </p>
+                  )}
                 </CardContent>
               </Link>
 
