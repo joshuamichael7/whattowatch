@@ -113,11 +113,21 @@ export async function getPersonalizedRecommendations(
       },
     );
 
-    if (response.data && response.data.recommendations) {
+    if (
+      response.data &&
+      response.data.recommendations &&
+      Array.isArray(response.data.recommendations)
+    ) {
       console.log(
         `[aiService] Received ${response.data.recommendations.length} recommendations from Netlify function`,
       );
-      return response.data.recommendations;
+      return response.data.recommendations.map((rec: any) => ({
+        title: rec.title || "",
+        reason:
+          rec.reason || rec.recommendationReason || "Based on your preferences",
+        imdb_id: rec.imdb_id || null,
+        year: rec.year || null,
+      }));
     }
 
     console.log(

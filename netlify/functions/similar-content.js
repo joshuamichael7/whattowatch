@@ -126,48 +126,82 @@ exports.handler = async (event, context) => {
 
     // Extract the generated text from the response
     const responseText = response.data.candidates[0].content.parts[0].text;
+    console.log(
+      "Raw response from Gemini API (first 100 chars):",
+      responseText.substring(0, 100) + "...",
+    );
 
     // Extract JSON from the response
-    let jsonMatch = responseText.match(/\[\s*\{.*\}\s*\]/s);
-    if (!jsonMatch) {
-      // Try to find JSON with different pattern
-      jsonMatch = responseText.match(/\{\s*"titles"\s*:\s*\[.*\]\s*\}/s);
+    let extractedJson = null;
+
+    // Try to find JSON array directly
+    const jsonArrayMatch = responseText.match(/\[\s*\{[\s\S]*\}\s*\]/s);
+    if (jsonArrayMatch) {
+      extractedJson = jsonArrayMatch[0].trim();
+    } else {
+      // Try to find JSON in code blocks
+      const codeBlockMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch && codeBlockMatch[1]) {
+        extractedJson = codeBlockMatch[1].trim();
+      } else {
+        // Try to find JSON with different pattern
+        const jsonObjMatch = responseText.match(
+          /\{\s*"titles"\s*:\s*\[[\s\S]*\]\s*\}/s,
+        );
+        if (jsonObjMatch) {
+          extractedJson = jsonObjMatch[0].trim();
+        }
+      }
     }
 
-    if (!jsonMatch) {
+    if (!extractedJson) {
       return {
         statusCode: 500,
         headers,
         body: JSON.stringify({
           error: "Failed to extract JSON from response",
+          rawResponse: responseText.substring(0, 500),
         }),
       };
     }
 
-    // Parse the JSON
-    const json = JSON.parse(jsonMatch[0]);
+    console.log(
+      "Extracted JSON (first 100 chars):",
+      extractedJson.substring(0, 100) + "...",
+    );
 
-    // Extract titles and reasons
-    const titles = json.titles.map((title) => {
+    try {
+      // Parse the JSON
+      const parsedData = JSON.parse(extractedJson);
+
+      // Handle both array format and object with titles property
+      const items = Array.isArray(parsedData)
+        ? parsedData
+        : parsedData.titles || [];
+
+      // Map to consistent format
+      const titles = items.map((item) => {
         return {
           title: item.title,
           year: item.year || null,
           imdb_id: item.imdb_id || null,
           aiRecommended: true,
-          recommendationReason: item.reason || "Similar in style and themes"
+          recommendationReason: item.reason || "Similar in style and themes",
         };
       });
-      
+
       console.log(`Generated ${titles.length} similar titles for "${title}"`);
 
       // Log the extracted titles with reasons for debugging
       if (titles.length > 0) {
         console.log(
           "Extracted titles with detailed reasons:",
-          titles.slice(0, 3).map(
-            (t) =>
-              `${t.title} (${t.year || "unknown"}) [${t.imdb_id || "no ID"}] - Reason: ${t.recommendationReason?.substring(0, 50)}...`,
-          ),
+          titles
+            .slice(0, 3)
+            .map(
+              (t) =>
+                `${t.title} (${t.year || "unknown"}) [${t.imdb_id || "no ID"}] - Reason: ${t.recommendationReason?.substring(0, 50)}...`,
+            ),
         );
       }
 
@@ -183,8 +217,7 @@ exports.handler = async (event, context) => {
         headers,
         body: JSON.stringify({
           error: "Error parsing extracted JSON",
-          rawResponse: responseText.substring(0, 1000),
-          extractedJson: extractedJson.substring(0, 1000)
+          rawResponse: responseText.substring(0, 500),
         }),
       };
     }

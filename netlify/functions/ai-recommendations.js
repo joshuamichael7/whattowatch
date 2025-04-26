@@ -222,37 +222,72 @@ exports.handler = async (event, context) => {
     // Extract the generated text from the response
     const responseText = response.data.candidates[0].content.parts[0].text;
 
+    // Log the raw response for debugging
+    console.log(
+      "Raw response from Gemini API (first 100 chars):",
+      responseText.substring(0, 100) + "...",
+    );
+
     // Extract JSON from the response
-    let jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
-    if (!jsonMatch) {
-      // Try to find JSON with different pattern
-      jsonMatch = responseText.match(/\[\s*\{.*\}\s*\]/s);
-    }
-    if (!jsonMatch) {
-      // Try to find JSON with another pattern
-      jsonMatch = responseText.match(
-        /\{\s*"recommendations"\s*:\s*\[.*\]\s*\}/s,
-      );
+    let extractedJson = null;
+
+    // Try to find JSON array directly - this should be the most common case
+    const jsonArrayMatch = responseText.match(/\[\s*\{[\s\S]*\}\s*\]/s);
+    if (jsonArrayMatch) {
+      extractedJson = jsonArrayMatch[0].trim();
+    } else {
+      // Try to find JSON in code blocks
+      const codeBlockMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch && codeBlockMatch[1]) {
+        extractedJson = codeBlockMatch[1].trim();
+      } else {
+        // Try to find JSON with another pattern
+        const jsonObjMatch = responseText.match(
+          /\{\s*"recommendations"\s*:\s*\[[\s\S]*\]\s*\}/s,
+        );
+        if (jsonObjMatch) {
+          extractedJson = jsonObjMatch[0].trim();
+        }
+      }
     }
 
-    if (jsonMatch) {
-      const jsonStr = jsonMatch[1] || jsonMatch[0];
-      console.log(`Extracted JSON: ${jsonStr}`);
+    if (extractedJson) {
+      console.log(
+        `Extracted JSON (first 100 chars): ${extractedJson.substring(0, 100)}...`,
+      );
 
       try {
-        const parsedData = JSON.parse(jsonStr);
+        const parsedData = JSON.parse(extractedJson);
         const recommendations = Array.isArray(parsedData)
           ? parsedData
           : parsedData.recommendations;
-        console.log(
-          `Generated ${recommendations.length} personalized recommendations`,
-        );
 
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({ recommendations }),
-        };
+        if (recommendations && recommendations.length > 0) {
+          console.log(
+            `Generated ${recommendations.length} personalized recommendations`,
+          );
+
+          // Validate recommendations against user preferences
+          const validatedRecommendations = validateRecommendations(
+            recommendations,
+            preferences,
+          );
+
+          if (validatedRecommendations.length > 0) {
+            return {
+              statusCode: 200,
+              headers,
+              body: JSON.stringify({
+                recommendations: validatedRecommendations,
+              }),
+            };
+          } else {
+            console.log("No recommendations passed validation");
+            // Fall through to error handling
+          }
+        } else {
+          console.error("No recommendations found in parsed data");
+        }
       } catch (parseError) {
         console.error("Error parsing JSON from Gemini response:", parseError);
         console.log(
@@ -260,14 +295,7 @@ exports.handler = async (event, context) => {
           responseText.substring(0, 500),
         );
 
-        return {
-          statusCode: 500,
-          headers,
-          body: JSON.stringify({
-            error: "Error parsing AI response",
-            rawResponse: responseText.substring(0, 1000),
-          }),
-        };
+        // Continue to fallback methods
       }
     }
 
@@ -315,7 +343,7 @@ exports.handler = async (event, context) => {
       headers,
       body: JSON.stringify({
         error: "No JSON found in response",
-        rawResponse: responseText.substring(0, 1000),
+        rawResponse: responseText.substring(0, 500),
       }),
     };
   } catch (error) {
