@@ -638,7 +638,7 @@ export async function verifyRecommendationWithOmdb(
     // 2. Find the best match based on title, year, and synopsis similarity
     const bestMatch = await findBestMatch(item, data.Search);
 
-    if (bestMatch && bestMatch.similarityScore > 0.1) {
+    if (bestMatch && bestMatch.similarityScore >= 0.05) {
       console.log(
         `[verifyRecommendationWithOmdb] Best match: "${bestMatch.title}" with similarity score ${bestMatch.similarityScore}`,
       );
