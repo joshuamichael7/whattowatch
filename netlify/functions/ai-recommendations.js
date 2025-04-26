@@ -306,13 +306,23 @@ exports.handler = async (event, context) => {
           const jsonArray = JSON.parse(jsonArrayMatch[0]);
           if (Array.isArray(jsonArray) && jsonArray.length > 0) {
             console.log(`Extracted ${jsonArray.length} items from JSON array`);
-            return {
-              statusCode: 200,
-              headers,
-              body: JSON.stringify({
-                recommendations: jsonArray,
-              }),
-            };
+            // Process the array instead of returning it directly
+            for (const item of jsonArray) {
+              if (item.title) {
+                manualItems.push({
+                  title: item.title,
+                  year: item.year || null,
+                  imdb_id: item.imdb_id || null,
+                  director: item.director || null,
+                  actors: item.actors || null,
+                  reason: item.reason || "Matches your preferences",
+                  synopsis: item.synopsis || null,
+                });
+              }
+            }
+            console.log(
+              `Processed ${manualItems.length} items from JSON array`,
+            );
           }
         } catch (e) {
           console.error("Error parsing JSON array:", e);
