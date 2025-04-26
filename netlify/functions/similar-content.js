@@ -4,7 +4,7 @@ const axios = require("axios");
 const defaultConfig = {
   apiKey: process.env.GEMINI_API_KEY,
   apiVersion: "v1beta",
-  modelName: "gemini-2.0-flash",
+  modelName: "gemini-1.5-flash", // Use 1.5 instead of 2.0 for better compatibility
   maxTokens: parseInt(process.env.GEMINI_MAX_TOKENS || "1024"),
   temperature: parseFloat(process.env.GEMINI_TEMPERATURE || "0.7"),
 };
@@ -123,91 +123,40 @@ exports.handler = async (event, context) => {
       },
     );
 
-    // Parse the response to extract just the titles
+    // Extract the generated text from the response
     const responseText = response.data.candidates[0].content.parts[0].text;
 
-    // Extract numbered list items with reasons
-    const titles = responseText
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => /^\d+\.\s+.+/.test(line)) // Match lines starting with numbers followed by period
-      .map((line) => {
-        // Extract the full line
-        const fullLine = line.replace(/^\d+\.\s+/, "").trim();
+    // Extract JSON from the response
+    let jsonMatch = responseText.match(/\[\s*\{.*\}\s*\]/s);
+    if (!jsonMatch) {
+      // Try to find JSON with different pattern
+      jsonMatch = responseText.match(/\{\s*"titles"\s*:\s*\[.*\]\s*\}/s);
+    }
 
-        // Check if the title has a year in parentheses and IMDB ID in square brackets
-        // This improved regex captures the title, year, and IMDB ID more reliably
-        const match = fullLine.match(
-          /(.+?)\s+\((\d{4})\)\s*(?:\[(tt\d+)\])?(.*)/,
-        );
+    if (!jsonMatch) {
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          error: "Failed to extract JSON from response",
+        }),
+      };
+    }
 
-        if (match) {
-          // The title is in match[1], year in match[2], IMDB ID in match[3] (if present)
-          // Any additional text after the IMDB ID would be in match[4]
-          const title = match[1].trim();
-          const year = match[2];
-          const imdb_id = match[3] || null;
+    // Parse the JSON
+    const json = JSON.parse(jsonMatch[0]);
 
-          // Extract reason if it exists after the IMDB ID
-          // First check if there's any text after the IMDB ID bracket
-          let reason = "Similar in style and themes";
-
-          if (match[4]) {
-            // Look for explicit reason format
-            const reasonMatch = match[4].match(/\s*[-|]\s*Reason:\s*(.+)/i);
-            if (reasonMatch) {
-              reason = reasonMatch[1].trim();
-            } else {
-              // Try alternative formats
-              const altReasonMatch = match[4].match(/\s*[-|:]\s*(.+)/i);
-              if (altReasonMatch) {
-                reason = altReasonMatch[1].trim();
-              }
-            }
-          }
-
-          return {
-            title: title,
-            year: year,
-            imdb_id: imdb_id,
-            aiRecommended: true,
-            recommendationReason: reason,
-          };
-        }
-
-        // If the standard format wasn't found, try an alternative approach
-        // Split by common separators that might indicate a reason
-        const parts = fullLine.split(/\s*[\-|:]\s*/);
-        const fullTitle = parts[0].trim();
-        const reason =
-          parts.length > 1
-            ? parts.slice(1).join(" - ").trim()
-            : "Similar in style and themes";
-
-        // Try to extract year and IMDB ID from the title part
-        const altMatch = fullTitle.match(
-          /(.+?)(?:\s+\((\d{4})\))?(?:\s*\[(tt\d+)\])?/,
-        );
-
-        if (altMatch) {
-          return {
-            title: altMatch[1].trim(),
-            year: altMatch[2] || null,
-            imdb_id: altMatch[3] || null,
-            aiRecommended: true,
-            recommendationReason: reason,
-          };
-        }
-
-        // Fallback if no patterns match
-        return {
-          title: fullTitle,
-          year: null,
-          imdb_id: null,
-          aiRecommended: true,
-          recommendationReason: reason,
-        };
-      });
+    // Extract titles and reasons
+    const titles = json.titles.map((title) => {
+      const { title: titleText, year, imdb_id, reason } = title;
+      return {
+        title: titleText,
+        year: year || null,
+        imdb_id: imdb_id || null,
+        aiRecommended: true,
+        recommendationReason: reason || "Similar in style and themes",
+      };
+    });
 
     console.log(`Generated ${titles.length} similar titles for "${title}"`);
 

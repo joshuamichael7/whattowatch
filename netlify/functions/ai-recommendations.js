@@ -129,7 +129,8 @@ exports.handler = async (event, context) => {
     // Parse the request body
     const {
       preferences,
-      limit = 20, // Increased to 20 to allow for filtering
+      mediaType = "movie",
+      limit = 20,
       apiVersion,
       modelName,
     } = JSON.parse(event.body || "{}");
@@ -220,7 +221,6 @@ exports.handler = async (event, context) => {
 
     // Extract the generated text from the response
     const responseText = response.data.candidates[0].content.parts[0].text;
-    console.log("Raw response text:", responseText.substring(0, 100) + "...");
 
     // Extract JSON from the response
     let jsonMatch = responseText.match(/\[\s*\{.*\}\s*\]/s);
