@@ -548,7 +548,10 @@ export async function verifyRecommendationWithOmdb(
     // Get the original AI data if available
     const aiTitle = item.title;
     const aiSynopsis = item.synopsis || item.overview || "";
-    const aiYear = item.year;
+    const aiYear =
+      item.year ||
+      (item.release_date ? item.release_date.substring(0, 4) : null);
+    const aiReason = item.recommendationReason || item.reason;
 
     console.log(
       `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
@@ -563,21 +566,106 @@ export async function verifyRecommendationWithOmdb(
       `[verifyRecommendationWithOmdb] VERIFICATION PROCESS RUNNING - This is not just grabbing the first result`,
     );
 
-    // Implement the actual verification logic here
-    // This would typically involve:
-    // 1. Searching OMDB for the title
-    // 2. Finding the best match based on title, year, and synopsis similarity
-    // 3. Returning the verified data or the original if no good match is found
+    // 1. Search OMDB for the title
+    const response = await fetch(
+      `/.netlify/functions/omdb?s=${encodeURIComponent(searchQuery)}`,
+    );
 
-    // For now, we'll return the original item with a verified flag
+    if (!response.ok) {
+      console.error(
+        `[verifyRecommendationWithOmdb] OMDB search failed: ${response.status}`,
+      );
+      return {
+        ...item,
+        verified: false,
+        similarityScore: 0,
+      };
+    }
+
+    const data = await response.json();
+
+    if (data.Response !== "True" || !data.Search || data.Search.length === 0) {
+      console.log(
+        `[verifyRecommendationWithOmdb] No results found for "${aiTitle}"`,
+      );
+
+      // Try a more lenient search without the year
+      if (aiYear) {
+        console.log(
+          `[verifyRecommendationWithOmdb] Trying search without year: "${aiTitle}"`,
+        );
+        const altResponse = await fetch(
+          `/.netlify/functions/omdb?s=${encodeURIComponent(aiTitle)}`,
+        );
+
+        if (altResponse.ok) {
+          const altData = await altResponse.json();
+          if (
+            altData.Response === "True" &&
+            altData.Search &&
+            altData.Search.length > 0
+          ) {
+            console.log(
+              `[verifyRecommendationWithOmdb] Found ${altData.Search.length} results without year`,
+            );
+            // Continue with these results
+            const bestMatch = await findBestMatch(item, altData.Search);
+            if (bestMatch) {
+              return {
+                ...item,
+                ...bestMatch,
+                recommendationReason:
+                  aiReason || bestMatch.recommendationReason,
+                verified: true,
+                similarityScore: bestMatch.similarityScore || 0,
+              };
+            }
+          }
+        }
+      }
+
+      return {
+        ...item,
+        verified: false,
+        similarityScore: 0,
+      };
+    }
+
+    console.log(
+      `[verifyRecommendationWithOmdb] Found ${data.Search.length} results for "${aiTitle}"`,
+    );
+
+    // 2. Find the best match based on title, year, and synopsis similarity
+    const bestMatch = await findBestMatch(item, data.Search);
+
+    if (bestMatch && bestMatch.similarityScore > 0.1) {
+      console.log(
+        `[verifyRecommendationWithOmdb] Best match: "${bestMatch.title}" with similarity score ${bestMatch.similarityScore}`,
+      );
+      return {
+        ...item,
+        ...bestMatch,
+        recommendationReason: aiReason || bestMatch.recommendationReason,
+        verified: true,
+        similarityScore: bestMatch.similarityScore || 0,
+      };
+    }
+
+    console.log(
+      `[verifyRecommendationWithOmdb] No good match found, using original data`,
+    );
     return {
       ...item,
-      verified: true,
-      similarityScore: 1.0,
+      verified: false,
+      similarityScore: 0,
     };
   } catch (error) {
     console.error("Error verifying recommendation:", error);
-    return null;
+    return {
+      ...item,
+      verified: false,
+      similarityScore: 0,
+    };
   }
 }
 
