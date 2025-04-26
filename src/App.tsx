@@ -14,6 +14,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { useAuth } from "./contexts/AuthContext";
 import AdminRoleDebugger from "./components/AdminRoleDebugger";
 import DebugPanel from "./components/DebugPanel";
+import DebugRecommendations from "./components/DebugRecommendations";
 import SupabaseConnectionTest from "./components/SupabaseConnectionTest";
 import UserDashboard from "./components/UserDashboard";
 

@@ -195,6 +195,7 @@ export async function getSimilarContentTitles(
         vote_count: 0,
         genre_ids: [],
         overview: item.synopsis || "",
+        synopsis: item.synopsis || "",
         recommendationReason:
           item.recommendationReason || item.reason || `Similar to ${title}`,
         year: item.year,
@@ -235,6 +236,7 @@ export async function getSimilarContentTitles(
           vote_count: 0,
           genre_ids: [],
           overview: item.synopsis || "",
+          synopsis: item.synopsis || "",
           recommendationReason:
             item.recommendationReason || item.reason || `Similar to ${title}`,
           year: item.year,
@@ -344,6 +346,7 @@ export async function getPersonalizedRecommendations(
         vote_count: 0,
         genre_ids: [],
         overview: item.synopsis || "",
+        synopsis: item.synopsis || "",
         recommendationReason: item.reason || "Matches your preferences",
         year: item.year,
         aiRecommended: true,

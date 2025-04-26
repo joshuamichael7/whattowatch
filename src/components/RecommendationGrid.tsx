@@ -349,7 +349,7 @@ const RecommendationGrid = ({
                       )}
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">
-                    {rec.synopsis}
+                    {rec.synopsis || rec.overview || "No synopsis available"}
                   </p>
                 </CardContent>
               </Link>
