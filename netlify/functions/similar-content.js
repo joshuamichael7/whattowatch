@@ -149,32 +149,41 @@ exports.handler = async (event, context) => {
 
     // Extract titles and reasons
     const titles = json.titles.map((title) => {
-      const { title: titleText, year, imdb_id, reason } = title;
-      return {
-        title: titleText,
-        year: year || null,
-        imdb_id: imdb_id || null,
+        title: item.title,
+        year: item.year || null,
+        imdb_id: item.imdb_id || null,
         aiRecommended: true,
-        recommendationReason: reason || "Similar in style and themes",
+        recommendationReason: item.reason || "Similar in style and themes",
+      }));
+      
+      console.log(`Generated ${titles.length} similar titles for "${title}"`);
+
+      // Log the extracted titles with reasons for debugging
+      console.log(
+        "Extracted titles with detailed reasons:",
+        titles.map(
+          (t) =>
+            `${t.title} (${t.year || "unknown"}) [${t.imdb_id || "no ID"}] - Reason: ${t.recommendationReason.substring(0, 50)}...`,
+        ),
+      );
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ titles, aiRecommended: true }),
       };
-    });
-
-    console.log(`Generated ${titles.length} similar titles for "${title}"`);
-
-    // Log the extracted titles with reasons for debugging
-    console.log(
-      "Extracted titles with detailed reasons:",
-      titles.map(
-        (t) =>
-          `${t.title} (${t.year || "unknown"}) [${t.imdb_id || "no ID"}] - Reason: ${t.recommendationReason.substring(0, 50)}...`,
-      ),
-    );
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ titles, aiRecommended: true }),
-    };
+    } catch (parseError) {
+      console.error("Error parsing extracted JSON:", parseError);
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          error: "Error parsing extracted JSON",
+          rawResponse: responseText,
+          extractedJson: extractedJson
+        }),
+      };
+    }
   } catch (error) {
     console.error("Error calling Gemini API:", error);
 

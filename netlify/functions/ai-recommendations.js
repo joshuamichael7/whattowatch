@@ -223,20 +223,27 @@ exports.handler = async (event, context) => {
     const responseText = response.data.candidates[0].content.parts[0].text;
 
     // Extract JSON from the response
-    let jsonMatch = responseText.match(/\[\s*\{.*\}\s*\]/s);
+    let jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
     if (!jsonMatch) {
       // Try to find JSON with different pattern
+      jsonMatch = responseText.match(/\[\s*\{.*\}\s*\]/s);
+    }
+    if (!jsonMatch) {
+      // Try to find JSON with another pattern
       jsonMatch = responseText.match(
         /\{\s*"recommendations"\s*:\s*\[.*\]\s*\}/s,
       );
     }
 
     if (jsonMatch) {
-      const jsonStr = jsonMatch[0];
+      const jsonStr = jsonMatch[1] || jsonMatch[0];
       console.log(`Extracted JSON: ${jsonStr}`);
 
       try {
-        const recommendations = JSON.parse(jsonStr);
+        const parsedData = JSON.parse(jsonStr);
+        const recommendations = Array.isArray(parsedData)
+          ? parsedData
+          : parsedData.recommendations;
         console.log(
           `Generated ${recommendations.length} personalized recommendations`,
         );
