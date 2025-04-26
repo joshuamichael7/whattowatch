@@ -101,6 +101,7 @@ const MovieDetailPage = () => {
 
       setIsLoading(true);
       setError(null);
+      setVerificationStatus("Starting verification process...");
 
       try {
         // Check if id is an IMDB ID (starts with tt) or a title
@@ -223,42 +224,42 @@ const MovieDetailPage = () => {
         console.log(`Running verification for: ${movieData.title}`);
 
         try {
-            // Log the movie data before verification
-            console.log("Movie data before verification:", {
-              title: movieData.title,
-              synopsis: movieData.synopsis || movieData.overview,
-              year:
-                movieData.year ||
-                (movieData.release_date
-                  ? movieData.release_date.substring(0, 4)
-                  : null),
+          // Log the movie data before verification
+          console.log("Movie data before verification:", {
+            title: movieData.title,
+            synopsis: movieData.synopsis || movieData.overview,
+            year:
+              movieData.year ||
+              (movieData.release_date
+                ? movieData.release_date.substring(0, 4)
+                : null),
+          });
+
+          const verifiedMovie = await verifyRecommendationWithOmdb(movieData);
+
+          if (verifiedMovie && verifiedMovie.verified) {
+            console.log(`Successfully verified: ${verifiedMovie.title}`);
+            console.log("Verification details:", {
+              originalTitle: movieData.title,
+              verifiedTitle: verifiedMovie.title,
+              similarityScore: verifiedMovie.similarityScore,
+              imdbId: verifiedMovie.imdb_id,
             });
-
-            const verifiedMovie = await verifyRecommendationWithOmdb(movieData);
-
-            if (verifiedMovie && verifiedMovie.verified) {
-              console.log(`Successfully verified: ${verifiedMovie.title}`);
-              console.log("Verification details:", {
-                originalTitle: movieData.title,
-                verifiedTitle: verifiedMovie.title,
-                similarityScore: verifiedMovie.similarityScore,
-                imdbId: verifiedMovie.imdb_id,
-              });
-              setVerificationStatus("Recommendation verified");
-              movieData = verifiedMovie;
-            } else {
-              console.log(
-                `Could not verify: ${movieData.title}, using original data`,
-              );
-              setVerificationStatus("Using original recommendation data");
-            }
-          } catch (verifyError) {
-            console.error("Error verifying recommendation:", verifyError);
-            setVerificationStatus("Verification failed, using original data");
+            setVerificationStatus("Recommendation verified");
+            movieData = verifiedMovie;
+          } else {
+            console.log(
+              `Could not verify: ${movieData.title}, using original data`,
+            );
+            setVerificationStatus("Using original recommendation data");
           }
-        }
 
-        setMovie(movieData as ContentItem);
+          setMovie(movieData as ContentItem);
+        } catch (verifyError) {
+          console.error("Error verifying recommendation:", verifyError);
+          setVerificationStatus("Verification failed, using original data");
+          setMovie(movieData as ContentItem);
+        }
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load content details",
