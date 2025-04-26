@@ -172,25 +172,7 @@ exports.handler = async (event, context) => {
         : `${Math.floor(preferences.viewingTime / 60)} hour${preferences.viewingTime >= 120 ? "s" : ""}${preferences.viewingTime % 60 > 0 ? ` ${preferences.viewingTime % 60} minutes` : ""}`;
 
     // Construct the prompt for Gemini
-    const prompt = `I need personalized movie and TV show recommendations based on the following preferences:\n\n
-    - Preferred genres: ${genresText || "No specific genres"}\n
-    - Current mood: ${preferences.mood}\n
-    - Available viewing time: ${viewingTimeText}\n
-    - Content they've enjoyed: ${favoritesText || "No examples provided"}\n
-    - Content they want to avoid: ${avoidText || "No examples provided"}\n
-    - Age/content rating preference: ${preferences.ageRating}\n\n
-    Please recommend exactly ${limit} movies or TV shows that match these preferences. For each recommendation, provide:\n
-    1. The exact title as it appears in IMDB\n
-    2. The year of release in parentheses\n
-    3. A brief reason why it matches their preferences (1-2 sentences)\n\n
-    Format your response as a JSON array with title, year, and reason properties for each recommendation. Example:\n
-    [\n
-      {"title": "The Shawshank Redemption", "year": "1994", "reason": "A powerful drama about hope and redemption that matches your preference for thoughtful storytelling."},\n
-      {"title": "Inception", "year": "2010", "reason": "A mind-bending sci-fi thriller that aligns with your interest in complex narratives."}\n
-    ]\n
-    \n
-    IMPORTANT: Make sure the titles are accurate and match real movies or TV shows.\n
-    Only return the JSON array, no other text.`;
+    const prompt = `I need personalized movie and TV show recommendations based on the following preferences:\\n\\n\n    - Preferred genres: ${genresText || "No specific genres"}\\n\n    - Current mood: ${preferences.mood}\\n\n    - Available viewing time: ${viewingTimeText}\\n\n    - Content they've enjoyed: ${favoritesText || "No examples provided"}\\n\n    - Content they want to avoid: ${avoidText || "No examples provided"}\\n\n    - Age/content rating preference: ${preferences.ageRating}\\n\\n\n    Please recommend exactly ${limit} movies or TV shows that match these preferences. For each recommendation, provide:\\n\n    1. The exact title as it appears in IMDB\\n\n    2. The year of release (just the 4-digit year)\\n\n    3. A brief reason why it matches their preferences (1-2 sentences)\\n\n    4. A brief synopsis of the plot (1-2 sentences)\\n\\n\n    Format your response as a JSON array with title, year, reason, and synopsis properties for each recommendation. Example:\\n\n    [\\n\n      {\"title\": \"The Shawshank Redemption\", \"year\": \"1994\", \"reason\": \"A powerful drama about hope and redemption that matches your preference for thoughtful storytelling.\", \"synopsis\": \"Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.\"},\\n\n      {\"title\": \"Inception\", \"year\": \"2010\", \"reason\": \"A mind-bending sci-fi thriller that aligns with your interest in complex narratives.\", \"synopsis\": \"A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.\"}\\n\n    ]\\n\n    \\n\n    IMPORTANT: Make sure the titles are accurate and match real movies or TV shows.\\n\n    Only return the JSON array, no other text.`;
 
     // Construct the API endpoint URL
     const apiEndpoint = `https://generativelanguage.googleapis.com/${defaultConfig.apiVersion}/models/${defaultConfig.modelName}:generateContent`;
@@ -307,7 +289,7 @@ exports.handler = async (event, context) => {
       const lines = responseText.split("\n");
 
       for (const line of lines) {
-        // Look for patterns like: {"title": "Movie Name", "year": "2021", "imdb_id": "tt12345", "director": "...", "actors": "...", "reason": "..."},
+        // Look for patterns like: {"title": "Movie Name", "year": "2021", "reason": "...", "synopsis": "..."},
         if (line.includes('"title"') && line.includes('"reason"')) {
           const titleMatch = line.match(/"title"\s*:\s*"([^"]+)"/);
           const yearMatch = line.match(/"year"\s*:\s*"([^"]+)"/);
@@ -315,6 +297,7 @@ exports.handler = async (event, context) => {
           const directorMatch = line.match(/"director"\s*:\s*"([^"]+)"/);
           const actorsMatch = line.match(/"actors"\s*:\s*"([^"]+)"/);
           const reasonMatch = line.match(/"reason"\s*:\s*"([^"]+)"/);
+          const synopsisMatch = line.match(/"synopsis"\s*:\s*"([^"]+)"/);
 
           if (titleMatch && reasonMatch) {
             manualItems.push({
@@ -324,6 +307,7 @@ exports.handler = async (event, context) => {
               director: directorMatch ? directorMatch[1] : null,
               actors: actorsMatch ? actorsMatch[1] : null,
               reason: reasonMatch[1],
+              synopsis: synopsisMatch ? synopsisMatch[1] : null,
             });
           }
         }

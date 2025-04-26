@@ -3,91 +3,27 @@ import { getEnvVar } from "../lib/utils";
 import { ContentItem } from "../types/omdb";
 
 /**
- * Helper function to validate a recommendation against OMDB data
- * @param recommendation The recommendation to validate
- * @returns True if the recommendation is valid, false otherwise
+ * Helper function to validate a recommendation by title only
+ * @param title The title to validate
+ * @param year Optional year to validate
+ * @returns True if the title is valid, false otherwise
  */
-async function validateRecommendationWithOmdb(recommendation: {
-  title: string;
-  year?: string;
-  imdb_id?: string;
-  reason?: string;
-}): Promise<boolean> {
+async function validateRecommendationByTitleOnly(
+  title: string,
+  year?: string,
+): Promise<boolean> {
   try {
-    if (!recommendation.title) {
-      console.log(
-        "[validateRecommendationWithOmdb] Missing title in recommendation",
-      );
+    if (!title) {
+      console.log("[validateRecommendationByTitleOnly] Missing title");
       return false;
     }
 
-    // First, try to validate by IMDB ID if available
-    if (recommendation.imdb_id && recommendation.imdb_id.startsWith("tt")) {
-      console.log(
-        `[validateRecommendationWithOmdb] Validating by IMDB ID: ${recommendation.imdb_id}`,
-      );
-
-      // Fetch content by IMDB ID
-      const response = await fetch(
-        `/.netlify/functions/omdb?i=${recommendation.imdb_id}&plot=short`,
-      );
-      if (!response.ok) {
-        console.error(
-          `[validateRecommendationWithOmdb] Error fetching by IMDB ID: ${response.status}`,
-        );
-        return false;
-      }
-
-      const data = await response.json();
-
-      // Check if the response is valid
-      if (data.Response === "False" || !data.Title) {
-        console.log(
-          `[validateRecommendationWithOmdb] Invalid IMDB ID: ${recommendation.imdb_id}`,
-        );
-        return false;
-      }
-
-      // Check if the title from OMDB matches the recommendation title
-      const isTitleMatch = await checkTitleMatch(
-        data.Title,
-        recommendation.title,
-      );
-      if (!isTitleMatch) {
-        console.log(
-          `[validateRecommendationWithOmdb] Title mismatch: OMDB "${data.Title}" vs Recommendation "${recommendation.title}"`,
-        );
-        return false;
-      }
-
-      // If year is provided, check if it matches
-      if (
-        recommendation.year &&
-        data.Year &&
-        recommendation.year !== data.Year
-      ) {
-        console.log(
-          `[validateRecommendationWithOmdb] Year mismatch: OMDB ${data.Year} vs Recommendation ${recommendation.year}`,
-        );
-        return false;
-      }
-
-      console.log(
-        `[validateRecommendationWithOmdb] Valid recommendation: "${recommendation.title}" (${recommendation.imdb_id})`,
-      );
-      return true;
-    }
-
-    // If no IMDB ID or validation by ID failed, try by title
     console.log(
-      `[validateRecommendationWithOmdb] Validating by title: "${recommendation.title}"`,
+      `[validateRecommendationByTitleOnly] Validating title: "${title}"${year ? ` (${year})` : ""}`,
     );
 
-    // Construct search query with title and year if available
-    let searchQuery = recommendation.title;
-    if (recommendation.year) {
-      searchQuery += ` ${recommendation.year}`;
-    }
+    // Construct search query with title only - don't include year to maximize chances of finding a match
+    let searchQuery = title;
 
     // Search by title
     const response = await fetch(
@@ -95,9 +31,10 @@ async function validateRecommendationWithOmdb(recommendation: {
     );
     if (!response.ok) {
       console.error(
-        `[validateRecommendationWithOmdb] Error searching by title: ${response.status}`,
+        `[validateRecommendationByTitleOnly] Error searching by title: ${response.status}`,
       );
-      return false;
+      // Return true anyway to avoid filtering out recommendations due to API errors
+      return true;
     }
 
     const data = await response.json();
@@ -110,227 +47,49 @@ async function validateRecommendationWithOmdb(recommendation: {
       data.Search.length === 0
     ) {
       console.log(
-        `[validateRecommendationWithOmdb] No results found for title: "${recommendation.title}"`,
+        `[validateRecommendationByTitleOnly] No results found for title: "${title}", trying alternative search`,
       );
-      return false;
-    }
 
-    // Find the best match in search results
-    const bestMatch = findBestTitleMatch(
-      data.Search,
-      recommendation.title,
-      recommendation.year,
-    );
-    if (!bestMatch) {
+      // Try a more lenient search by taking just the first word or first few characters
+      const simplifiedTitle = title.split(" ")[0];
+      if (simplifiedTitle && simplifiedTitle.length > 2) {
+        const altResponse = await fetch(
+          `/.netlify/functions/omdb?s=${encodeURIComponent(simplifiedTitle)}`,
+        );
+        if (altResponse.ok) {
+          const altData = await altResponse.json();
+          if (
+            altData.Response === "True" &&
+            altData.Search &&
+            altData.Search.length > 0
+          ) {
+            console.log(
+              `[validateRecommendationByTitleOnly] Found results with simplified search: ${simplifiedTitle}`,
+            );
+            return true;
+          }
+        }
+      }
+
+      // If we still can't find anything, just accept the recommendation anyway
       console.log(
-        `[validateRecommendationWithOmdb] No good match found for title: "${recommendation.title}"`,
+        `[validateRecommendationByTitleOnly] No results found, but accepting recommendation anyway: "${title}"`,
       );
-      return false;
+      return true;
     }
 
     console.log(
-      `[validateRecommendationWithOmdb] Valid recommendation: "${recommendation.title}" matched with "${bestMatch.Title}" (${bestMatch.imdbID})`,
+      `[validateRecommendationByTitleOnly] Found ${data.Search.length} results for "${title}"`,
     );
     return true;
   } catch (error) {
     console.error(
-      `[validateRecommendationWithOmdb] Error validating recommendation:`,
+      `[validateRecommendationByTitleOnly] Error validating title:`,
       error,
     );
-    return false;
-  }
-}
-
-/**
- * Helper function to check if two titles match (with some flexibility)
- * @param title1 First title
- * @param title2 Second title
- * @returns True if the titles match, false otherwise
- */
-async function checkTitleMatch(
-  title1: string,
-  title2: string,
-): Promise<boolean> {
-  if (!title1 || !title2) return false;
-
-  // Normalize titles: lowercase, remove special characters, trim whitespace
-  const normalizeTitle = (title: string): string => {
-    return title
-      .toLowerCase()
-      .replace(/[^\w\s]/g, "") // Remove special characters
-      .replace(/\s+/g, " ") // Replace multiple spaces with a single space
-      .trim();
-  };
-
-  const normalizedTitle1 = normalizeTitle(title1);
-  const normalizedTitle2 = normalizeTitle(title2);
-
-  // Check for exact match first
-  if (normalizedTitle1 === normalizedTitle2) {
-    console.log(
-      `[checkTitleMatch] Exact match found between "${title1}" and "${title2}"`,
-    );
+    // Return true on error to avoid filtering out recommendations due to technical issues
     return true;
   }
-
-  // Check if one title is contained within the other (for partial matches)
-  if (
-    normalizedTitle1.includes(normalizedTitle2) ||
-    normalizedTitle2.includes(normalizedTitle1)
-  ) {
-    console.log(
-      `[checkTitleMatch] Partial match found between "${title1}" and "${title2}"`,
-    );
-    return true;
-  }
-
-  // Calculate similarity for close matches
-  const maxLength = Math.max(normalizedTitle1.length, normalizedTitle2.length);
-  if (maxLength === 0) return false;
-
-  // Simple Levenshtein distance calculation for similarity
-  const distance = levenshteinDistance(normalizedTitle1, normalizedTitle2);
-  const similarity = 1 - distance / maxLength;
-
-  // Consider it a match if similarity is above threshold (e.g., 0.8 or 80% similar)
-  const isMatch = similarity > 0.8;
-  if (isMatch) {
-    console.log(
-      `[checkTitleMatch] Close match found between "${title1}" and "${title2}" (similarity: ${similarity.toFixed(2)})`,
-    );
-  }
-  return isMatch;
-}
-
-/**
- * Helper function to calculate Levenshtein distance between two strings
- * @param str1 First string
- * @param str2 Second string
- * @returns The Levenshtein distance
- */
-function levenshteinDistance(str1: string, str2: string): number {
-  const m = str1.length;
-  const n = str2.length;
-
-  // Create a matrix of size (m+1) x (n+1)
-  const dp: number[][] = Array(m + 1)
-    .fill(null)
-    .map(() => Array(n + 1).fill(0));
-
-  // Initialize the first row and column
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-
-  // Fill the matrix
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1, // deletion
-        dp[i][j - 1] + 1, // insertion
-        dp[i - 1][j - 1] + cost, // substitution
-      );
-    }
-  }
-
-  return dp[m][n];
-}
-
-/**
- * Find the best title match in search results
- * @param results Search results from OMDB
- * @param queryTitle The title to match
- * @param queryYear Optional year to match
- * @returns The best matching item or null if no good match found
- */
-function findBestTitleMatch(
-  results: any[],
-  queryTitle: string,
-  queryYear?: string,
-): any | null {
-  if (!results || !Array.isArray(results) || results.length === 0) return null;
-
-  // First try to find an exact title match with year if provided
-  if (queryYear) {
-    const exactMatchWithYear = results.find((item) => {
-      const titleMatches =
-        item.Title.toLowerCase() === queryTitle.toLowerCase();
-      return titleMatches && item.Year === queryYear;
-    });
-    if (exactMatchWithYear) return exactMatchWithYear;
-  }
-
-  // Then try to find an exact title match without considering year
-  const exactMatch = results.find(
-    (item) => item.Title.toLowerCase() === queryTitle.toLowerCase(),
-  );
-  if (exactMatch) return exactMatch;
-
-  // If no exact match, try to find a close match
-  for (const item of results) {
-    const normalizeTitle = (title: string): string => {
-      return title
-        .toLowerCase()
-        .replace(/[^\w\s]/g, "") // Remove special characters
-        .replace(/\s+/g, " ") // Replace multiple spaces with a single space
-        .trim();
-    };
-
-    const normalizedItemTitle = normalizeTitle(item.Title);
-    const normalizedQueryTitle = normalizeTitle(queryTitle);
-
-    // Check for partial matches
-    if (
-      normalizedItemTitle.includes(normalizedQueryTitle) ||
-      normalizedQueryTitle.includes(normalizedItemTitle)
-    ) {
-      return item;
-    }
-  }
-
-  // If still no match, calculate similarity for each result
-  let bestMatch = null;
-  let bestSimilarity = 0;
-
-  for (const item of results) {
-    const normalizeTitle = (title: string): string => {
-      return title
-        .toLowerCase()
-        .replace(/[^\w\s]/g, "") // Remove special characters
-        .replace(/\s+/g, " ") // Replace multiple spaces with a single space
-        .trim();
-    };
-
-    const normalizedItemTitle = normalizeTitle(item.Title);
-    const normalizedQueryTitle = normalizeTitle(queryTitle);
-
-    const maxLength = Math.max(
-      normalizedItemTitle.length,
-      normalizedQueryTitle.length,
-    );
-    if (maxLength === 0) continue;
-
-    const distance = levenshteinDistance(
-      normalizedItemTitle,
-      normalizedQueryTitle,
-    );
-    const similarity = 1 - distance / maxLength;
-
-    if (similarity > bestSimilarity && similarity > 0.7) {
-      bestSimilarity = similarity;
-      bestMatch = item;
-    }
-  }
-
-  // Only return if similarity is above threshold
-  if (bestSimilarity > 0.7) {
-    console.log(
-      `[findBestTitleMatch] Found match with similarity ${bestSimilarity.toFixed(2)}: "${bestMatch.Title}"`,
-    );
-    return bestMatch;
-  }
-
-  return null;
 }
 
 /**
@@ -382,34 +141,92 @@ export async function getSimilarContentTitles(
     }
 
     console.log(
-      `[getSimilarContentTitles] Received ${data.titles.length} recommendations, validating...`,
+      `[getSimilarContentTitles] Received ${data.titles.length} recommendations`,
     );
 
-    // Validate each recommendation against OMDB
-    const validatedRecommendations: ContentItem[] = [];
+    // Convert recommendations to ContentItem format without validation
+    const recommendations: ContentItem[] = [];
+    const validationPromises: Promise<boolean>[] = [];
+    const validItems: any[] = [];
 
+    // First, validate all recommendations
     for (const item of data.titles) {
-      // Skip items without title or IMDB ID
-      if (!item.title || (!item.imdb_id && !item.imdbID)) {
+      // Skip items without title
+      if (!item.title) {
         console.log(
-          `[getSimilarContentTitles] Skipping item with missing title or IMDB ID`,
+          `[getSimilarContentTitles] Skipping item with missing title`,
         );
         continue;
       }
 
-      const imdbId = item.imdb_id || item.imdbID;
-
       // Validate the recommendation
-      const isValid = await validateRecommendationWithOmdb({
+      const validationPromise = validateRecommendation({
         title: item.title,
         year: item.year,
-        imdb_id: imdbId,
-        reason: item.recommendationReason || item.reason,
+        synopsis: item.synopsis,
+      }).then((isValid) => {
+        if (isValid) {
+          validItems.push(item);
+        }
+        return isValid;
       });
 
-      if (isValid) {
+      validationPromises.push(validationPromise);
+    }
+
+    // Wait for all validations to complete
+    await Promise.all(validationPromises);
+
+    console.log(
+      `[getSimilarContentTitles] ${validItems.length} items passed validation`,
+    );
+
+    // Convert valid items to ContentItem format
+    for (const item of validItems) {
+      const imdbId = item.imdb_id || item.imdbID || generateUUID();
+
+      // Convert to ContentItem format
+      recommendations.push({
+        id: imdbId,
+        title: item.title,
+        poster_path: item.poster || "",
+        media_type: mediaType,
+        vote_average: parseFloat(item.rating || "0") || 0,
+        vote_count: 0,
+        genre_ids: [],
+        overview: item.synopsis || "",
+        recommendationReason:
+          item.recommendationReason || item.reason || `Similar to ${title}`,
+        year: item.year,
+        aiRecommended: true,
+      });
+
+      // Stop once we have enough recommendations
+      if (recommendations.length >= limit) {
+        break;
+      }
+    }
+
+    // If we don't have enough recommendations, include some unvalidated ones
+    if (
+      recommendations.length < limit &&
+      data.titles.length > validItems.length
+    ) {
+      console.log(
+        `[getSimilarContentTitles] Adding unvalidated recommendations to meet minimum count`,
+      );
+
+      for (const item of data.titles) {
+        // Skip items that were already validated and added
+        if (validItems.includes(item)) continue;
+
+        // Skip items without title
+        if (!item.title) continue;
+
+        const imdbId = item.imdb_id || item.imdbID || generateUUID();
+
         // Convert to ContentItem format
-        validatedRecommendations.push({
+        recommendations.push({
           id: imdbId,
           title: item.title,
           poster_path: item.poster || "",
@@ -424,17 +241,17 @@ export async function getSimilarContentTitles(
           aiRecommended: true,
         });
 
-        // Stop once we have enough valid recommendations
-        if (validatedRecommendations.length >= limit) {
+        // Stop once we have enough recommendations
+        if (recommendations.length >= limit) {
           break;
         }
       }
     }
 
     console.log(
-      `[getSimilarContentTitles] Returning ${validatedRecommendations.length} validated recommendations`,
+      `[getSimilarContentTitles] Returning ${recommendations.length} recommendations`,
     );
-    return validatedRecommendations;
+    return recommendations;
   } catch (error) {
     console.error(
       "[getSimilarContentTitles] Error getting similar content:",
@@ -491,11 +308,8 @@ export async function getPersonalizedRecommendations(
     }
 
     console.log(
-      `[getPersonalizedRecommendations] Received ${data.recommendations.length} recommendations, validating...`,
+      `[getPersonalizedRecommendations] Received ${data.recommendations.length} recommendations`,
     );
-
-    // Validate each recommendation against OMDB
-    const validatedRecommendations: ContentItem[] = [];
 
     // Add more logging to see what we're getting from the API
     console.log(
@@ -503,9 +317,11 @@ export async function getPersonalizedRecommendations(
       data.recommendations.slice(0, 3).map((r) => ({
         title: r.title,
         year: r.year,
-        imdb_id: r.imdb_id || r.imdbID,
       })),
     );
+
+    // Convert recommendations to ContentItem format
+    const recommendations: ContentItem[] = [];
 
     for (const item of data.recommendations) {
       // Skip items without title
@@ -516,45 +332,33 @@ export async function getPersonalizedRecommendations(
         continue;
       }
 
-      const imdbId = item.imdb_id || item.imdbID;
+      const imdbId = item.imdb_id || item.imdbID || generateUUID();
 
-      // Validate the recommendation
-      const isValid = await validateRecommendationWithOmdb({
+      // Convert to ContentItem format
+      recommendations.push({
+        id: imdbId,
         title: item.title,
+        poster_path: item.poster || "",
+        media_type: item.type === "movie" ? "movie" : "tv",
+        vote_average: parseFloat(item.rating || "0") || 0,
+        vote_count: 0,
+        genre_ids: [],
+        overview: item.synopsis || "",
+        recommendationReason: item.reason || "Matches your preferences",
         year: item.year,
-        imdb_id: imdbId,
-        director: item.director,
-        actors: item.actors,
-        reason: item.reason,
+        aiRecommended: true,
       });
 
-      if (isValid) {
-        // Convert to ContentItem format
-        validatedRecommendations.push({
-          id: imdbId || generateUUID(),
-          title: item.title,
-          poster_path: item.poster || "",
-          media_type: item.type === "movie" ? "movie" : "tv",
-          vote_average: parseFloat(item.rating || "0") || 0,
-          vote_count: 0,
-          genre_ids: [],
-          overview: item.synopsis || "",
-          recommendationReason: item.reason || "Matches your preferences",
-          year: item.year,
-          aiRecommended: true,
-        });
-
-        // Stop once we have enough valid recommendations
-        if (validatedRecommendations.length >= limit) {
-          break;
-        }
+      // Stop once we have enough recommendations
+      if (recommendations.length >= limit) {
+        break;
       }
     }
 
     console.log(
-      `[getPersonalizedRecommendations] Returning ${validatedRecommendations.length} validated recommendations`,
+      `[getPersonalizedRecommendations] Returning ${recommendations.length} recommendations`,
     );
-    return validatedRecommendations;
+    return recommendations;
   } catch (error) {
     console.error(
       "[getPersonalizedRecommendations] Error getting personalized recommendations:",

@@ -84,11 +84,12 @@ exports.handler = async (event, context) => {
     - title: The EXACT title as it appears in IMDB
     - year: The year of release
     - reason: A brief explanation of why this content is similar
+    - synopsis: A brief summary of the plot (1-2 sentences)
     
     Example JSON format:
     [
-      {"title": "Parks and Recreation", "year": "2009", "reason": "Mockumentary workplace comedy with quirky characters and similar humor style"},
-      {"title": "Brooklyn Nine-Nine", "year": "2013", "reason": "Ensemble workplace comedy with similar character dynamics"}
+      {"title": "Parks and Recreation", "year": "2009", "reason": "Mockumentary workplace comedy with quirky characters and similar humor style", "synopsis": "The absurd antics of an Indiana town's public officials as they pursue projects to make their city a better place."},
+      {"title": "Brooklyn Nine-Nine", "year": "2013", "reason": "Ensemble workplace comedy with similar character dynamics", "synopsis": "Comedy series following the exploits of Det. Jake Peralta and his diverse, lovable colleagues as they police the NYPD's 99th Precinct."}
     ]
     
     IMPORTANT: Use the EXACT title spelling and formatting as it appears in IMDB.
@@ -183,6 +184,7 @@ exports.handler = async (event, context) => {
           imdb_id: item.imdb_id || null,
           aiRecommended: true,
           recommendationReason: item.reason || "Similar in style and themes",
+          synopsis: item.synopsis || null,
         };
       });
 
