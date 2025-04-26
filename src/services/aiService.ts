@@ -696,6 +696,10 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
     "Remember: War of the Son",
   ];
 
+  // Define aiSynopsis for use in similarity comparison
+  const aiSynopsis = aiItem.synopsis || aiItem.overview || "";
+  const aiTitle = aiItem.title || "";
+
   const isLikelySeries =
     aiSynopsis.toLowerCase().includes("series") ||
     aiSynopsis.toLowerCase().includes("episode") ||
@@ -709,9 +713,6 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
     aiItem.media_type = "tv";
   }
 
-  // Define aiSynopsis for use in similarity comparison
-  const aiSynopsis = aiItem.synopsis || aiItem.overview || "";
-
   // Define aiYear for filtering
   const aiYear =
     aiItem.year ||
@@ -721,10 +722,10 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
   const detailedCandidates: ContentItem[] = [];
 
   // Limit to top 5 candidates to avoid too many API calls
-  const maxCandidates = Math.min(candidates.length, 5);
+  const maxCandidates = Math.min(omdbResults.length, 5);
 
   for (let i = 0; i < maxCandidates; i++) {
-    const candidate = candidates[i];
+    const candidate = omdbResults[i];
     try {
       const details = await getFullDetails(candidate.imdbID);
       if (details && details.Plot && details.Plot !== "N/A") {
@@ -794,9 +795,9 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
   }
 
   // If no detailed candidates were found, fall back to the first result
-  if (candidates.length > 0) {
+  if (omdbResults.length > 0) {
     try {
-      const details = await getFullDetails(candidates[0].imdbID);
+      const details = await getFullDetails(omdbResults[0].imdbID);
       if (details) {
         return {
           id: details.imdbID,
@@ -881,6 +882,7 @@ async function findBestMatchWithSynopsis(
   }
 
   // Then filter by year if available
+  let candidates = omdbResults;
   if (aiYear && candidates.length > 1) {
     const yearMatches = candidates.filter((result) => {
       // Handle year ranges like "2019–2022" in TV shows

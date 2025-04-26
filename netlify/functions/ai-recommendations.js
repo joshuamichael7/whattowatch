@@ -297,51 +297,103 @@ exports.handler = async (event, context) => {
       const jsonObjects = [];
       let currentObject = "";
       let inObject = false;
+      let bracketCount = 0;
 
+      // Try to extract the full JSON array first
+      const jsonArrayMatch = responseText.match(/\[\s*\{[\s\S]*\}\s*\]/s);
+      if (jsonArrayMatch) {
+        try {
+          const jsonArray = JSON.parse(jsonArrayMatch[0]);
+          if (Array.isArray(jsonArray) && jsonArray.length > 0) {
+            console.log(`Extracted ${jsonArray.length} items from JSON array`);
+            return {
+              statusCode: 200,
+              headers,
+              body: JSON.stringify({
+                recommendations: jsonArray,
+              }),
+            };
+          }
+        } catch (e) {
+          console.error("Error parsing JSON array:", e);
+        }
+      }
+
+      // If we couldn't extract the full array, try line by line
       for (const line of lines) {
         const trimmedLine = line.trim();
-        if (trimmedLine.startsWith("{") && !inObject) {
-          inObject = true;
-          currentObject = trimmedLine;
+
+        // Count opening and closing braces to track complete objects
+        if (trimmedLine.includes("{")) {
+          if (!inObject) {
+            inObject = true;
+            currentObject = trimmedLine;
+          } else {
+            currentObject += trimmedLine;
+          }
+          bracketCount += (trimmedLine.match(/{/g) || []).length;
+        } else if (trimmedLine.includes("}")) {
+          currentObject += trimmedLine;
+          bracketCount -= (trimmedLine.match(/}/g) || []).length;
+
+          // If brackets are balanced, we have a complete object
+          if (bracketCount === 0 && inObject) {
+            // Clean up the object string - remove any trailing commas
+            let cleanObject = currentObject;
+            if (cleanObject.endsWith(",")) {
+              cleanObject = cleanObject.slice(0, -1);
+            }
+
+            try {
+              // Try to parse as a single object
+              const obj = JSON.parse(cleanObject);
+              if (obj.title) {
+                manualItems.push({
+                  title: obj.title,
+                  year: obj.year || null,
+                  imdb_id: obj.imdb_id || null,
+                  director: obj.director || null,
+                  actors: obj.actors || null,
+                  reason: obj.reason || "Matches your preferences",
+                  synopsis: obj.synopsis || null,
+                });
+              }
+            } catch (e) {
+              // Try to parse as an array
+              try {
+                if (cleanObject.startsWith("[") && cleanObject.endsWith("]")) {
+                  const objArray = JSON.parse(cleanObject);
+                  if (Array.isArray(objArray)) {
+                    for (const item of objArray) {
+                      if (item.title) {
+                        manualItems.push({
+                          title: item.title,
+                          year: item.year || null,
+                          imdb_id: item.imdb_id || null,
+                          director: item.director || null,
+                          actors: item.actors || null,
+                          reason: item.reason || "Matches your preferences",
+                          synopsis: item.synopsis || null,
+                        });
+                      }
+                    }
+                  }
+                }
+              } catch (arrayError) {
+                // Not a valid JSON array either
+              }
+            }
+
+            inObject = false;
+            currentObject = "";
+            bracketCount = 0;
+          }
         } else if (inObject) {
           currentObject += trimmedLine;
-          if (trimmedLine.endsWith(",") || trimmedLine.endsWith("}")) {
-            if (currentObject.endsWith(",")) {
-              currentObject = currentObject.slice(0, -1);
-            }
-            try {
-              const obj = JSON.parse(currentObject);
-              jsonObjects.push(obj);
-            } catch (e) {
-              // Not a complete object yet
-            }
-            if (trimmedLine.endsWith("}")) {
-              inObject = false;
-              currentObject = "";
-            }
-          }
         }
       }
 
-      // If we found complete objects, use them
-      if (jsonObjects.length > 0) {
-        console.log(`Extracted ${jsonObjects.length} complete JSON objects`);
-        for (const obj of jsonObjects) {
-          if (obj.title) {
-            manualItems.push({
-              title: obj.title,
-              year: obj.year || null,
-              imdb_id: obj.imdb_id || null,
-              director: obj.director || null,
-              actors: obj.actors || null,
-              reason: obj.reason || "Matches your preferences",
-              synopsis: obj.synopsis || null,
-            });
-          }
-        }
-      }
-
-      // If we couldn't extract complete objects, fall back to regex matching
+      // If we still couldn't extract objects, fall back to regex matching
       if (manualItems.length === 0) {
         console.log("Falling back to regex extraction");
         for (const line of lines) {
