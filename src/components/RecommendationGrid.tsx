@@ -60,6 +60,7 @@ interface RecommendationItem {
   runtime?: string;
   contentRating?: string;
   content_rating?: string;
+  imdb_id?: string; // Added to support direct IMDB ID links
 }
 
 interface RecommendationGridProps {
@@ -280,7 +281,7 @@ const RecommendationGrid = ({
               className="overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow"
             >
               <Link
-                to={`/movie/${encodeURIComponent(rec.title)}`}
+                to={`/movie/${rec.imdb_id || encodeURIComponent(rec.title)}`}
                 className="flex flex-col h-full"
               >
                 <div className="relative aspect-[2/3] overflow-hidden bg-muted">
@@ -507,7 +508,7 @@ const RecommendationGrid = ({
                                 asChild
                               >
                                 <Link
-                                  to={`/${selectedItem.type}/${selectedItem.id}`}
+                                  to={`/${selectedItem.type}/${selectedItem.imdb_id || selectedItem.id}`}
                                 >
                                   <ExternalLink size={16} />
                                   View Details

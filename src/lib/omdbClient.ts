@@ -17,9 +17,20 @@ async function fetchFromOmdb(params: URLSearchParams) {
     // Log the search query for debugging
     if (params.has("s")) {
       console.log(`[omdbClient] Search query: ${params.get("s")}`);
+    } else if (params.has("i")) {
+      console.log(`[omdbClient] IMDB ID query: ${params.get("i")}`);
+    } else if (params.has("t")) {
+      console.log(`[omdbClient] Title query: ${params.get("t")}`);
     }
 
     const response = await fetch(`${API_ENDPOINT}?${params.toString()}`);
+    if (!response.ok) {
+      console.error(
+        `OMDB API response not OK: ${response.status} ${response.statusText}`,
+      );
+      return null;
+    }
+
     const data = await response.json();
 
     if (data.Response === "False") {
@@ -532,8 +543,12 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
 
     params.append("plot", "full");
 
+    console.log(`Fetching from OMDB with params: ${params.toString()}`);
     const data = await fetchFromOmdb(params);
-    if (!data) return null;
+    if (!data) {
+      console.error(`No data returned from OMDB for ID: ${id}`);
+      return null;
+    }
 
     // Use the helper function to format OMDB data
     const contentItem = formatOMDBData(data);
