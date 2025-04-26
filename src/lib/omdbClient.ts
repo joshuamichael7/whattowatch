@@ -318,13 +318,30 @@ async function searchFromOmdb(
   type?: "movie" | "series" | "all",
 ): Promise<ContentItem[]> {
   try {
+    // Handle Korean drama titles with year in parentheses
+    let searchQuery = query;
+    let searchYear = null;
+    const yearMatch = query.match(/(.*?)\s*\((\d{4})\)/);
+    if (yearMatch) {
+      searchQuery = yearMatch[1].trim();
+      searchYear = yearMatch[2];
+      console.log(
+        `[omdbClient] Extracted title "${searchQuery}" and year "${searchYear}" from "${query}"`,
+      );
+    }
+
     // First try an exact title search using the 't' parameter
     const exactParams = new URLSearchParams({
-      t: query,
+      t: searchQuery,
     });
 
     if (type && type !== "all") {
       exactParams.append("type", type);
+    }
+
+    // If we have a year, add it to the exact search
+    if (searchYear) {
+      exactParams.append("y", searchYear);
     }
 
     const exactData = await fetchFromOmdb(exactParams);
@@ -332,16 +349,21 @@ async function searchFromOmdb(
     // If we found an exact match, use it and then supplement with regular search results
     if (exactData && exactData.Response === "True" && exactData.Title) {
       console.log(
-        `[omdbClient] Found exact match for "${query}": ${exactData.Title}`,
+        `[omdbClient] Found exact match for "${query}": ${exactData.Title} (${exactData.Year})`,
       );
 
       // Now do a regular search to get additional results
       const params = new URLSearchParams({
-        s: query,
+        s: searchQuery,
       });
 
       if (type && type !== "all") {
         params.append("type", type);
+      }
+
+      // If we have a year, add it to the search
+      if (searchYear) {
+        params.append("y", searchYear);
       }
 
       const searchData = await fetchFromOmdb(params);
@@ -372,9 +394,9 @@ async function searchFromOmdb(
       return [exactItem];
     }
 
-    // If no exact match, fall back to regular search
+    // If no exact match, try search without year first
     const params = new URLSearchParams({
-      s: query,
+      s: searchQuery,
     });
 
     if (type && type !== "all") {
@@ -382,7 +404,42 @@ async function searchFromOmdb(
     }
 
     const data = await fetchFromOmdb(params);
-    if (!data) {
+    if (
+      !data ||
+      data.Response !== "True" ||
+      !data.Search ||
+      data.Search.length === 0
+    ) {
+      // If search without year fails and we have a year, try with just the first word of the title
+      // This helps with Korean dramas that might be listed under different naming conventions
+      const firstWord = searchQuery.split(" ")[0];
+      if (firstWord && firstWord.length > 2 && firstWord !== searchQuery) {
+        console.log(
+          `[omdbClient] Trying simplified search with first word: "${firstWord}"`,
+        );
+        const simplifiedParams = new URLSearchParams({
+          s: firstWord,
+        });
+
+        if (type && type !== "all") {
+          simplifiedParams.append("type", type);
+        }
+
+        const simplifiedData = await fetchFromOmdb(simplifiedParams);
+        if (
+          simplifiedData &&
+          simplifiedData.Response === "True" &&
+          simplifiedData.Search
+        ) {
+          console.log(
+            `[omdbClient] Found ${simplifiedData.Search.length} results for simplified search "${firstWord}"`,
+          );
+
+          // Transform search results
+          return transformSearchResults(simplifiedData.Search);
+        }
+      }
+
       console.log(`[omdbClient] No results found for "${query}" in OMDB API`);
       return [];
     }
