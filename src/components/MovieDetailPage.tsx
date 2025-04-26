@@ -217,12 +217,12 @@ const MovieDetailPage = () => {
           throw new Error("Content not found");
         }
 
-        // Check if this is an AI recommendation that needs verification
-        if (movieData.needsVerification || movieData.aiRecommended) {
-          setVerificationStatus("Verifying recommendation...");
-          console.log(`Verifying AI recommendation: ${movieData.title}`);
+        // Always run verification for any content to ensure we have the right match
+        // This is especially important for AI recommendations
+        setVerificationStatus("Verifying content details...");
+        console.log(`Running verification for: ${movieData.title}`);
 
-          try {
+        try {
             // Log the movie data before verification
             console.log("Movie data before verification:", {
               title: movieData.title,

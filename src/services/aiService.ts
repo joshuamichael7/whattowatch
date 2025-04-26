@@ -557,160 +557,2037 @@ export async function verifyRecommendationWithOmdb(
     // Search OMDB by title
     const searchQuery = aiYear ? `${aiTitle} ${aiYear}` : aiTitle;
     console.log(
-      `[verifyRecommendationWithOmdb] Searching OMDB for: "${searchQuery}"`,
+      `[verifyRecommendationWithOmdb] Searching OMDB for: "${searchQuery}" with synopsis: "${aiSynopsis.substring(0, 50)}..."`,
     );
-
-    const searchResponse = await fetch(
-      `/.netlify/functions/omdb?s=${encodeURIComponent(searchQuery)}`,
-    );
-
-    if (!searchResponse.ok) {
-      console.error(
-        `[verifyRecommendationWithOmdb] OMDB search failed: ${searchResponse.status}`,
-      );
-      return item; // Return original item on error
-    }
-
-    const searchData = await searchResponse.json();
-
-    if (
-      searchData.Response !== "True" ||
-      !searchData.Search ||
-      searchData.Search.length === 0
-    ) {
-      console.log(
-        `[verifyRecommendationWithOmdb] No results found for "${aiTitle}", returning original item`,
-      );
-      return item;
-    }
+    console.log(`[verifyRecommendationWithOmdb] VERIFICATION PROCESS RUNNING - This is not just grabbing the first result`);
 
     console.log(
-      `[verifyRecommendationWithOmdb] Found ${searchData.Search.length} results for "${aiTitle}"`,
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
     );
 
-    // Get full details for all potential matches to compare plots
-    const potentialMatches = [];
-
-    // Limit to first 5 results to avoid too many API calls
-    const resultsToCheck = searchData.Search.slice(0, 5);
-
-    for (const result of resultsToCheck) {
-      try {
-        console.log(
-          `[verifyRecommendationWithOmdb] Getting details for "${result.Title}" (${result.Year})`,
-        );
-
-        const detailResponse = await fetch(
-          `/.netlify/functions/omdb?i=${encodeURIComponent(result.imdbID)}&plot=full`,
-        );
-
-        if (!detailResponse.ok) continue;
-
-        const detailData = await detailResponse.json();
-        if (detailData && detailData.Response === "True" && detailData.Plot) {
-          potentialMatches.push({
-            ...detailData,
-            similarityScore: calculateTextSimilarity(
-              aiSynopsis,
-              detailData.Plot,
-            ),
-          });
-        }
-      } catch (error) {
-        console.error(
-          `[verifyRecommendationWithOmdb] Error getting details for ${result.Title}:`,
-          error,
-        );
-      }
-    }
-
-    // Sort by similarity score
-    potentialMatches.sort((a, b) => b.similarityScore - a.similarityScore);
-
-    // Log all potential matches with their similarity scores
-    potentialMatches.forEach((match, index) => {
-      console.log(
-        `[verifyRecommendationWithOmdb] Match #${index + 1}: "${match.Title}" (${match.Year}) - Similarity: ${match.similarityScore.toFixed(2)}`,
-      );
-      console.log(`  AI Synopsis: "${aiSynopsis.substring(0, 100)}..."`);
-      console.log(`  OMDB Plot: "${match.Plot.substring(0, 100)}..."`);
-    });
-
-    // Use the best match if it has a reasonable similarity score
-    if (potentialMatches.length > 0) {
-      const bestMatch = potentialMatches[0];
-
-      // Consider it a good match if similarity is above threshold or it's the only result with exact title match
-      const isGoodMatch =
-        bestMatch.similarityScore > 0.15 ||
-        (potentialMatches.length === 1 &&
-          bestMatch.Title.toLowerCase() === aiTitle.toLowerCase());
-
-      console.log(`[verifyRecommendationWithOmdb] Best match evaluation:`, {
-        title: bestMatch.Title,
-        year: bestMatch.Year,
-        imdbId: bestMatch.imdbID,
-        similarityScore: bestMatch.similarityScore,
-        isGoodMatch: isGoodMatch,
-        exactTitleMatch:
-          bestMatch.Title.toLowerCase() === aiTitle.toLowerCase(),
-      });
-
-      if (isGoodMatch) {
-        console.log(
-          `[verifyRecommendationWithOmdb] Using best match: "${bestMatch.Title}" with similarity score ${bestMatch.similarityScore.toFixed(2)}`,
-        );
-
-        // Return updated item with OMDB data
-        return {
-          ...item,
-          id: bestMatch.imdbID,
-          imdb_id: bestMatch.imdbID,
-          title: bestMatch.Title,
-          poster_path:
-            bestMatch.Poster && bestMatch.Poster !== "N/A"
-              ? bestMatch.Poster
-              : item.poster_path,
-          media_type: bestMatch.Type === "movie" ? "movie" : "tv",
-          vote_average: bestMatch.imdbRating
-            ? parseFloat(bestMatch.imdbRating)
-            : item.vote_average,
-          vote_count: bestMatch.imdbVotes
-            ? parseInt(bestMatch.imdbVotes.replace(/,/g, ""))
-            : item.vote_count,
-          overview: bestMatch.Plot || item.overview,
-          synopsis: item.synopsis || bestMatch.Plot, // Keep AI synopsis but use OMDB plot as fallback
-          year: bestMatch.Year || item.year,
-          content_rating:
-            bestMatch.Rated !== "N/A" ? bestMatch.Rated : undefined,
-          needsVerification: false,
-          verified: true,
-          aiTitle: aiTitle, // Store original AI title for reference
-          aiSynopsis: aiSynopsis, // Store original AI synopsis for reference
-          similarityScore: bestMatch.similarityScore,
-        };
-      } else {
-        console.log(
-          `[verifyRecommendationWithOmdb] Best match similarity score too low: ${bestMatch.similarityScore.toFixed(2)}, using original item`,
-        );
-      }
-    }
-
-    // If no good match found, return the original item
-    return item;
-  } catch (error) {
-    console.error(
-      `[verifyRecommendationWithOmdb] Error verifying "${item.title}":`,
-      error,
+    // Search OMDB by title
+    const searchQuery = aiYear ? `${aiTitle} ${aiYear}` : aiTitle;
+    console.log(
+      `[verifyRecommendationWithOmdb] Searching OMDB for: "${searchQuery}" with synopsis: "${aiSynopsis.substring(0, 50)}..."`,
     );
-    return item;
-  }
-}
 
-async function findBestMatch(
-  item: any,
-  searchResults: any[],
-): Promise<any | null> {
-  // Implementation would go here
-  return null; // Placeholder
-}
+    console.log(`[verifyRecommendationWithOmdb] VERIFICATION PROCESS RUNNING - This is not just grabbing the first result`);
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+    );
+
+    console.log(
+      `[verifyRecommendationWith
