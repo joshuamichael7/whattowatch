@@ -201,6 +201,48 @@ exports.handler = async (event, context) => {
                 `${t.title} (${t.year || "unknown"}) [${t.imdb_id || "no ID"}] - Reason: ${t.recommendationReason?.substring(0, 50)}...`,
             ),
         );
+
+        // For each title, try to find its IMDB ID
+        console.log("Looking up IMDB IDs for recommendations...");
+
+        for (let i = 0; i < titles.length; i++) {
+          const title = titles[i];
+          try {
+            // Search OMDB for this title
+            const searchResponse = await axios.get(
+              `http://www.omdbapi.com/?apikey=${process.env.OMDB_API_KEY}&s=${encodeURIComponent(title.title)}`,
+            );
+
+            if (
+              searchResponse.data.Response === "True" &&
+              searchResponse.data.Search &&
+              searchResponse.data.Search.length > 0
+            ) {
+              // Find best match by title
+              const bestMatch = searchResponse.data.Search.find(
+                (result) =>
+                  result.Title.toLowerCase() === title.title.toLowerCase(),
+              );
+
+              if (bestMatch) {
+                console.log(
+                  `Found IMDB ID for "${title.title}": ${bestMatch.imdbID}`,
+                );
+                titles[i].imdb_id = bestMatch.imdbID;
+
+                // Also get the poster if available
+                if (bestMatch.Poster && bestMatch.Poster !== "N/A") {
+                  titles[i].poster = bestMatch.Poster;
+                }
+              }
+            }
+          } catch (error) {
+            console.error(
+              `Error looking up IMDB ID for "${title.title}":`,
+              error.message,
+            );
+          }
+        }
       }
 
       return {

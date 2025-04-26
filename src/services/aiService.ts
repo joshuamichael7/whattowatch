@@ -185,22 +185,90 @@ export async function getSimilarContentTitles(
     for (const item of validItems) {
       const imdbId = item.imdb_id || item.imdbID || generateUUID();
 
-      // Convert to ContentItem format
-      recommendations.push({
-        id: imdbId,
-        title: item.title,
-        poster_path: item.poster || "",
-        media_type: mediaType,
-        vote_average: parseFloat(item.rating || "0") || 0,
-        vote_count: 0,
-        genre_ids: [],
-        overview: item.synopsis || "",
-        synopsis: item.synopsis || "",
-        recommendationReason:
-          item.recommendationReason || item.reason || `Similar to ${title}`,
-        year: item.year,
-        aiRecommended: true,
-      });
+      // Log OMDB validation attempt
+      console.log(
+        `[getSimilarContentTitles] Validating with OMDB: "${item.title}"`,
+      );
+
+      // Search OMDB for this title
+      try {
+        const omdbResponse = await fetch(
+          `/.netlify/functions/omdb?s=${encodeURIComponent(item.title)}`,
+        );
+        const omdbData = await omdbResponse.json();
+
+        console.log(
+          `[getSimilarContentTitles] OMDB search results for "${item.title}":`,
+          omdbData.Response === "True"
+            ? `Found ${omdbData.Search?.length} results`
+            : "No results",
+        );
+
+        // If we found a match in OMDB, use its IMDB ID
+        let realImdbId = imdbId;
+        let posterUrl = item.poster || "";
+
+        if (
+          omdbData.Response === "True" &&
+          omdbData.Search &&
+          omdbData.Search.length > 0
+        ) {
+          // Find best match by title
+          const bestMatch = omdbData.Search.find(
+            (result) => result.Title.toLowerCase() === item.title.toLowerCase(),
+          );
+
+          if (bestMatch) {
+            console.log(
+              `[getSimilarContentTitles] Found exact OMDB match for "${item.title}": ${bestMatch.imdbID}`,
+            );
+            realImdbId = bestMatch.imdbID;
+            if (bestMatch.Poster && bestMatch.Poster !== "N/A") {
+              posterUrl = bestMatch.Poster;
+            }
+          }
+        }
+
+        // Convert to ContentItem format with real IMDB ID if found
+        recommendations.push({
+          id: realImdbId,
+          imdb_id: realImdbId.startsWith("tt") ? realImdbId : undefined,
+          title: item.title,
+          poster_path: posterUrl,
+          media_type: mediaType,
+          vote_average: parseFloat(item.rating || "0") || 0,
+          vote_count: 0,
+          genre_ids: [],
+          overview: item.synopsis || "",
+          synopsis: item.synopsis || "",
+          recommendationReason:
+            item.recommendationReason || item.reason || `Similar to ${title}`,
+          year: item.year,
+          aiRecommended: true,
+        });
+      } catch (error) {
+        console.error(
+          `[getSimilarContentTitles] Error validating with OMDB:`,
+          error,
+        );
+
+        // Still add the recommendation even if OMDB validation fails
+        recommendations.push({
+          id: imdbId,
+          title: item.title,
+          poster_path: item.poster || "",
+          media_type: mediaType,
+          vote_average: parseFloat(item.rating || "0") || 0,
+          vote_count: 0,
+          genre_ids: [],
+          overview: item.synopsis || "",
+          synopsis: item.synopsis || "",
+          recommendationReason:
+            item.recommendationReason || item.reason || `Similar to ${title}`,
+          year: item.year,
+          aiRecommended: true,
+        });
+      }
 
       // Stop once we have enough recommendations
       if (recommendations.length >= limit) {
