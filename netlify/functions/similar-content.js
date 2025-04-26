@@ -4,7 +4,7 @@ const axios = require("axios");
 const defaultConfig = {
   apiKey: process.env.GEMINI_API_KEY,
   apiVersion: "v1beta",
-  modelName: "gemini-1.5-flash", // Use 1.5 instead of 2.0 for better compatibility
+  modelName: "gemini-2.0-flash", // Updated to use 2.0 for consistency
   maxTokens: parseInt(process.env.GEMINI_MAX_TOKENS || "1024"),
   temperature: parseFloat(process.env.GEMINI_TEMPERATURE || "0.7"),
 };
@@ -43,8 +43,9 @@ exports.handler = async (event, context) => {
       overview,
       mediaType = "movie",
       limit = 20,
-      apiVersion = "v1beta",
-      modelName = "gemini-1.5-flash",
+      apiVersion,
+      modelName,
+      includeReasoning = true,
     } = event.body ? JSON.parse(event.body) : {};
 
     if (!title || !overview) {
