@@ -57,6 +57,7 @@ const MovieDetailPage = () => {
   const [fromRecommendations, setFromRecommendations] = useState(false);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const { user, isAuthenticated } = useAuth();
+  const { selectedRecommendation } = useRecommendations();
   const [verificationStatus, setVerificationStatus] = useState<string | null>(
     null,
   );
@@ -166,9 +167,13 @@ const MovieDetailPage = () => {
                 const urlParams = new URLSearchParams(window.location.search);
                 const aiSynopsis = urlParams.get("synopsis");
 
-                // Use the AI synopsis if available, otherwise use the first result's overview
-                tempMovieData.synopsis = aiSynopsis || "";
-                tempMovieData.overview = aiSynopsis || "";
+                // Only use AI-provided synopsis - never use unrelated content's overview
+                const contextSynopsis =
+                  selectedRecommendation?.synopsis ||
+                  selectedRecommendation?.overview ||
+                  "";
+                tempMovieData.synopsis = contextSynopsis || aiSynopsis || "";
+                tempMovieData.overview = contextSynopsis || aiSynopsis || "";
 
                 console.log(
                   `Using synopsis for verification: "${tempMovieData.synopsis?.substring(0, 50)}..."`,
@@ -205,7 +210,7 @@ const MovieDetailPage = () => {
                   setVerificationStatus(
                     "Could not verify content, using best match",
                   );
-                  movieData = firstResult;
+                  movieData = searchResults[0];
                 }
               } else {
                 console.log(
