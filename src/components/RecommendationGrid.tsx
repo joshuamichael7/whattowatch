@@ -281,8 +281,9 @@ const RecommendationGrid = ({
               className="overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow"
             >
               <Link
-                to={`/movie/${rec.imdb_id || encodeURIComponent(rec.title)}${rec.synopsis ? `?synopsis=${encodeURIComponent(rec.synopsis)}` : ""}`}
+                to={`/movie/${rec.imdb_id || encodeURIComponent(rec.title)}?synopsis=${encodeURIComponent(rec.synopsis || rec.overview || rec.reason || "")}${rec.year ? `&year=${rec.year}` : ""}`}
                 className="flex flex-col h-full"
+                state={{ recommendation: rec }}
               >
                 <div className="relative aspect-[2/3] overflow-hidden bg-muted">
                   <img

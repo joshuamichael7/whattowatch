@@ -58,7 +58,8 @@ const MovieDetailPage = () => {
   const [fromRecommendations, setFromRecommendations] = useState(false);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const { user, isAuthenticated } = useAuth();
-  const { selectedRecommendation } = useRecommendations();
+  const { selectedRecommendation, setSelectedRecommendation } =
+    useRecommendations();
   const [verificationStatus, setVerificationStatus] = useState<string | null>(
     null,
   );
@@ -167,18 +168,21 @@ const MovieDetailPage = () => {
                 // Get the original AI synopsis from the URL parameter if available
                 const urlParams = new URLSearchParams(window.location.search);
                 const aiSynopsis = urlParams.get("synopsis");
-
-                // Only use AI-provided synopsis - never use unrelated content's overview
                 const contextSynopsis =
                   selectedRecommendation?.synopsis ||
                   selectedRecommendation?.overview ||
                   "";
-                tempMovieData.synopsis = contextSynopsis || aiSynopsis || "";
-                tempMovieData.overview = contextSynopsis || aiSynopsis || "";
 
-                console.log(
-                  `Using synopsis for verification: "${tempMovieData.synopsis?.substring(0, 50)}..."`,
-                );
+                // Use either context or URL synopsis, never empty string
+                if (contextSynopsis || aiSynopsis) {
+                  tempMovieData.synopsis = contextSynopsis || aiSynopsis;
+                  tempMovieData.overview = contextSynopsis || aiSynopsis;
+                  console.log(
+                    `Using synopsis for verification: "${tempMovieData.synopsis?.substring(0, 100)}..."`,
+                  );
+                } else {
+                  console.error("No synopsis available for verification!");
+                }
 
                 console.log("Verifying content with OMDB first...");
                 verifiedMovie =

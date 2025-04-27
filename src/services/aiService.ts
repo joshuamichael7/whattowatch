@@ -687,8 +687,15 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
     console.log(
       `[findBestMatch] No synopsis available for "${aiTitle}", can't compare`,
     );
+    console.error(
+      `[findBestMatch] CRITICAL ERROR: Missing synopsis for "${aiTitle}"`,
+    );
     return null;
   }
+
+  console.log(
+    `[findBestMatch] Using synopsis for "${aiTitle}": "${aiSynopsis.substring(0, 100)}..."`,
+  );
 
   console.log(
     `[findBestMatch] Finding best match for "${aiTitle}" among ${omdbResults.length} results`,
