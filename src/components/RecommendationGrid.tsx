@@ -281,7 +281,7 @@ const RecommendationGrid = ({
               className="overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow"
             >
               <Link
-                to={`/movie/${rec.imdb_id || encodeURIComponent(rec.title)}?synopsis=${encodeURIComponent(rec.synopsis || rec.overview || rec.reason || "")}${rec.year ? `&year=${rec.year}` : ""}`}
+                to={`/movie/${encodeURIComponent(rec.title)}`}
                 className="flex flex-col h-full"
                 state={{ recommendation: rec }}
               >

@@ -173,16 +173,33 @@ const MovieDetailPage = () => {
                   selectedRecommendation?.overview ||
                   "";
 
-                // Use either context or URL synopsis, never empty string
-                if (contextSynopsis || aiSynopsis) {
-                  tempMovieData.synopsis = contextSynopsis || aiSynopsis;
-                  tempMovieData.overview = contextSynopsis || aiSynopsis;
-                  console.log(
-                    `Using synopsis for verification: "${tempMovieData.synopsis?.substring(0, 100)}..."`,
+                // Get synopsis from location state first, then context, then URL
+                const locationSynopsis =
+                  location.state?.recommendation?.synopsis ||
+                  location.state?.recommendation?.overview ||
+                  location.state?.recommendation?.reason;
+
+                if (!locationSynopsis) {
+                  console.error(
+                    "CRITICAL ERROR: No synopsis in location state! Cannot verify content.",
                   );
-                } else {
-                  console.error("No synopsis available for verification!");
+                  throw new Error(
+                    "Missing synopsis from recommendation. Cannot verify content.",
+                  );
                 }
+
+                console.log(
+                  "USING SYNOPSIS FROM LOCATION STATE FOR VERIFICATION:",
+                  locationSynopsis.substring(0, 100) + "...",
+                );
+
+                // Set the synopsis for verification
+                tempMovieData.synopsis = locationSynopsis;
+                tempMovieData.overview = locationSynopsis;
+
+                console.log(
+                  `USING SYNOPSIS FOR VERIFICATION: "${tempMovieData.synopsis?.substring(0, 100)}..."`,
+                );
 
                 console.log("Verifying content with OMDB first...");
                 verifiedMovie =

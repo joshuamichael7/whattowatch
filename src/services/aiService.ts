@@ -682,17 +682,19 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
   const aiSynopsis = aiItem.synopsis || aiItem.overview || "";
   const aiTitle = aiItem.title || "";
 
-  // If no synopsis, we can't compare
+  // If no synopsis, we can't compare - NEVER use fallbacks
   if (!aiSynopsis) {
     console.log(
-      `[findBestMatch] No synopsis available for "${aiTitle}", can't compare`,
+      `[findBestMatch] No synopsis available for \\\"${aiTitle}\\\", can't compare`,
     );
     console.error(
-      `[findBestMatch] CRITICAL ERROR: Missing synopsis for "${aiTitle}"`,
+      `[findBestMatch] CRITICAL ERROR: Missing synopsis for \\\"${aiTitle}\\\"`,
     );
+    // Return null to indicate verification failed - no fallbacks!
     return null;
   }
 
+  // If we have a synopsis, proceed with normal matching logic
   console.log(
     `[findBestMatch] Using synopsis for "${aiTitle}": "${aiSynopsis.substring(0, 100)}..."`,
   );

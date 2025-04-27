@@ -904,6 +904,36 @@ export async function getSimilarContent(
   // Force useDirectApi to true to always use OMDB API directly
   useDirectApi = true;
 
+  // CRITICAL: Check if id is actually a title and not an IMDB ID
+  // If it doesn't start with 'tt' and isn't a UUID, it's probably a title
+  const isImdbId = id.startsWith("tt") && /^tt\d+$/.test(id);
+  const isUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  if (!isImdbId && !isUuid) {
+    console.log(
+      `[getSimilarContent] ID appears to be a title: ${id}. Searching for proper ID first.`,
+    );
+    try {
+      const searchResults = await searchContent(id);
+      if (
+        searchResults &&
+        searchResults.length > 0 &&
+        searchResults[0].imdb_id
+      ) {
+        console.log(
+          `[getSimilarContent] Found proper ID for title ${id}: ${searchResults[0].imdb_id}`,
+        );
+        id = searchResults[0].imdb_id;
+      }
+    } catch (error) {
+      console.error(
+        `[getSimilarContent] Error searching for proper ID:`,
+        error,
+      );
+    }
+  }
+
   console.log("[DEBUG] getSimilarContent started with params:", {
     id,
     useDirectApi,
