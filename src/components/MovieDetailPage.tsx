@@ -24,6 +24,7 @@ import SimilarContentCarousel from "@/components/SimilarContentCarousel";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { verifyRecommendationWithOmdb } from "@/services/aiService";
+import { useRecommendations } from "@/contexts/RecommendationContext";
 
 const genreMap: Record<number, string> = {
   28: "Action",
