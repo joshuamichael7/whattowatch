@@ -697,8 +697,8 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
   // Get full details for each candidate to compare plots
   const detailedCandidates: ContentItem[] = [];
 
-  // Limit to top 5 candidates to avoid too many API calls
-  const maxCandidates = Math.min(omdbResults.length, 5);
+  // Check all candidates to ensure we don't miss the right match
+  const maxCandidates = omdbResults.length;
 
   for (let i = 0; i < maxCandidates; i++) {
     const candidate = omdbResults[i];

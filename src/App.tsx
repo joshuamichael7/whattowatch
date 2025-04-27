@@ -17,6 +17,7 @@ import DebugPanel from "./components/DebugPanel";
 import DebugRecommendations from "./components/DebugRecommendations";
 import SupabaseConnectionTest from "./components/SupabaseConnectionTest";
 import UserDashboard from "./components/UserDashboard";
+import { RecommendationProvider } from "./contexts/RecommendationContext";
 
 // Lazy load authentication components
 const Auth = lazy(() => import("./components/Auth"));
@@ -25,50 +26,52 @@ const UserProfile = lazy(() => import("./components/UserProfile"));
 function App() {
   return (
     <AuthProvider>
-      <ThemeProvider defaultTheme="system">
-        <Suspense fallback={<p>Loading...</p>}>
-          <>
-            <div className="fixed top-4 right-4 z-50">
-              <ThemeToggle />
-            </div>
-            {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/movie/:id" element={<MovieDetailPage />} />
-              <Route path="/tv/:id" element={<MovieDetailPage />} />
-              <Route path="/search" element={<SimilarContentSearch />} />
-              <Route path="/login" element={<Auth />} />
-              <Route path="/register" element={<Auth />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/profile" element={<UserProfile />} />
-              <Route
-                path="/plot-similarity-test"
-                element={<PlotSimilarityTest />}
-              />
-              <Route
-                path="/edge-function-test"
-                element={<EdgeFunctionTester />}
-              />
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin-debug" element={<AdminRoleDebugger />} />
-              <Route path="/debug" element={<DebugPanel />} />
-              <Route
-                path="/debug-recommendations"
-                element={<DebugRecommendations />}
-              />
-              <Route
-                path="/supabase-test"
-                element={<SupabaseConnectionTest />}
-              />
-              <Route path="/user-dashboard" element={<UserDashboard />} />
-              {import.meta.env.VITE_TEMPO === "true" && (
-                <Route path="/tempobook/*" />
-              )}
-            </Routes>
-          </>
-        </Suspense>
-      </ThemeProvider>
+      <RecommendationProvider>
+        <ThemeProvider defaultTheme="system">
+          <Suspense fallback={<p>Loading...</p>}>
+            <>
+              <div className="fixed top-4 right-4 z-50">
+                <ThemeToggle />
+              </div>
+              {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/movie/:id" element={<MovieDetailPage />} />
+                <Route path="/tv/:id" element={<MovieDetailPage />} />
+                <Route path="/search" element={<SimilarContentSearch />} />
+                <Route path="/login" element={<Auth />} />
+                <Route path="/register" element={<Auth />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/profile" element={<UserProfile />} />
+                <Route
+                  path="/plot-similarity-test"
+                  element={<PlotSimilarityTest />}
+                />
+                <Route
+                  path="/edge-function-test"
+                  element={<EdgeFunctionTester />}
+                />
+                <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/admin-debug" element={<AdminRoleDebugger />} />
+                <Route path="/debug" element={<DebugPanel />} />
+                <Route
+                  path="/debug-recommendations"
+                  element={<DebugRecommendations />}
+                />
+                <Route
+                  path="/supabase-test"
+                  element={<SupabaseConnectionTest />}
+                />
+                <Route path="/user-dashboard" element={<UserDashboard />} />
+                {import.meta.env.VITE_TEMPO === "true" && (
+                  <Route path="/tempobook/*" />
+                )}
+              </Routes>
+            </>
+          </Suspense>
+        </ThemeProvider>
+      </RecommendationProvider>
     </AuthProvider>
   );
 }

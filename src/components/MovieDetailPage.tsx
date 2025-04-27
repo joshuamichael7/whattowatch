@@ -100,6 +100,34 @@ const MovieDetailPage = () => {
       setVerificationStatus("Starting verification process...");
 
       try {
+        // First check if we have this movie in the RecommendationContext
+        if (
+          selectedRecommendation &&
+          (selectedRecommendation.id === id ||
+            selectedRecommendation.title === decodeURIComponent(id))
+        ) {
+          console.log(
+            "Using movie data from RecommendationContext:",
+            selectedRecommendation,
+          );
+          setMovie(selectedRecommendation);
+
+          // Set verification status based on recommendation data
+          if (selectedRecommendation.aiRecommended) {
+            setVerificationStatus(
+              selectedRecommendation.verified
+                ? `Content verified with ${(selectedRecommendation.similarityScore || 0) * 100}% confidence`
+                : "AI recommended content",
+            );
+          } else {
+            setVerificationStatus("Using data from recommendations");
+          }
+
+          setIsLoading(false);
+          return;
+        }
+
+        // If not in context, proceed with regular fetching
         let movieData;
         let verifiedMovie = null;
 
@@ -134,9 +162,17 @@ const MovieDetailPage = () => {
               const firstResult = await getContentById(searchResults[0].id);
 
               if (firstResult) {
-                // Use the overview from the first result for verification
-                tempMovieData.synopsis = firstResult.overview || "";
-                tempMovieData.overview = firstResult.overview || "";
+                // Get the original AI synopsis from the URL parameter if available
+                const urlParams = new URLSearchParams(window.location.search);
+                const aiSynopsis = urlParams.get("synopsis");
+
+                // Use the AI synopsis if available, otherwise use the first result's overview
+                tempMovieData.synopsis = aiSynopsis || "";
+                tempMovieData.overview = aiSynopsis || "";
+
+                console.log(
+                  `Using synopsis for verification: "${tempMovieData.synopsis?.substring(0, 50)}..."`,
+                );
 
                 console.log("Verifying content with OMDB first...");
                 verifiedMovie =
@@ -221,7 +257,7 @@ const MovieDetailPage = () => {
     };
 
     fetchMovieDetails();
-  }, [id]);
+  }, [id, selectedRecommendation]);
 
   const handleAddToWatchlist = async (movie: ContentItem) => {
     if (!isAuthenticated || !user) {

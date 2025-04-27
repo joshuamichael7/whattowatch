@@ -140,6 +140,9 @@ const Dashboard = () => {
     setIsLoading(true);
     setActiveTab("recommendations");
 
+    // Store preferences for later use when changing filters
+    window.preferences = preferences;
+
     // Update filters with the selected age rating
     if (preferences.ageRating) {
       const selectedAgeRating = preferences.ageRating;
@@ -252,6 +255,7 @@ const Dashboard = () => {
                     poster_path: posterPath,
                     recommendationReason:
                       rec.reason || "AI recommended based on your preferences",
+                    originalAiData: rec, // Store the original AI data for verification
                   };
                   return contentItem;
                 }
@@ -729,7 +733,10 @@ const Dashboard = () => {
               <h2 className="text-2xl font-bold mb-6 font-heading">
                 Your Recommendations
               </h2>
-              <RecommendationGrid recommendations={recommendations} />
+              <RecommendationGrid
+                recommendations={recommendations}
+                onSelectItem={(item) => setSelectedRecommendation(item)}
+              />
             </div>
           </div>
         )}
