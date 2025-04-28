@@ -82,84 +82,94 @@ const RecommendationMatcher: React.FC<RecommendationMatcherProps> = ({
         }
 
         // First try direct IMDB ID lookup - ALWAYS use OMDB directly
+        let foundExcellentMatch = false;
         for (const imdbId of uniqueImdbIds) {
           if (!imdbId) continue;
 
           console.log(
             `[RecommendationMatcher] Searching by IMDB ID: ${imdbId}`,
           );
-          const response = await fetch(
-            `/.netlify/functions/omdb?i=${imdbId}&plot=full`,
-          );
-
-          if (!response.ok) {
-            console.error(
-              `[RecommendationMatcher] OMDB API error for IMDB ID ${imdbId}: ${response.status}`,
-            );
-            continue;
-          }
-
-          const data = await response.json();
-          if (data && data.Response === "True") {
-            // Check title similarity
-            const similarity = calculateTitleSimilarity(
-              recommendation.title,
-              data.Title,
+          try {
+            const response = await fetch(
+              `/.netlify/functions/omdb?i=${imdbId}&plot=full`,
             );
 
-            console.log(
-              `[RecommendationMatcher] Title similarity for ${data.Title}: ${similarity.toFixed(2)}`,
-            );
+            if (!response.ok) {
+              console.error(
+                `[RecommendationMatcher] OMDB API error for IMDB ID ${imdbId}: ${response.status}`,
+              );
+              continue;
+            }
 
-            // Use a stricter threshold of 0.95 for title matching
-            if (similarity >= 0.95) {
-              // Excellent match, convert to ContentItem
-              const contentItem = convertOmdbToContentItem(data);
-              contentItem.recommendationReason =
-                recommendation.reason || "Recommended for you";
-              contentItem.synopsis = data.Plot; // Use OMDB plot instead of recommendation synopsis
-              contentItem.imdb_url = recommendation.imdb_url; // Preserve the IMDB URL from the recommendation
+            const data = await response.json();
+            if (data && data.Response === "True") {
+              // Check title similarity
+              const similarity = calculateTitleSimilarity(
+                recommendation.title,
+                data.Title,
+              );
 
               console.log(
-                `[RecommendationMatcher] Found excellent match (${similarity.toFixed(2)}): ${data.Title}`,
+                `[RecommendationMatcher] Title similarity for ${data.Title}: ${similarity.toFixed(2)}`,
               );
-              if (onSelectMatch) {
-                onSelectMatch(contentItem);
-                return;
+
+              // Use a stricter threshold of 0.95 for title matching
+              if (similarity >= 0.95) {
+                // Excellent match, convert to ContentItem
+                const contentItem = convertOmdbToContentItem(data);
+                contentItem.recommendationReason =
+                  recommendation.reason || "Recommended for you";
+                contentItem.synopsis = data.Plot; // Use OMDB plot instead of recommendation synopsis
+                contentItem.imdb_url = recommendation.imdb_url; // Preserve the IMDB URL from the recommendation
+
+                console.log(
+                  `[RecommendationMatcher] Found excellent match (${similarity.toFixed(2)}): ${data.Title}`,
+                );
+                foundExcellentMatch = true;
+                if (onSelectMatch) {
+                  onSelectMatch(contentItem);
+                  return;
+                } else {
+                  navigate(`/movie/${data.imdbID}`, {
+                    state: { recommendation: contentItem },
+                  });
+                  return;
+                }
+              } else if (similarity >= 0.8) {
+                // Good match, add to results
+                console.log(
+                  `[RecommendationMatcher] Found good match (${similarity.toFixed(2)}): ${data.Title}`,
+                );
+                const contentItem = convertOmdbToContentItem(data);
+                contentItem.recommendationReason =
+                  recommendation.reason || "Recommended for you";
+                contentItem.synopsis = data.Plot; // Use OMDB plot instead of recommendation synopsis
+                contentItem.imdb_url = recommendation.imdb_url; // Preserve the IMDB URL from the recommendation
+                matchResults.push(contentItem);
               } else {
-                navigate(`/movie/${data.imdbID}`, {
-                  state: { recommendation: contentItem },
-                });
-                return;
+                console.log(
+                  `[RecommendationMatcher] Low similarity match (${similarity.toFixed(2)}): ${data.Title}`,
+                );
+                // Still add it to the results but with lower priority
+                const contentItem = convertOmdbToContentItem(data);
+                contentItem.recommendationReason =
+                  recommendation.reason || "Recommended for you";
+                contentItem.synopsis = data.Plot;
+                contentItem.imdb_url = recommendation.imdb_url;
+                contentItem.lowSimilarity = true;
+                matchResults.push(contentItem);
               }
-            } else if (similarity >= 0.8) {
-              // Good match, add to results
-              console.log(
-                `[RecommendationMatcher] Found good match (${similarity.toFixed(2)}): ${data.Title}`,
-              );
-              const contentItem = convertOmdbToContentItem(data);
-              contentItem.recommendationReason =
-                recommendation.reason || "Recommended for you";
-              contentItem.synopsis = data.Plot; // Use OMDB plot instead of recommendation synopsis
-              contentItem.imdb_url = recommendation.imdb_url; // Preserve the IMDB URL from the recommendation
-              matchResults.push(contentItem);
             } else {
               console.log(
-                `[RecommendationMatcher] Low similarity match (${similarity.toFixed(2)}): ${data.Title}`,
+                `[RecommendationMatcher] No valid data returned for IMDB ID: ${imdbId}`,
               );
-              // Still add it to the results but with lower priority
-              const contentItem = convertOmdbToContentItem(data);
-              contentItem.recommendationReason =
-                recommendation.reason || "Recommended for you";
-              contentItem.synopsis = data.Plot;
-              contentItem.imdb_url = recommendation.imdb_url;
-              contentItem.lowSimilarity = true;
-              matchResults.push(contentItem);
             }
-          } else {
-            console.log(
-              `[RecommendationMatcher] No valid data returned for IMDB ID: ${imdbId}`,
+          } catch (error) {
+            console.error(
+              `[RecommendationMatcher] Error fetching data for IMDB ID ${imdbId}:`,
+              error,
             );
+            continue;
           }
         }
 
@@ -271,12 +281,42 @@ const RecommendationMatcher: React.FC<RecommendationMatcherProps> = ({
     // Check for exact match
     if (normalizedTitle1 === normalizedTitle2) return 1.0;
 
-    // Check if one contains the other
+    // Check for suspicious titles that contain multiple titles
     if (
-      normalizedTitle1.includes(normalizedTitle2) ||
-      normalizedTitle2.includes(normalizedTitle1)
+      title1.includes(",") ||
+      title1.includes(";") ||
+      title1.includes("|") ||
+      title2.includes(",") ||
+      title2.includes(";") ||
+      title2.includes("|") ||
+      title1.length > 50 ||
+      title2.length > 50
     ) {
-      return 0.9;
+      console.log(
+        `[calculateTitleSimilarity] Suspicious title detected, reducing similarity score`,
+      );
+      return 0.5; // Reduce similarity for suspicious titles
+    }
+
+    // Check if one is an exact substring of the other (only for short titles)
+    // This helps with cases like "Signal" vs "Smoke Signals"
+    if (normalizedTitle1.length > 3 && normalizedTitle2.length > 3) {
+      // Only consider exact substring matches if the titles are significantly different in length
+      // This prevents "Signal" from matching with "Smoke Signals"
+      const lengthRatio =
+        Math.min(normalizedTitle1.length, normalizedTitle2.length) /
+        Math.max(normalizedTitle1.length, normalizedTitle2.length);
+
+      // If one title is less than 70% the length of the other, don't consider substring matches
+      if (lengthRatio < 0.7) {
+        if (
+          normalizedTitle1.includes(normalizedTitle2) ||
+          normalizedTitle2.includes(normalizedTitle1)
+        ) {
+          // Reduce similarity score for partial matches
+          return 0.7;
+        }
+      }
     }
 
     // Calculate Levenshtein distance

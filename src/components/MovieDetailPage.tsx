@@ -135,14 +135,24 @@ const MovieDetailPage = () => {
         let movieData;
         let verifiedMovie = null;
 
-        // First, check if this is from an AI recommendation that needs verification
-        if (!id.startsWith("tt")) {
+        // Check if this is an IMDB ID first - prioritize IMDB ID lookup
+        if (id.startsWith("tt")) {
+          // If it's already an IMDB ID, just get the content directly from OMDB
+          console.log(`Looking up content by IMDB ID: ${id}`);
+          movieData = await getContentById(id);
+
+          if (!movieData) {
+            throw new Error("Content not found");
+          }
+
+          setVerificationStatus("Using IMDB data directly");
+        } else {
           // If not an IMDB ID, it's likely a title that needs verification
           const decodedTitle = decodeURIComponent(id);
           console.log(`Looking up content by title: ${decodedTitle}`);
           console.log(`Searching OMDB for: ${decodedTitle}`);
 
-          // Get search results
+          // Get search results directly from OMDB
           const searchResults = await searchContent(decodedTitle);
 
           if (searchResults && searchResults.length > 0) {
@@ -160,106 +170,114 @@ const MovieDetailPage = () => {
 
             setVerificationStatus("Verifying content with OMDB...");
 
-            // Try to verify with the first search result
-            try {
-              // Get full details for the first result to use for verification
-              const firstResult = await getContentById(searchResults[0].id);
+            // Try to find an exact title match first
+            const exactMatch = searchResults.find(
+              (result) =>
+                result.title.toLowerCase() === decodedTitle.toLowerCase(),
+            );
 
-              if (firstResult) {
-                // Get the original AI synopsis from the URL parameter if available
-                const urlParams = new URLSearchParams(window.location.search);
-                const aiSynopsis = urlParams.get("synopsis");
-                const contextSynopsis =
-                  selectedRecommendation?.synopsis ||
-                  selectedRecommendation?.overview ||
-                  "";
+            if (exactMatch) {
+              console.log(`Found exact title match: ${exactMatch.title}`);
+              movieData = await getContentById(exactMatch.id);
+              setVerificationStatus("Found exact title match in OMDB");
+            } else {
+              // If no exact match, proceed with verification using synopsis
+              try {
+                // Get full details for the first result to use for verification
+                const firstResult = await getContentById(searchResults[0].id);
 
-                // Get synopsis from location state first, then context, then URL
-                const locationSynopsis =
-                  location.state?.recommendation?.synopsis ||
-                  location.state?.recommendation?.overview ||
-                  location.state?.recommendation?.reason;
+                if (firstResult) {
+                  // Get synopsis from location state first, then context, then URL
+                  const locationSynopsis =
+                    location.state?.recommendation?.synopsis ||
+                    location.state?.recommendation?.overview ||
+                    location.state?.recommendation?.reason;
 
-                if (!locationSynopsis) {
-                  console.error(
-                    "CRITICAL ERROR: No synopsis in location state! Cannot verify content.",
-                  );
-                  // Instead of throwing an error, set a flag to show the user selection screen
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const aiSynopsis = urlParams.get("synopsis");
+                  const contextSynopsis =
+                    selectedRecommendation?.synopsis ||
+                    selectedRecommendation?.overview ||
+                    "";
+
+                  if (!locationSynopsis) {
+                    console.error(
+                      "CRITICAL ERROR: No synopsis in location state! Cannot verify content.",
+                    );
+                    console.log(
+                      "No synopsis available, showing user selection screen",
+                    );
+                    tempMovieData.synopsis = "No synopsis available";
+                  }
+
                   console.log(
-                    "No synopsis available, showing user selection screen",
+                    "USING SYNOPSIS FROM LOCATION STATE FOR VERIFICATION:",
+                    locationSynopsis?.substring(0, 100) + "...",
                   );
-                  // Continue with basic search results instead of throwing an error
-                  tempMovieData.synopsis = "No synopsis available";
-                }
 
-                console.log(
-                  "USING SYNOPSIS FROM LOCATION STATE FOR VERIFICATION:",
-                  locationSynopsis.substring(0, 100) + "...",
-                );
+                  // Set the synopsis for verification
+                  tempMovieData.synopsis =
+                    locationSynopsis || contextSynopsis || aiSynopsis || "";
+                  tempMovieData.overview =
+                    locationSynopsis || contextSynopsis || aiSynopsis || "";
 
-                // Set the synopsis for verification
-                tempMovieData.synopsis = locationSynopsis;
-                tempMovieData.overview = locationSynopsis;
-
-                console.log(
-                  `USING SYNOPSIS FOR VERIFICATION: "${tempMovieData.synopsis?.substring(0, 100)}..."`,
-                );
-
-                console.log("Verifying content with OMDB first...");
-                verifiedMovie =
-                  await verifyRecommendationWithOmdb(tempMovieData);
-
-                if (
-                  verifiedMovie &&
-                  verifiedMovie.verified &&
-                  verifiedMovie.imdb_id
-                ) {
-                  console.log(`Successfully verified: ${verifiedMovie.title}`);
-                  console.log("Verification details:", {
-                    originalTitle: decodedTitle,
-                    verifiedTitle: verifiedMovie.title,
-                    similarityScore: verifiedMovie.similarityScore,
-                    imdbId: verifiedMovie.imdb_id,
-                  });
-
-                  setVerificationStatus("Content verified, loading details...");
-
-                  // Now that we have a verified IMDB ID, use it to get the full details
                   console.log(
-                    `Loading full details using verified IMDB ID: ${verifiedMovie.imdb_id}`,
+                    `USING SYNOPSIS FOR VERIFICATION: "${tempMovieData.synopsis?.substring(0, 100)}..."`,
                   );
-                  movieData = await getContentById(verifiedMovie.imdb_id);
+
+                  console.log("Verifying content with OMDB...");
+                  verifiedMovie =
+                    await verifyRecommendationWithOmdb(tempMovieData);
+
+                  if (
+                    verifiedMovie &&
+                    verifiedMovie.verified &&
+                    verifiedMovie.imdb_id &&
+                    verifiedMovie.similarityScore > 0.7 // Require higher similarity score
+                  ) {
+                    console.log(
+                      `Successfully verified: ${verifiedMovie.title}`,
+                    );
+                    console.log("Verification details:", {
+                      originalTitle: decodedTitle,
+                      verifiedTitle: verifiedMovie.title,
+                      similarityScore: verifiedMovie.similarityScore,
+                      imdbId: verifiedMovie.imdb_id,
+                    });
+
+                    setVerificationStatus(
+                      "Content verified, loading details...",
+                    );
+
+                    // Now that we have a verified IMDB ID, use it to get the full details
+                    console.log(
+                      `Loading full details using verified IMDB ID: ${verifiedMovie.imdb_id}`,
+                    );
+                    movieData = await getContentById(verifiedMovie.imdb_id);
+                  } else {
+                    console.log(
+                      `Could not verify with high confidence (95% threshold): ${decodedTitle}, using first search result`,
+                    );
+                    setVerificationStatus(
+                      "Could not verify content with high confidence (95% threshold), using best match",
+                    );
+                    movieData = searchResults[0];
+                  }
                 } else {
                   console.log(
-                    `Could not verify: ${decodedTitle}, using first search result`,
-                  );
-                  setVerificationStatus(
-                    "Could not verify content, using best match",
+                    `No details found for first search result, using basic search result`,
                   );
                   movieData = searchResults[0];
                 }
-              } else {
-                console.log(
-                  `No details found for first search result, using basic search result`,
+              } catch (verifyError) {
+                console.error("Error during verification:", verifyError);
+                setVerificationStatus(
+                  "Verification failed, using search results",
                 );
                 movieData = searchResults[0];
               }
-            } catch (verifyError) {
-              console.error("Error during verification:", verifyError);
-              setVerificationStatus(
-                "Verification failed, using search results",
-              );
-              movieData = searchResults[0];
             }
           } else {
-            throw new Error("Content not found");
-          }
-        } else {
-          // If it's already an IMDB ID, just get the content directly
-          console.log(`Looking up content by IMDB ID: ${id}`);
-          movieData = await getContentById(id);
-
-          if (!movieData) {
             throw new Error("Content not found");
           }
         }

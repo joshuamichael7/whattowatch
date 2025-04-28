@@ -571,7 +571,14 @@ export async function verifyRecommendationWithOmdb(
       }
     }
 
-    // First try direct IMDB ID lookup if available
+    // Check if the IDs don't match and log a warning
+    if (aiImdbId && extractedImdbId && aiImdbId !== extractedImdbId) {
+      console.warn(
+        `[verifyRecommendationWithOmdb] WARNING: IMDB ID mismatch between provided ID (${aiImdbId}) and URL-extracted ID (${extractedImdbId})`,
+      );
+    }
+
+    // ALWAYS try direct IMDB ID lookup first if available
     if (aiImdbId || extractedImdbId) {
       const imdbIds = [aiImdbId, extractedImdbId].filter(Boolean) as string[];
       const uniqueImdbIds = [...new Set(imdbIds)];
@@ -597,45 +604,36 @@ export async function verifyRecommendationWithOmdb(
 
         const data = await response.json();
         if (data && data.Response === "True") {
-          // Calculate title similarity
+          // For IMDB ID lookups, we trust the result more but still verify the title
           const similarity = calculateTitleSimilarity(aiTitle, data.Title);
           console.log(
             `[verifyRecommendationWithOmdb] Title similarity for "${data.Title}" (${imdbId}): ${similarity.toFixed(2)}`,
           );
 
-          if (similarity >= 0.8) {
-            // Good match, convert to ContentItem
-            const contentItem = convertOmdbToContentItem(data);
-            contentItem.recommendationReason =
-              aiReason || "Recommended for you";
-            contentItem.synopsis = aiSynopsis || data.Plot;
-            contentItem.verified = true;
-            contentItem.similarityScore = similarity;
+          // Create the content item regardless of similarity score
+          const contentItem = convertOmdbToContentItem(data);
+          contentItem.recommendationReason = aiReason || "Recommended for you";
+          contentItem.synopsis = aiSynopsis || data.Plot;
+          contentItem.verified = true;
+          contentItem.similarityScore = similarity;
+          contentItem.imdb_url = aiImdbUrl; // Preserve the original IMDB URL
 
+          // If similarity is high, it's a confident match
+          if (similarity >= 0.8) {
             console.log(
               `[verifyRecommendationWithOmdb] Found good match by IMDB ID: "${data.Title}" (${similarity.toFixed(2)})`,
             );
-            return contentItem;
           } else {
+            // Even with low similarity, we trust the IMDB ID but mark it as low confidence
             console.log(
-              `[verifyRecommendationWithOmdb] IMDB ID match has low title similarity: "${data.Title}" (${similarity.toFixed(2)})`,
+              `[verifyRecommendationWithOmdb] Using IMDB match despite lower similarity score: "${data.Title}" (${similarity.toFixed(2)})`,
             );
-
-            // Even with low similarity, if we have a direct IMDB ID match, use it with a warning
-            if (similarity >= 0.5) {
-              console.log(
-                `[verifyRecommendationWithOmdb] Using IMDB match despite lower similarity score: "${data.Title}" (${similarity.toFixed(2)})`,
-              );
-              const contentItem = convertOmdbToContentItem(data);
-              contentItem.recommendationReason =
-                aiReason || "Recommended for you";
-              contentItem.synopsis = aiSynopsis || data.Plot;
-              contentItem.verified = true;
-              contentItem.similarityScore = similarity;
-              contentItem.lowConfidenceMatch = true;
-              return contentItem;
-            }
+            contentItem.lowConfidenceMatch = true;
           }
+
+          // Return the content item from IMDB ID lookup regardless of similarity
+          // This prioritizes IMDB ID over title matching
+          return contentItem;
         } else {
           console.log(
             `[verifyRecommendationWithOmdb] IMDB ID ${imdbId} returned no valid data: ${JSON.stringify(data)}`,
@@ -668,6 +666,7 @@ export async function verifyRecommendationWithOmdb(
         similarityScore: 0,
         needsUserSelection: true,
         verificationError: `API error: ${response.status} ${response.statusText}`,
+        imdb_url: aiImdbUrl, // Preserve the IMDB URL
       };
     }
 
@@ -697,6 +696,7 @@ export async function verifyRecommendationWithOmdb(
             similarityScore: 0,
             needsUserSelection: true,
             verificationError: `API error: ${altResponse.status} ${altResponse.statusText}`,
+            imdb_url: aiImdbUrl, // Preserve the IMDB URL
           };
         }
 
@@ -721,6 +721,7 @@ export async function verifyRecommendationWithOmdb(
               similarityScore: 0,
               needsUserSelection: true,
               potentialMatches: altData.Search.slice(0, 5), // Limit to top 5
+              imdb_url: aiImdbUrl, // Preserve the IMDB URL
             };
           }
 
@@ -740,6 +741,7 @@ export async function verifyRecommendationWithOmdb(
               contentItem.synopsis = aiSynopsis || detailData.Plot;
               contentItem.verified = true;
               contentItem.similarityScore = 0.5; // Medium confidence
+              contentItem.imdb_url = aiImdbUrl; // Preserve the IMDB URL
 
               console.log(
                 `[verifyRecommendationWithOmdb] Using single result match: "${contentItem.title}" with medium confidence`,
@@ -785,6 +787,7 @@ export async function verifyRecommendationWithOmdb(
               needsUserSelection: true,
               potentialMatches: fuzzyData.Search.slice(0, 5), // Limit to top 5
               fuzzySearch: true,
+              imdb_url: aiImdbUrl, // Preserve the IMDB URL
             };
           }
         }
@@ -800,6 +803,7 @@ export async function verifyRecommendationWithOmdb(
         similarityScore: 0,
         needsUserSelection: true,
         verificationError: "No matching content found",
+        imdb_url: aiImdbUrl, // Preserve the IMDB URL
       };
     }
 
@@ -847,6 +851,7 @@ export async function verifyRecommendationWithOmdb(
           contentItem.synopsis = aiSynopsis || detailData.Plot;
           contentItem.verified = true;
           contentItem.similarityScore = bestMatch.similarity;
+          contentItem.imdb_url = aiImdbUrl; // Preserve the IMDB URL
 
           return contentItem;
         }
@@ -864,6 +869,7 @@ export async function verifyRecommendationWithOmdb(
         scoredResults.length > 0 ? scoredResults[0].similarity : 0,
       needsUserSelection: true,
       potentialMatches: data.Search.slice(0, 5), // Limit to top 5
+      imdb_url: aiImdbUrl, // Preserve the IMDB URL
     };
   } catch (error) {
     console.error(
@@ -880,6 +886,7 @@ export async function verifyRecommendationWithOmdb(
         error instanceof Error
           ? error.message
           : "Unknown error during verification",
+      imdb_url: item.imdb_url, // Preserve the IMDB URL
     };
   }
 }
@@ -905,12 +912,42 @@ function calculateTitleSimilarity(title1: string, title2: string): number {
   // Check for exact match
   if (normalizedTitle1 === normalizedTitle2) return 1.0;
 
-  // Check if one contains the other
+  // Check for suspicious titles that contain multiple titles
   if (
-    normalizedTitle1.includes(normalizedTitle2) ||
-    normalizedTitle2.includes(normalizedTitle1)
+    title1.includes(",") ||
+    title1.includes(";") ||
+    title1.includes("|") ||
+    title2.includes(",") ||
+    title2.includes(";") ||
+    title2.includes("|") ||
+    title1.length > 50 ||
+    title2.length > 50
   ) {
-    return 0.9;
+    console.log(
+      `[calculateTitleSimilarity] Suspicious title detected, reducing similarity score`,
+    );
+    return 0.5; // Reduce similarity for suspicious titles
+  }
+
+  // Check if one is an exact substring of the other (only for short titles)
+  // This helps with cases like "Signal" vs "Smoke Signals"
+  if (normalizedTitle1.length > 3 && normalizedTitle2.length > 3) {
+    // Only consider exact substring matches if the titles are significantly different in length
+    // This prevents "Signal" from matching with "Smoke Signals"
+    const lengthRatio =
+      Math.min(normalizedTitle1.length, normalizedTitle2.length) /
+      Math.max(normalizedTitle1.length, normalizedTitle2.length);
+
+    // If one title is less than 70% the length of the other, don't consider substring matches
+    if (lengthRatio < 0.7) {
+      if (
+        normalizedTitle1.includes(normalizedTitle2) ||
+        normalizedTitle2.includes(normalizedTitle1)
+      ) {
+        // Reduce similarity score for partial matches
+        return 0.7;
+      }
+    }
   }
 
   // Calculate Levenshtein distance

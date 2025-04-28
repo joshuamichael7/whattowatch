@@ -132,18 +132,6 @@ function isTitleMatch(title1: string, title2: string): boolean {
     return true;
   }
 
-  // Check if one title is contained within the other (for partial matches)
-  // This helps with titles that might have additional info like "(2022)" or "- Extended Cut"
-  if (
-    normalizedTitle1.includes(normalizedTitle2) ||
-    normalizedTitle2.includes(normalizedTitle1)
-  ) {
-    console.log(
-      `[isTitleMatch] Partial match found between "${title1}" and "${title2}"`,
-    );
-    return true;
-  }
-
   // Calculate similarity for close matches
   const maxLength = Math.max(normalizedTitle1.length, normalizedTitle2.length);
   if (maxLength === 0) return false;
@@ -156,8 +144,8 @@ function isTitleMatch(title1: string, title2: string): boolean {
     `[isTitleMatch] Similarity between "${title1}" and "${title2}": ${similarity.toFixed(2)}`,
   );
 
-  // Consider it a match if similarity is above threshold (e.g., 0.8 or 80% similar)
-  const isMatch = similarity > 0.8;
+  // Consider it a match if similarity is above threshold (increased from 0.8 to 0.95 for stricter matching)
+  const isMatch = similarity > 0.95;
   if (isMatch) {
     console.log(
       `[isTitleMatch] Close match found between "${title1}" and "${title2}"`,
@@ -264,42 +252,38 @@ export async function searchContent(
     }
 
     // First, try to search in Supabase
-    const supabaseResults = await searchContentInSupabase(query, type);
+    let supabaseContent = null;
 
-    // If we have results from Supabase, return them
-    if (supabaseResults && supabaseResults.length > 0) {
-      console.log(
-        `[omdbClient] Found ${supabaseResults.length} results in Supabase for "${query}"`,
-      );
-
-      // Extract title and year from query
-      const { queryTitle, queryYear } = extractQueryTitleAndYear(query);
-
-      // Find exact title match
-      const exactTitleMatch = findExactTitleMatch(
-        supabaseResults,
-        queryTitle,
-        queryYear,
-      );
-
-      if (exactTitleMatch) {
+    if (isImdbId) {
+      // If it's an IMDB ID, try to find it by imdb_id field in Supabase
+      console.log(`[omdbClient] Looking up IMDB ID: ${id} in Supabase`);
+      supabaseContent = await getContentByImdbIdFromSupabase(id);
+    } else {
+      // Otherwise try to find it by UUID in Supabase only if it looks like a UUID
+      // This is a fallback for content already in our database with UUIDs
+      const uuidPattern =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidPattern.test(id)) {
+        console.log(`[omdbClient] Looking up UUID: ${id} in Supabase`);
+        supabaseContent = await getContentByIdFromSupabase(id);
+      } else {
         console.log(
-          `[omdbClient] Found exact title match for "${query}": ${exactTitleMatch.title}`,
+          `[omdbClient] ID ${id} is not an IMDB ID or UUID, treating as title`,
         );
-        const otherResults = supabaseResults.filter(
-          (item) => item.id !== exactTitleMatch.id,
-        );
-        return [exactTitleMatch, ...otherResults];
       }
-
-      // We're no longer doing partial matching since it can cause confusion
-      // Only use exact title matches to ensure accuracy
-      return supabaseResults;
     }
 
-    // If no results from Supabase, fall back to OMDB API
+    // If we have content from Supabase, return it
+    if (supabaseContent) {
+      console.log(
+        `[omdbClient] Found content in Supabase: ${supabaseContent.title}`,
+      );
+      return supabaseContent;
+    }
+
+    // If no content from Supabase, fall back to OMDB API
     console.log(
-      `[omdbClient] No results found in Supabase for "${query}", falling back to OMDB API`,
+      `[omdbClient] Content not found in Supabase, falling back to OMDB API`,
     );
 
     return await searchFromOmdb(query, type);
