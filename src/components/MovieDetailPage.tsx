@@ -63,6 +63,7 @@ const MovieDetailPage = () => {
   const [verificationStatus, setVerificationStatus] = useState<string | null>(
     null,
   );
+  const [potentialMatches, setPotentialMatches] = useState<any[]>([]);
 
   useEffect(() => {
     const hasRecommendations =

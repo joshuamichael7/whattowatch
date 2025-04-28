@@ -40,13 +40,25 @@ const RecommendationMatcher: React.FC<RecommendationMatcherProps> = ({
       setError(null);
 
       try {
+        console.log(
+          `[RecommendationMatcher] Finding matches for: ${recommendation.title}`,
+        );
+        console.log(
+          `[RecommendationMatcher] IMDB ID: ${recommendation.imdb_id || "none"}`,
+        );
+        console.log(
+          `[RecommendationMatcher] IMDB URL: ${recommendation.imdb_url || "none"}`,
+        );
+
         // Extract IMDB ID from URL if available
         let extractedImdbId = null;
         if (recommendation.imdb_url) {
           const urlMatch = recommendation.imdb_url.match(/\/title\/(tt\d+)/i);
           if (urlMatch && urlMatch[1]) {
             extractedImdbId = urlMatch[1];
-            console.log(`Extracted IMDB ID from URL: ${extractedImdbId}`);
+            console.log(
+              `[RecommendationMatcher] Extracted IMDB ID from URL: ${extractedImdbId}`,
+            );
           }
         }
 
@@ -57,98 +69,181 @@ const RecommendationMatcher: React.FC<RecommendationMatcherProps> = ({
         const uniqueImdbIds = [...new Set(imdbIds)];
         const matchResults: ContentItem[] = [];
 
-        // First try direct IMDB ID lookup
+        // Check if the IDs don't match and log a warning
+        if (
+          uniqueImdbIds.length > 1 &&
+          recommendation.imdb_id &&
+          extractedImdbId &&
+          recommendation.imdb_id !== extractedImdbId
+        ) {
+          console.warn(
+            `[RecommendationMatcher] WARNING: IMDB ID mismatch between provided ID (${recommendation.imdb_id}) and URL-extracted ID (${extractedImdbId})`,
+          );
+        }
+
+        // First try direct IMDB ID lookup - ALWAYS use OMDB directly
         for (const imdbId of uniqueImdbIds) {
           if (!imdbId) continue;
 
-          console.log(`Searching by IMDB ID: ${imdbId}`);
+          console.log(
+            `[RecommendationMatcher] Searching by IMDB ID: ${imdbId}`,
+          );
           const response = await fetch(
             `/.netlify/functions/omdb?i=${imdbId}&plot=full`,
           );
 
-          if (response.ok) {
-            const data = await response.json();
-            if (data && data.Response === "True") {
-              // Check title similarity
-              const similarity = calculateTitleSimilarity(
-                recommendation.title,
-                data.Title,
+          if (!response.ok) {
+            console.error(
+              `[RecommendationMatcher] OMDB API error for IMDB ID ${imdbId}: ${response.status}`,
+            );
+            continue;
+          }
+
+          const data = await response.json();
+          if (data && data.Response === "True") {
+            // Check title similarity
+            const similarity = calculateTitleSimilarity(
+              recommendation.title,
+              data.Title,
+            );
+
+            console.log(
+              `[RecommendationMatcher] Title similarity for ${data.Title}: ${similarity.toFixed(2)}`,
+            );
+
+            // Use a stricter threshold of 0.95 for title matching
+            if (similarity >= 0.95) {
+              // Excellent match, convert to ContentItem
+              const contentItem = convertOmdbToContentItem(data);
+              contentItem.recommendationReason =
+                recommendation.reason || "Recommended for you";
+              contentItem.synopsis = data.Plot; // Use OMDB plot instead of recommendation synopsis
+              contentItem.imdb_url = recommendation.imdb_url; // Preserve the IMDB URL from the recommendation
+
+              console.log(
+                `[RecommendationMatcher] Found excellent match (${similarity.toFixed(2)}): ${data.Title}`,
               );
-
-              console.log(`Title similarity for ${data.Title}: ${similarity}`);
-
-              if (similarity >= 0.8) {
-                // Good match, convert to ContentItem
-                const contentItem = convertOmdbToContentItem(data);
-                contentItem.recommendationReason =
-                  recommendation.reason || "Recommended for you";
-                contentItem.synopsis = detailData.Plot; // Use OMDB plot instead of recommendation synopsis
-
-                // If this is a very good match (>90%), select it immediately
-                if (similarity > 0.9) {
-                  console.log(
-                    `Found excellent match (${similarity}): ${data.Title}`,
-                  );
-                  if (onSelectMatch) {
-                    onSelectMatch(contentItem);
-                    return;
-                  } else {
-                    navigate(`/movie/${data.imdbID}`, {
-                      state: { recommendation: contentItem },
-                    });
-                    return;
-                  }
-                }
-
-                matchResults.push(contentItem);
+              if (onSelectMatch) {
+                onSelectMatch(contentItem);
+                return;
+              } else {
+                navigate(`/movie/${data.imdbID}`, {
+                  state: { recommendation: contentItem },
+                });
+                return;
               }
+            } else if (similarity >= 0.8) {
+              // Good match, add to results
+              console.log(
+                `[RecommendationMatcher] Found good match (${similarity.toFixed(2)}): ${data.Title}`,
+              );
+              const contentItem = convertOmdbToContentItem(data);
+              contentItem.recommendationReason =
+                recommendation.reason || "Recommended for you";
+              contentItem.synopsis = data.Plot; // Use OMDB plot instead of recommendation synopsis
+              contentItem.imdb_url = recommendation.imdb_url; // Preserve the IMDB URL from the recommendation
+              matchResults.push(contentItem);
+            } else {
+              console.log(
+                `[RecommendationMatcher] Low similarity match (${similarity.toFixed(2)}): ${data.Title}`,
+              );
+              // Still add it to the results but with lower priority
+              const contentItem = convertOmdbToContentItem(data);
+              contentItem.recommendationReason =
+                recommendation.reason || "Recommended for you";
+              contentItem.synopsis = data.Plot;
+              contentItem.imdb_url = recommendation.imdb_url;
+              contentItem.lowSimilarity = true;
+              matchResults.push(contentItem);
             }
+          } else {
+            console.log(
+              `[RecommendationMatcher] No valid data returned for IMDB ID: ${imdbId}`,
+            );
           }
         }
 
         // If no good matches by IMDB ID, search by title
         if (matchResults.length === 0) {
-          console.log(`Searching by title: ${recommendation.title}`);
+          console.log(
+            `[RecommendationMatcher] No matches by IMDB ID, searching by title: ${recommendation.title}`,
+          );
           const titleSearchResponse = await fetch(
             `/.netlify/functions/omdb?s=${encodeURIComponent(recommendation.title)}${recommendation.year ? `&y=${recommendation.year}` : ""}`,
           );
 
-          if (titleSearchResponse.ok) {
-            const searchData = await titleSearchResponse.json();
-            if (
-              searchData &&
-              searchData.Response === "True" &&
-              searchData.Search
-            ) {
-              // Get full details for each search result
-              for (const result of searchData.Search.slice(0, 5)) {
-                // Limit to top 5
-                const detailResponse = await fetch(
-                  `/.netlify/functions/omdb?i=${result.imdbID}&plot=full`,
-                );
-                if (detailResponse.ok) {
-                  const detailData = await detailResponse.json();
-                  if (detailData && detailData.Response === "True") {
-                    const contentItem = convertOmdbToContentItem(detailData);
-                    contentItem.recommendationReason =
-                      recommendation.reason || "Recommended for you";
-                    contentItem.synopsis = detailData.Plot; // Use OMDB plot instead of recommendation synopsis
-                    matchResults.push(contentItem);
-                  }
+          if (!titleSearchResponse.ok) {
+            console.error(
+              `[RecommendationMatcher] OMDB search failed: ${titleSearchResponse.status}`,
+            );
+            setError("Error searching for content. Please try again.");
+            return;
+          }
+
+          const searchData = await titleSearchResponse.json();
+          if (
+            searchData &&
+            searchData.Response === "True" &&
+            searchData.Search
+          ) {
+            console.log(
+              `[RecommendationMatcher] Found ${searchData.Search.length} results by title search`,
+            );
+
+            // Get full details for each search result
+            for (const result of searchData.Search.slice(0, 5)) {
+              // Limit to top 5
+              const detailResponse = await fetch(
+                `/.netlify/functions/omdb?i=${result.imdbID}&plot=full`,
+              );
+              if (detailResponse.ok) {
+                const detailData = await detailResponse.json();
+                if (detailData && detailData.Response === "True") {
+                  // Calculate similarity
+                  const similarity = calculateTitleSimilarity(
+                    recommendation.title,
+                    detailData.Title,
+                  );
+
+                  console.log(
+                    `[RecommendationMatcher] Title similarity for ${detailData.Title}: ${similarity.toFixed(2)}`,
+                  );
+
+                  const contentItem = convertOmdbToContentItem(detailData);
+                  contentItem.recommendationReason =
+                    recommendation.reason || "Recommended for you";
+                  contentItem.synopsis = detailData.Plot; // Use OMDB plot instead of recommendation synopsis
+                  contentItem.imdb_url = recommendation.imdb_url; // Preserve the IMDB URL from the recommendation
+                  contentItem.similarityScore = similarity;
+                  matchResults.push(contentItem);
                 }
               }
             }
+          } else {
+            console.log(
+              `[RecommendationMatcher] No results found for title: ${recommendation.title}`,
+            );
           }
         }
 
         if (matchResults.length > 0) {
-          console.log(`Found ${matchResults.length} potential matches`);
-          setMatches(matchResults);
+          console.log(
+            `[RecommendationMatcher] Found ${matchResults.length} potential matches`,
+          );
+
+          // Sort matches by similarity score if available
+          const sortedMatches = matchResults.sort((a, b) => {
+            const scoreA = a.similarityScore || (a.lowSimilarity ? 0 : 0.5);
+            const scoreB = b.similarityScore || (b.lowSimilarity ? 0 : 0.5);
+            return scoreB - scoreA;
+          });
+
+          setMatches(sortedMatches);
         } else {
           setError("We couldn't find any matches for this recommendation.");
         }
       } catch (err) {
-        console.error("Error finding matches:", err);
+        console.error("[RecommendationMatcher] Error finding matches:", err);
         setError("An error occurred while searching for matches.");
       } finally {
         setIsLoading(false);

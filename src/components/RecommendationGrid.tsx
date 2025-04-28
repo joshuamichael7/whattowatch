@@ -61,6 +61,7 @@ interface RecommendationItem {
   contentRating?: string;
   content_rating?: string;
   imdb_id?: string; // Added to support direct IMDB ID links
+  imdb_url?: string; // Added to support direct IMDB URL links
 }
 
 interface RecommendationGridProps {
@@ -281,9 +282,15 @@ const RecommendationGrid = ({
               className="overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow"
             >
               <Link
-                to={`/movie/${rec.imdb_id || encodeURIComponent(rec.title)}`}
+                to={`/${rec.type}/${rec.imdb_id || encodeURIComponent(rec.title)}`}
                 className="flex flex-col h-full"
-                state={{ recommendation: rec }}
+                state={{
+                  recommendation: {
+                    ...rec,
+                    imdb_url: rec.imdb_url, // Ensure imdb_url is passed in state
+                  },
+                  fromRecommendations: true,
+                }}
               >
                 <div className="relative aspect-[2/3] overflow-hidden bg-muted">
                   <img
@@ -531,7 +538,10 @@ const RecommendationGrid = ({
                                 <Link
                                   to={`/${selectedItem.type}/${selectedItem.imdb_id || selectedItem.id || encodeURIComponent(selectedItem.title)}`}
                                   state={{
-                                    recommendation: selectedItem,
+                                    recommendation: {
+                                      ...selectedItem,
+                                      imdb_url: selectedItem.imdb_url, // Ensure imdb_url is passed in state
+                                    },
                                     fromRecommendations: true,
                                   }}
                                 >

@@ -42,6 +42,10 @@ export interface ContentItem {
   streamingOn?: string[];
   contentRating?: string;
 
+  // IMDB specific fields
+  imdb_id?: string;
+  imdb_url?: string; // Added for storing IMDB URL
+
   // Fields from OMDB API
   imdbID?: string;
   Type?: string;
@@ -54,6 +58,19 @@ export interface ContentItem {
   Director?: string;
   Actors?: string;
   imdbRating?: string;
+
+  // Verification fields
+  verified?: boolean;
+  similarityScore?: number;
+  needsVerification?: boolean;
+  needsUserSelection?: boolean;
+  potentialMatches?: any[];
+  verificationError?: string;
+  lowConfidenceMatch?: boolean;
+  lowSimilarity?: boolean;
+  fuzzySearch?: boolean;
+  originalAiData?: any;
+  reason?: string;
 }
 
 // OMDB API search response

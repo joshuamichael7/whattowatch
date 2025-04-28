@@ -555,39 +555,9 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     // Check if the ID is an IMDB ID (starts with 'tt' followed by numbers)
     const isImdbId = id.startsWith("tt") && /^tt\d+$/.test(id);
 
-    // First, try to get content from Supabase
-    let supabaseContent = null;
-
-    if (isImdbId) {
-      // If it's an IMDB ID, try to find it by imdb_id field in Supabase
-      console.log(`[omdbClient] Looking up IMDB ID: ${id} in Supabase`);
-      supabaseContent = await getContentByImdbIdFromSupabase(id);
-    } else {
-      // Otherwise try to find it by UUID in Supabase only if it looks like a UUID
-      // This is a fallback for content already in our database with UUIDs
-      const uuidPattern =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (uuidPattern.test(id)) {
-        console.log(`[omdbClient] Looking up UUID: ${id} in Supabase`);
-        supabaseContent = await getContentByIdFromSupabase(id);
-      } else {
-        console.log(
-          `[omdbClient] ID ${id} is not an IMDB ID or UUID, treating as title`,
-        );
-      }
-    }
-
-    // If we have content from Supabase, return it
-    if (supabaseContent) {
-      console.log(
-        `[omdbClient] Found content in Supabase: ${supabaseContent.title}`,
-      );
-      return supabaseContent;
-    }
-
-    // If no content from Supabase, fall back to OMDB API
+    // Always search directly from OMDB API, skip Supabase
     console.log(
-      `[omdbClient] Content not found in Supabase, falling back to OMDB API`,
+      `[omdbClient] Looking up content directly from OMDB API for ID: ${id}`,
     );
 
     // Use the appropriate parameter based on whether it's an IMDB ID or not
