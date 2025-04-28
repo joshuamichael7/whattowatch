@@ -82,7 +82,7 @@ const RecommendationMatcher: React.FC<RecommendationMatcherProps> = ({
                 const contentItem = convertOmdbToContentItem(data);
                 contentItem.recommendationReason =
                   recommendation.reason || "Recommended for you";
-                contentItem.synopsis = recommendation.synopsis || data.Plot;
+                contentItem.synopsis = detailData.Plot; // Use OMDB plot instead of recommendation synopsis
 
                 // If this is a very good match (>90%), select it immediately
                 if (similarity > 0.9) {
@@ -132,8 +132,7 @@ const RecommendationMatcher: React.FC<RecommendationMatcherProps> = ({
                     const contentItem = convertOmdbToContentItem(detailData);
                     contentItem.recommendationReason =
                       recommendation.reason || "Recommended for you";
-                    contentItem.synopsis =
-                      recommendation.synopsis || detailData.Plot;
+                    contentItem.synopsis = detailData.Plot; // Use OMDB plot instead of recommendation synopsis
                     matchResults.push(contentItem);
                   }
                 }

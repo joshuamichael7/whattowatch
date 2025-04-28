@@ -473,7 +473,8 @@ const RecommendationGrid = ({
                                 Synopsis
                               </h4>
                               <p className="text-sm text-muted-foreground">
-                                {selectedItem.synopsis}
+                                {selectedItem.overview ||
+                                  "No description available"}
                               </p>
                             </div>
 
@@ -529,6 +530,10 @@ const RecommendationGrid = ({
                               >
                                 <Link
                                   to={`/${selectedItem.type}/${selectedItem.imdb_id || selectedItem.id || encodeURIComponent(selectedItem.title)}`}
+                                  state={{
+                                    recommendation: selectedItem,
+                                    fromRecommendations: true,
+                                  }}
                                 >
                                   <ExternalLink size={16} />
                                   View Details

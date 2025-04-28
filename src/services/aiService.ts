@@ -576,6 +576,10 @@ export async function verifyRecommendationWithOmdb(
       const imdbIds = [aiImdbId, extractedImdbId].filter(Boolean) as string[];
       const uniqueImdbIds = [...new Set(imdbIds)];
 
+      console.log(
+        `[verifyRecommendationWithOmdb] Attempting lookup with ${uniqueImdbIds.length} unique IMDB IDs: ${uniqueImdbIds.join(", ")}`,
+      );
+
       for (const imdbId of uniqueImdbIds) {
         console.log(
           `[verifyRecommendationWithOmdb] Trying direct IMDB ID lookup: ${imdbId}`,
@@ -584,41 +588,65 @@ export async function verifyRecommendationWithOmdb(
           `/.netlify/functions/omdb?i=${imdbId}&plot=full`,
         );
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data && data.Response === "True") {
-            // Calculate title similarity
-            const similarity = calculateTitleSimilarity(aiTitle, data.Title);
+        if (!response.ok) {
+          console.error(
+            `[verifyRecommendationWithOmdb] OMDB API error for IMDB ID ${imdbId}: ${response.status} ${response.statusText}`,
+          );
+          continue; // Try next IMDB ID if available
+        }
+
+        const data = await response.json();
+        if (data && data.Response === "True") {
+          // Calculate title similarity
+          const similarity = calculateTitleSimilarity(aiTitle, data.Title);
+          console.log(
+            `[verifyRecommendationWithOmdb] Title similarity for "${data.Title}" (${imdbId}): ${similarity.toFixed(2)}`,
+          );
+
+          if (similarity >= 0.8) {
+            // Good match, convert to ContentItem
+            const contentItem = convertOmdbToContentItem(data);
+            contentItem.recommendationReason =
+              aiReason || "Recommended for you";
+            contentItem.synopsis = aiSynopsis || data.Plot;
+            contentItem.verified = true;
+            contentItem.similarityScore = similarity;
+
             console.log(
-              `[verifyRecommendationWithOmdb] Title similarity for ${data.Title}: ${similarity}`,
+              `[verifyRecommendationWithOmdb] Found good match by IMDB ID: "${data.Title}" (${similarity.toFixed(2)})`,
+            );
+            return contentItem;
+          } else {
+            console.log(
+              `[verifyRecommendationWithOmdb] IMDB ID match has low title similarity: "${data.Title}" (${similarity.toFixed(2)})`,
             );
 
-            if (similarity >= 0.8) {
-              // Good match, convert to ContentItem
+            // Even with low similarity, if we have a direct IMDB ID match, use it with a warning
+            if (similarity >= 0.5) {
+              console.log(
+                `[verifyRecommendationWithOmdb] Using IMDB match despite lower similarity score: "${data.Title}" (${similarity.toFixed(2)})`,
+              );
               const contentItem = convertOmdbToContentItem(data);
               contentItem.recommendationReason =
                 aiReason || "Recommended for you";
               contentItem.synopsis = aiSynopsis || data.Plot;
               contentItem.verified = true;
               contentItem.similarityScore = similarity;
-
-              console.log(
-                `[verifyRecommendationWithOmdb] Found good match by IMDB ID: ${data.Title} (${similarity})`,
-              );
+              contentItem.lowConfidenceMatch = true;
               return contentItem;
-            } else {
-              console.log(
-                `[verifyRecommendationWithOmdb] IMDB ID match has low title similarity: ${data.Title} (${similarity})`,
-              );
             }
           }
+        } else {
+          console.log(
+            `[verifyRecommendationWithOmdb] IMDB ID ${imdbId} returned no valid data: ${JSON.stringify(data)}`,
+          );
         }
       }
     }
 
     // If IMDB ID lookup failed or had low similarity, search by title
     console.log(
-      `[verifyRecommendationWithOmdb] Searching by title: ${aiTitle}`,
+      `[verifyRecommendationWithOmdb] IMDB ID lookup failed or had low similarity. Searching by title: "${aiTitle}"${aiYear ? ` (${aiYear})` : ""}`,
     );
     const searchQuery = aiYear ? `${aiTitle} ${aiYear}` : aiTitle;
     const response = await fetch(
@@ -627,13 +655,19 @@ export async function verifyRecommendationWithOmdb(
 
     if (!response.ok) {
       console.error(
-        `[verifyRecommendationWithOmdb] OMDB search failed: ${response.status}`,
+        `[verifyRecommendationWithOmdb] OMDB search failed: ${response.status} ${response.statusText}`,
+      );
+
+      // Return the original item with verification status
+      console.log(
+        `[verifyRecommendationWithOmdb] Returning original item with verification status due to API error`,
       );
       return {
         ...item,
         verified: false,
         similarityScore: 0,
         needsUserSelection: true,
+        verificationError: `API error: ${response.status} ${response.statusText}`,
       };
     }
 
@@ -641,7 +675,7 @@ export async function verifyRecommendationWithOmdb(
 
     if (data.Response !== "True" || !data.Search || data.Search.length === 0) {
       console.log(
-        `[verifyRecommendationWithOmdb] No results found for "${aiTitle}"`,
+        `[verifyRecommendationWithOmdb] No results found for "${aiTitle}"${aiYear ? ` (${aiYear})` : ""}`,
       );
 
       // Try a more lenient search without the year
@@ -653,72 +687,158 @@ export async function verifyRecommendationWithOmdb(
           `/.netlify/functions/omdb?s=${encodeURIComponent(aiTitle)}`,
         );
 
-        if (altResponse.ok) {
-          const altData = await altResponse.json();
-          if (
-            altData.Response === "True" &&
-            altData.Search &&
-            altData.Search.length > 0
-          ) {
+        if (!altResponse.ok) {
+          console.error(
+            `[verifyRecommendationWithOmdb] Alternative search failed: ${altResponse.status} ${altResponse.statusText}`,
+          );
+          return {
+            ...item,
+            verified: false,
+            similarityScore: 0,
+            needsUserSelection: true,
+            verificationError: `API error: ${altResponse.status} ${altResponse.statusText}`,
+          };
+        }
+
+        const altData = await altResponse.json();
+        if (
+          altData.Response === "True" &&
+          altData.Search &&
+          altData.Search.length > 0
+        ) {
+          console.log(
+            `[verifyRecommendationWithOmdb] Found ${altData.Search.length} results without year for "${aiTitle}"`,
+          );
+
+          // If we have multiple results, let the user choose
+          if (altData.Search.length > 1) {
             console.log(
-              `[verifyRecommendationWithOmdb] Found ${altData.Search.length} results without year`,
+              `[verifyRecommendationWithOmdb] Multiple results found (${altData.Search.length}), returning for user selection`,
             );
+            return {
+              ...item,
+              verified: false,
+              similarityScore: 0,
+              needsUserSelection: true,
+              potentialMatches: altData.Search.slice(0, 5), // Limit to top 5
+            };
+          }
 
-            // If we have multiple results, let the user choose
-            if (altData.Search.length > 1) {
-              return {
-                ...item,
-                verified: false,
-                similarityScore: 0,
-                needsUserSelection: true,
-                potentialMatches: altData.Search.slice(0, 5), // Limit to top 5
-              };
+          // If only one result, get full details
+          console.log(
+            `[verifyRecommendationWithOmdb] Single result found, getting full details for ${altData.Search[0].imdbID}`,
+          );
+          const detailResponse = await fetch(
+            `/.netlify/functions/omdb?i=${altData.Search[0].imdbID}&plot=full`,
+          );
+          if (detailResponse.ok) {
+            const detailData = await detailResponse.json();
+            if (detailData && detailData.Response === "True") {
+              const contentItem = convertOmdbToContentItem(detailData);
+              contentItem.recommendationReason =
+                aiReason || "Recommended for you";
+              contentItem.synopsis = aiSynopsis || detailData.Plot;
+              contentItem.verified = true;
+              contentItem.similarityScore = 0.5; // Medium confidence
+
+              console.log(
+                `[verifyRecommendationWithOmdb] Using single result match: "${contentItem.title}" with medium confidence`,
+              );
+              return contentItem;
+            } else {
+              console.error(
+                `[verifyRecommendationWithOmdb] Failed to get details for single result: ${JSON.stringify(detailData)}`,
+              );
             }
-
-            // If only one result, get full details
-            const detailResponse = await fetch(
-              `/.netlify/functions/omdb?i=${altData.Search[0].imdbID}&plot=full`,
+          } else {
+            console.error(
+              `[verifyRecommendationWithOmdb] Failed to fetch details for single result: ${detailResponse.status} ${detailResponse.statusText}`,
             );
-            if (detailResponse.ok) {
-              const detailData = await detailResponse.json();
-              if (detailData && detailData.Response === "True") {
-                const contentItem = convertOmdbToContentItem(detailData);
-                contentItem.recommendationReason =
-                  aiReason || "Recommended for you";
-                contentItem.synopsis = aiSynopsis || detailData.Plot;
-                contentItem.verified = true;
-                contentItem.similarityScore = 0.5; // Medium confidence
-
-                return contentItem;
-              }
-            }
           }
         }
       }
 
+      // Try a fuzzy search with just the first few words of the title
+      const firstFewWords = aiTitle.split(" ").slice(0, 2).join(" ");
+      if (firstFewWords.length > 3 && firstFewWords !== aiTitle) {
+        console.log(
+          `[verifyRecommendationWithOmdb] Trying fuzzy search with first few words: "${firstFewWords}"`,
+        );
+        const fuzzyResponse = await fetch(
+          `/.netlify/functions/omdb?s=${encodeURIComponent(firstFewWords)}`,
+        );
+
+        if (fuzzyResponse.ok) {
+          const fuzzyData = await fuzzyResponse.json();
+          if (
+            fuzzyData.Response === "True" &&
+            fuzzyData.Search &&
+            fuzzyData.Search.length > 0
+          ) {
+            console.log(
+              `[verifyRecommendationWithOmdb] Found ${fuzzyData.Search.length} results with fuzzy search`,
+            );
+            return {
+              ...item,
+              verified: false,
+              similarityScore: 0,
+              needsUserSelection: true,
+              potentialMatches: fuzzyData.Search.slice(0, 5), // Limit to top 5
+              fuzzySearch: true,
+            };
+          }
+        }
+      }
+
+      // As a last resort, return the original item with verification status
+      console.log(
+        `[verifyRecommendationWithOmdb] All search attempts failed, returning original item with verification status`,
+      );
       return {
         ...item,
         verified: false,
         similarityScore: 0,
         needsUserSelection: true,
+        verificationError: "No matching content found",
       };
     }
 
     console.log(
-      `[verifyRecommendationWithOmdb] Found ${data.Search.length} results for "${aiTitle}"`,
+      `[verifyRecommendationWithOmdb] Found ${data.Search.length} results for "${aiTitle}"${aiYear ? ` (${aiYear})` : ""}`,
     );
 
-    // If we have multiple results, check for exact title matches
-    const exactMatches = data.Search.filter((result) => {
+    // Calculate similarity for all results and sort by similarity
+    const scoredResults = data.Search.map((result) => {
       const similarity = calculateTitleSimilarity(aiTitle, result.Title);
-      return similarity > 0.9; // Only consider very close matches
-    });
+      return { result, similarity };
+    }).sort((a, b) => b.similarity - a.similarity);
 
-    if (exactMatches.length === 1) {
-      // We have exactly one good match, get full details
-      const detailResponse = await fetch(
-        `/.netlify/functions/omdb?i=${exactMatches[0].imdbID}&plot=full`,
+    console.log(
+      `[verifyRecommendationWithOmdb] Top 3 matches by similarity:`,
+      scoredResults
+        .slice(0, 3)
+        .map(
+          (item) =>
+            `"${item.result.Title}" (${item.result.Year}) - Score: ${item.similarity.toFixed(2)}`,
+        ),
+    );
+
+    // If we have results with high similarity, use the best one
+    const highSimilarityMatches = scoredResults.filter(
+      (item) => item.similarity > 0.8,
+    );
+
+    if (highSimilarityMatches.length > 0) {
+      const bestMatch = highSimilarityMatches[0];
+      console.log(
+        `[verifyRecommendationWithOmdb] Using best match with high similarity: "${bestMatch.result.Title}" (${bestMatch.similarity.toFixed(2)})`,
       );
+
+      // Get full details for the best match
+      const detailResponse = await fetch(
+        `/.netlify/functions/omdb?i=${bestMatch.result.imdbID}&plot=full`,
+      );
+
       if (detailResponse.ok) {
         const detailData = await detailResponse.json();
         if (detailData && detailData.Response === "True") {
@@ -726,28 +846,40 @@ export async function verifyRecommendationWithOmdb(
           contentItem.recommendationReason = aiReason || "Recommended for you";
           contentItem.synopsis = aiSynopsis || detailData.Plot;
           contentItem.verified = true;
-          contentItem.similarityScore = 0.9;
+          contentItem.similarityScore = bestMatch.similarity;
 
           return contentItem;
         }
       }
     }
 
-    // If we have multiple potential matches, let the user choose
+    // If we have multiple potential matches but none with high similarity, let the user choose
+    console.log(
+      `[verifyRecommendationWithOmdb] No high similarity matches found, returning top results for user selection`,
+    );
     return {
       ...item,
       verified: false,
-      similarityScore: 0,
+      similarityScore:
+        scoredResults.length > 0 ? scoredResults[0].similarity : 0,
       needsUserSelection: true,
       potentialMatches: data.Search.slice(0, 5), // Limit to top 5
     };
   } catch (error) {
-    console.error("Error verifying recommendation:", error);
+    console.error(
+      "[verifyRecommendationWithOmdb] Error verifying recommendation:",
+      error,
+    );
+    // Return the original item with error information
     return {
       ...item,
       verified: false,
       similarityScore: 0,
       needsUserSelection: true,
+      verificationError:
+        error instanceof Error
+          ? error.message
+          : "Unknown error during verification",
     };
   }
 }
@@ -861,7 +993,7 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
   const aiSynopsis = aiItem.synopsis || aiItem.overview || "";
   const aiTitle = aiItem.title || "";
 
-  // If no synopsis, we can't compare - NEVER use fallbacks
+  // We can now proceed without synopsis
   if (!aiSynopsis) {
     console.log(
       `[findBestMatch] No synopsis available for \\\"${aiTitle}\\\", can't compare`,

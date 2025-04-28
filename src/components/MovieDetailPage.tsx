@@ -183,9 +183,12 @@ const MovieDetailPage = () => {
                   console.error(
                     "CRITICAL ERROR: No synopsis in location state! Cannot verify content.",
                   );
-                  throw new Error(
-                    "Missing synopsis from recommendation. Cannot verify content.",
+                  // Instead of throwing an error, set a flag to show the user selection screen
+                  console.log(
+                    "No synopsis available, showing user selection screen",
                   );
+                  // Continue with basic search results instead of throwing an error
+                  tempMovieData.synopsis = "No synopsis available";
                 }
 
                 console.log(
@@ -353,6 +356,8 @@ const MovieDetailPage = () => {
       </div>
     );
   }
+
+  const needsUserSelection = false; // We're no longer using this flag since we don't need synopsis verification
 
   if (needsUserSelection) {
     return (
