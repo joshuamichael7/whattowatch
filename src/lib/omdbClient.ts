@@ -254,21 +254,24 @@ export async function searchContent(
     // First, try to search in Supabase
     let supabaseContent = null;
 
+    // Check if the query is an IMDB ID (starts with 'tt' followed by numbers)
+    const isImdbId = query.startsWith("tt") && /^tt\d+$/.test(query);
+
     if (isImdbId) {
       // If it's an IMDB ID, try to find it by imdb_id field in Supabase
-      console.log(`[omdbClient] Looking up IMDB ID: ${id} in Supabase`);
-      supabaseContent = await getContentByImdbIdFromSupabase(id);
+      console.log(`[omdbClient] Looking up IMDB ID: ${query} in Supabase`);
+      supabaseContent = await getContentByImdbIdFromSupabase(query);
     } else {
       // Otherwise try to find it by UUID in Supabase only if it looks like a UUID
       // This is a fallback for content already in our database with UUIDs
       const uuidPattern =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (uuidPattern.test(id)) {
-        console.log(`[omdbClient] Looking up UUID: ${id} in Supabase`);
-        supabaseContent = await getContentByIdFromSupabase(id);
+      if (uuidPattern.test(query)) {
+        console.log(`[omdbClient] Looking up UUID: ${query} in Supabase`);
+        supabaseContent = await getContentByIdFromSupabase(query);
       } else {
         console.log(
-          `[omdbClient] ID ${id} is not an IMDB ID or UUID, treating as title`,
+          `[omdbClient] Query "${query}" is not an IMDB ID or UUID, treating as title`,
         );
       }
     }
