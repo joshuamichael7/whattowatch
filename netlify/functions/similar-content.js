@@ -83,16 +83,19 @@ exports.handler = async (event, context) => {
     CRITICAL: Format your response as a JSON array with the following properties for each recommendation:
     - title: The EXACT title as it appears in IMDB - this is extremely important for matching with the database
     - year: The year of release
+    - imdb_id: The IMDB ID in the format tt1234567
+    - imdb_url: The IMDB URL in the format https://www.imdb.com/title/tt1234567/
     - reason: A brief explanation of why this content is similar
     - synopsis: A detailed summary of the plot (2-3 sentences) - this helps with matching
     
     Example JSON format:
     [
-      {"title": "Parks and Recreation", "year": "2009", "reason": "Mockumentary workplace comedy with quirky characters and similar humor style", "synopsis": "The absurd antics of an Indiana town's public officials as they pursue projects to make their city a better place. The series focuses on Leslie Knope, an ambitious mid-level bureaucrat in the Parks Department of Pawnee, Indiana."},
-      {"title": "Brooklyn Nine-Nine", "year": "2013", "reason": "Ensemble workplace comedy with similar character dynamics", "synopsis": "Comedy series following the exploits of Det. Jake Peralta and his diverse, lovable colleagues as they police the NYPD's 99th Precinct. The show explores their professional challenges and personal lives while solving crimes in Brooklyn."}
+      {"title": "Parks and Recreation", "year": "2009", "imdb_id": "tt1266020", "imdb_url": "https://www.imdb.com/title/tt1266020/", "reason": "Mockumentary workplace comedy with quirky characters and similar humor style", "synopsis": "The absurd antics of an Indiana town's public officials as they pursue projects to make their city a better place. The series focuses on Leslie Knope, an ambitious mid-level bureaucrat in the Parks Department of Pawnee, Indiana."},
+      {"title": "Brooklyn Nine-Nine", "year": "2013", "imdb_id": "tt2467372", "imdb_url": "https://www.imdb.com/title/tt2467372/", "reason": "Ensemble workplace comedy with similar character dynamics", "synopsis": "Comedy series following the exploits of Det. Jake Peralta and his diverse, lovable colleagues as they police the NYPD's 99th Precinct. The show explores their professional challenges and personal lives while solving crimes in Brooklyn."}
     ]
     
     ULTRA IMPORTANT: Use the EXACT title spelling and formatting as it appears in IMDB - this is critical for matching.
+    ULTRA IMPORTANT: Make sure the IMDB ID and URL are correct and match the actual IMDB entry for the title.
     CRITICAL: Only return the JSON array, no other text.`;
 
     // Construct the API endpoint URL

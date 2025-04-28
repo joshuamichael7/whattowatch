@@ -545,28 +545,82 @@ export async function verifyRecommendationWithOmdb(
   try {
     console.log(`[verifyRecommendationWithOmdb] Verifying "${item.title}"`);
 
-    // Get the AI synopsis and title
+    // Get the AI data
     const aiTitle = item.title;
     const aiSynopsis = item.synopsis || item.overview || "";
     const aiYear =
       item.year ||
       (item.release_date ? item.release_date.substring(0, 4) : null);
     const aiReason = item.recommendationReason || item.reason;
+    const aiImdbId = item.imdb_id || null;
+    const aiImdbUrl = item.imdb_url || null;
 
     console.log(
-      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, Synopsis="${aiSynopsis.substring(0, 50)}..."`,
+      `[verifyRecommendationWithOmdb] AI data: Title="${aiTitle}", Year=${aiYear || "unknown"}, IMDB ID=${aiImdbId || "none"}, IMDB URL=${aiImdbUrl || "none"}`,
     );
 
-    // Search OMDB by title
+    // Extract IMDB ID from URL if available
+    let extractedImdbId = null;
+    if (aiImdbUrl) {
+      const urlMatch = aiImdbUrl.match(/\/title\/(tt\d+)/i);
+      if (urlMatch && urlMatch[1]) {
+        extractedImdbId = urlMatch[1];
+        console.log(
+          `[verifyRecommendationWithOmdb] Extracted IMDB ID from URL: ${extractedImdbId}`,
+        );
+      }
+    }
+
+    // First try direct IMDB ID lookup if available
+    if (aiImdbId || extractedImdbId) {
+      const imdbIds = [aiImdbId, extractedImdbId].filter(Boolean) as string[];
+      const uniqueImdbIds = [...new Set(imdbIds)];
+
+      for (const imdbId of uniqueImdbIds) {
+        console.log(
+          `[verifyRecommendationWithOmdb] Trying direct IMDB ID lookup: ${imdbId}`,
+        );
+        const response = await fetch(
+          `/.netlify/functions/omdb?i=${imdbId}&plot=full`,
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.Response === "True") {
+            // Calculate title similarity
+            const similarity = calculateTitleSimilarity(aiTitle, data.Title);
+            console.log(
+              `[verifyRecommendationWithOmdb] Title similarity for ${data.Title}: ${similarity}`,
+            );
+
+            if (similarity >= 0.8) {
+              // Good match, convert to ContentItem
+              const contentItem = convertOmdbToContentItem(data);
+              contentItem.recommendationReason =
+                aiReason || "Recommended for you";
+              contentItem.synopsis = aiSynopsis || data.Plot;
+              contentItem.verified = true;
+              contentItem.similarityScore = similarity;
+
+              console.log(
+                `[verifyRecommendationWithOmdb] Found good match by IMDB ID: ${data.Title} (${similarity})`,
+              );
+              return contentItem;
+            } else {
+              console.log(
+                `[verifyRecommendationWithOmdb] IMDB ID match has low title similarity: ${data.Title} (${similarity})`,
+              );
+            }
+          }
+        }
+      }
+    }
+
+    // If IMDB ID lookup failed or had low similarity, search by title
+    console.log(
+      `[verifyRecommendationWithOmdb] Searching by title: ${aiTitle}`,
+    );
     const searchQuery = aiYear ? `${aiTitle} ${aiYear}` : aiTitle;
-    console.log(
-      `[verifyRecommendationWithOmdb] Searching OMDB for: "${searchQuery}" with synopsis: "${aiSynopsis.substring(0, 50)}..."`,
-    );
-    console.log(
-      `[verifyRecommendationWithOmdb] VERIFICATION PROCESS RUNNING - This is not just grabbing the first result`,
-    );
-
-    // 1. Search OMDB for the title
     const response = await fetch(
       `/.netlify/functions/omdb?s=${encodeURIComponent(searchQuery)}`,
     );
@@ -579,6 +633,7 @@ export async function verifyRecommendationWithOmdb(
         ...item,
         verified: false,
         similarityScore: 0,
+        needsUserSelection: true,
       };
     }
 
@@ -608,17 +663,34 @@ export async function verifyRecommendationWithOmdb(
             console.log(
               `[verifyRecommendationWithOmdb] Found ${altData.Search.length} results without year`,
             );
-            // Continue with these results
-            const bestMatch = await findBestMatch(item, altData.Search);
-            if (bestMatch) {
+
+            // If we have multiple results, let the user choose
+            if (altData.Search.length > 1) {
               return {
                 ...item,
-                ...bestMatch,
-                recommendationReason:
-                  aiReason || bestMatch.recommendationReason,
-                verified: true,
-                similarityScore: bestMatch.similarityScore || 0,
+                verified: false,
+                similarityScore: 0,
+                needsUserSelection: true,
+                potentialMatches: altData.Search.slice(0, 5), // Limit to top 5
               };
+            }
+
+            // If only one result, get full details
+            const detailResponse = await fetch(
+              `/.netlify/functions/omdb?i=${altData.Search[0].imdbID}&plot=full`,
+            );
+            if (detailResponse.ok) {
+              const detailData = await detailResponse.json();
+              if (detailData && detailData.Response === "True") {
+                const contentItem = convertOmdbToContentItem(detailData);
+                contentItem.recommendationReason =
+                  aiReason || "Recommended for you";
+                contentItem.synopsis = aiSynopsis || detailData.Plot;
+                contentItem.verified = true;
+                contentItem.similarityScore = 0.5; // Medium confidence
+
+                return contentItem;
+              }
             }
           }
         }
@@ -628,6 +700,7 @@ export async function verifyRecommendationWithOmdb(
         ...item,
         verified: false,
         similarityScore: 0,
+        needsUserSelection: true,
       };
     }
 
@@ -635,29 +708,38 @@ export async function verifyRecommendationWithOmdb(
       `[verifyRecommendationWithOmdb] Found ${data.Search.length} results for "${aiTitle}"`,
     );
 
-    // 2. Find the best match based on title, year, and synopsis similarity
-    const bestMatch = await findBestMatch(item, data.Search);
+    // If we have multiple results, check for exact title matches
+    const exactMatches = data.Search.filter((result) => {
+      const similarity = calculateTitleSimilarity(aiTitle, result.Title);
+      return similarity > 0.9; // Only consider very close matches
+    });
 
-    if (bestMatch && bestMatch.similarityScore >= 0.05) {
-      console.log(
-        `[verifyRecommendationWithOmdb] Best match: "${bestMatch.title}" with similarity score ${bestMatch.similarityScore}`,
+    if (exactMatches.length === 1) {
+      // We have exactly one good match, get full details
+      const detailResponse = await fetch(
+        `/.netlify/functions/omdb?i=${exactMatches[0].imdbID}&plot=full`,
       );
-      return {
-        ...item,
-        ...bestMatch,
-        recommendationReason: aiReason || bestMatch.recommendationReason,
-        verified: true,
-        similarityScore: bestMatch.similarityScore || 0,
-      };
+      if (detailResponse.ok) {
+        const detailData = await detailResponse.json();
+        if (detailData && detailData.Response === "True") {
+          const contentItem = convertOmdbToContentItem(detailData);
+          contentItem.recommendationReason = aiReason || "Recommended for you";
+          contentItem.synopsis = aiSynopsis || detailData.Plot;
+          contentItem.verified = true;
+          contentItem.similarityScore = 0.9;
+
+          return contentItem;
+        }
+      }
     }
 
-    console.log(
-      `[verifyRecommendationWithOmdb] No good match found, using original data`,
-    );
+    // If we have multiple potential matches, let the user choose
     return {
       ...item,
       verified: false,
       similarityScore: 0,
+      needsUserSelection: true,
+      potentialMatches: data.Search.slice(0, 5), // Limit to top 5
     };
   } catch (error) {
     console.error("Error verifying recommendation:", error);
@@ -665,8 +747,105 @@ export async function verifyRecommendationWithOmdb(
       ...item,
       verified: false,
       similarityScore: 0,
+      needsUserSelection: true,
     };
   }
+}
+
+/**
+ * Calculate similarity between two titles
+ */
+function calculateTitleSimilarity(title1: string, title2: string): number {
+  if (!title1 || !title2) return 0;
+
+  // Normalize titles: lowercase, remove special characters
+  const normalize = (title: string): string => {
+    return title
+      .toLowerCase()
+      .replace(/[^\w\s]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  const normalizedTitle1 = normalize(title1);
+  const normalizedTitle2 = normalize(title2);
+
+  // Check for exact match
+  if (normalizedTitle1 === normalizedTitle2) return 1.0;
+
+  // Check if one contains the other
+  if (
+    normalizedTitle1.includes(normalizedTitle2) ||
+    normalizedTitle2.includes(normalizedTitle1)
+  ) {
+    return 0.9;
+  }
+
+  // Calculate Levenshtein distance
+  const distance = levenshteinDistance(normalizedTitle1, normalizedTitle2);
+  const maxLength = Math.max(normalizedTitle1.length, normalizedTitle2.length);
+
+  return maxLength > 0 ? 1 - distance / maxLength : 0;
+}
+
+/**
+ * Calculate Levenshtein distance between two strings
+ */
+function levenshteinDistance(str1: string, str2: string): number {
+  const m = str1.length;
+  const n = str2.length;
+
+  // Create a matrix of size (m+1) x (n+1)
+  const dp: number[][] = Array(m + 1)
+    .fill(null)
+    .map(() => Array(n + 1).fill(0));
+
+  // Initialize the first row and column
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  // Fill the matrix
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1, // deletion
+        dp[i][j - 1] + 1, // insertion
+        dp[i - 1][j - 1] + cost, // substitution
+      );
+    }
+  }
+
+  return dp[m][n];
+}
+
+/**
+ * Convert OMDB data to ContentItem format
+ */
+function convertOmdbToContentItem(omdbData: any): ContentItem {
+  return {
+    id: omdbData.imdbID,
+    imdb_id: omdbData.imdbID,
+    title: omdbData.Title,
+    poster_path: omdbData.Poster !== "N/A" ? omdbData.Poster : "",
+    media_type: omdbData.Type === "movie" ? "movie" : "tv",
+    vote_average:
+      omdbData.imdbRating !== "N/A" ? parseFloat(omdbData.imdbRating) : 0,
+    vote_count:
+      omdbData.imdbVotes !== "N/A"
+        ? parseInt(omdbData.imdbVotes.replace(/,/g, ""))
+        : 0,
+    genre_ids: [],
+    genre_strings: omdbData.Genre ? omdbData.Genre.split(", ") : [],
+    overview: omdbData.Plot !== "N/A" ? omdbData.Plot : "",
+    content_rating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
+    year: omdbData.Year,
+    release_date:
+      omdbData.Released !== "N/A" ? omdbData.Released : omdbData.Year,
+    runtime: omdbData.Runtime !== "N/A" ? omdbData.Runtime : "",
+    director: omdbData.Director !== "N/A" ? omdbData.Director : "",
+    actors: omdbData.Actors !== "N/A" ? omdbData.Actors : "",
+  };
 }
 
 /**

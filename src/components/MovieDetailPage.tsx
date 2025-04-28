@@ -354,6 +354,43 @@ const MovieDetailPage = () => {
     );
   }
 
+  if (needsUserSelection) {
+    return (
+      <div className="min-h-screen bg-background font-body">
+        <MovieDetailPageHeader title="Select Content" />
+        <div className="container py-8">
+          <Button
+            variant="ghost"
+            onClick={() => navigate(-1)}
+            className="mb-6 transition-all hover:shadow-md"
+          >
+            <div className="flex items-center">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </div>
+          </Button>
+
+          <RecommendationMatcher
+            recommendation={{
+              title: decodeURIComponent(id),
+              year: locationState?.recommendation?.year,
+              imdb_id: locationState?.recommendation?.imdb_id,
+              imdb_url: locationState?.recommendation?.imdb_url,
+              reason:
+                locationState?.recommendation?.recommendationReason ||
+                locationState?.recommendation?.reason,
+              synopsis:
+                locationState?.recommendation?.synopsis ||
+                locationState?.recommendation?.overview,
+            }}
+            onSelectMatch={handleSelectMatch}
+            onCancel={() => navigate(-1)}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (error || !movie) {
     return (
       <div className="container py-12 text-center min-h-[50vh] font-body">
