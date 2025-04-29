@@ -268,7 +268,7 @@ export async function searchSimilarContentByText(
       },
       body: JSON.stringify({
         operation: "querySimilarContent",
-        params: { text: query, limit },
+        params: { text: query, limit, namespace: "content" },
       }),
     });
 

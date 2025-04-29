@@ -336,47 +336,15 @@ async function querySimilarContent(text, limit = 10) {
       `DEMO MODE: Simulating query for text: "${text.substring(0, 50)}..."`,
     );
 
-    // Return mock data for demo purposes
-    return [
-      {
-        id: "tt7923710",
-        score: 0.95,
-        metadata: {
-          title: "My Mister",
-          year: "2018",
-          type: "tv",
-          imdbID: "tt7923710",
-          plot: "A man in his 40s withstands the weight of life. A woman in her 20s goes through different experiences, but also withstands the weight of her life.",
-          genre: "Drama",
-          director: "Kim Won-seok",
-          actors: "Lee Sun-kyun, IU, Lee Ji-ah",
-          language: "Korean",
-          country: "South Korea",
-          poster:
-            "https://m.media-amazon.com/images/M/MV5BMmE4OWVjZmItMjk0Yy00NTBkLTg5NDItYWJiMzY5MzYzNzY3XkEyXkFqcGdeQXVyNjc3MjQzNTI@._V1_SX300.jpg",
-          rated: "TV-14",
-        },
-      },
-      {
-        id: "tt6587640",
-        score: 0.89,
-        metadata: {
-          title: "Misaeng",
-          year: "2014",
-          type: "tv",
-          imdbID: "tt6587640",
-          plot: "Equipped with nothing more than a GED and strategies for the game of Go, an office intern is thrown into the cold reality of the corporate world.",
-          genre: "Drama",
-          director: "Kim Won-seok",
-          actors: "Im Si-wan, Lee Sung-min, Kang So-ra",
-          language: "Korean",
-          country: "South Korea",
-          poster:
-            "https://m.media-amazon.com/images/M/MV5BNDVmNjY2NjktNTVkZi00OWYzLWI0ZTMtZjU0YWVlYTY1M2MxXkEyXkFqcGdeQXVyMzE4MDkyNTA@._V1_SX300.jpg",
-          rated: "TV-14",
-        },
-      },
-    ];
+    // Use Pinecone's query method with namespace
+    const queryResponse = await index.namespace(namespace).query({
+      vector: text,
+      topK: limit,
+      includeMetadata: true,
+    });
+
+    console.log("Query response:", queryResponse);
+    return queryResponse.matches;
   } catch (error) {
     console.error("Error querying Pinecone:", error);
     return [];
