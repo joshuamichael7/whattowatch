@@ -297,33 +297,19 @@ const MovieDetailPage = () => {
             // If we have multiple results, show selection screen
             if (searchResults.length > 1) {
               console.log(
-                `Multiple results found for "${decodedTitle}", showing selection screen`,
+                `Multiple results found for \"${decodedTitle}\", showing selection screen`,
               );
               setPotentialMatches(searchResults);
               setNeedsUserSelection(true);
               setIsLoading(false);
               return;
-            }
-
-            // Try to find an exact title match first
-            const exactMatch = searchResults.find(
-              (result) =>
-                result.title.toLowerCase() === decodedTitle.toLowerCase(),
-            );
-
-            if (exactMatch) {
-              console.log(`Found exact title match: ${exactMatch.title}`);
-              movieData = await getContentById(exactMatch.id);
-              setVerificationStatus("Found exact title match in OMDB");
             } else {
-              // If no exact match, use the first result
+              // Only one result, use it
               console.log(
-                `No exact match found, using first result: ${searchResults[0].title}`,
+                `Single result found for \"${decodedTitle}\", using it: ${searchResults[0].title}`,
               );
               movieData = await getContentById(searchResults[0].id);
-              setVerificationStatus(
-                "Using best available match from search results",
-              );
+              setVerificationStatus("Using single match from title search");
             }
           } else {
             throw new Error("Content not found");
