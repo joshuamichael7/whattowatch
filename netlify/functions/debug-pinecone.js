@@ -68,7 +68,10 @@ exports.handler = async (event, context) => {
     let upsertResult;
     try {
       const index = pc.index(indexName);
-      upsertResult = await index.namespace("test").upsert([testVector]);
+      // Use a test namespace for debugging
+      const testNamespace = "test";
+      console.log(`Using test namespace: ${testNamespace}`);
+      upsertResult = await index.namespace(testNamespace).upsert([testVector]);
       console.log("Test upsert result:", upsertResult);
     } catch (upsertError) {
       console.log(`Error during test upsert: ${upsertError.message}`);

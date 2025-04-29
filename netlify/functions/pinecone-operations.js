@@ -327,24 +327,36 @@ async function upsertVectors(vectors) {
 /**
  * Query Pinecone for similar content
  */
-async function querySimilarContent(text, limit = 10) {
+async function querySimilarContent(text, limit = 10, namespace = "content") {
   const index = await getPineconeIndex();
   if (!index) return [];
 
   try {
-    console.log(
-      `DEMO MODE: Simulating query for text: "${text.substring(0, 50)}..."`,
-    );
+    console.log(`Querying Pinecone with text: "${text.substring(0, 50)}..."`);
 
-    // Use Pinecone's query method with namespace
+    // Use Pinecone's query method with namespace and integrated embedding
+    const namespace = "content";
+    console.log(`Using namespace for query: ${namespace}`);
     const queryResponse = await index.namespace(namespace).query({
-      vector: text,
       topK: limit,
       includeMetadata: true,
+      text: text, // Using text for Pinecone's built-in embedding
     });
 
-    console.log("Query response:", queryResponse);
-    return queryResponse.matches;
+    console.log(
+      `Pinecone query returned ${queryResponse.matches?.length || 0} matches`,
+    );
+
+    // Log the first match for debugging
+    if (queryResponse.matches && queryResponse.matches.length > 0) {
+      console.log("First match:", {
+        id: queryResponse.matches[0].id,
+        score: queryResponse.matches[0].score,
+        metadata: queryResponse.matches[0].metadata,
+      });
+    }
+
+    return queryResponse.matches || [];
   } catch (error) {
     console.error("Error querying Pinecone:", error);
     return [];
