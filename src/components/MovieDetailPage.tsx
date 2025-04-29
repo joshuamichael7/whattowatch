@@ -25,6 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { verifyRecommendationWithOmdb } from "@/services/aiService";
 import { useRecommendations } from "@/contexts/RecommendationContext";
+import RecommendationMatcher from "@/components/RecommendationMatcher";
 
 const genreMap: Record<number, string> = {
   28: "Action",
@@ -64,6 +65,8 @@ const MovieDetailPage = () => {
     null,
   );
   const [potentialMatches, setPotentialMatches] = useState<any[]>([]);
+  const [needsUserSelection, setNeedsUserSelection] = useState(false);
+  const locationState = location.state;
 
   useEffect(() => {
     const hasRecommendations =
@@ -95,6 +98,49 @@ const MovieDetailPage = () => {
     checkWatchlist();
   }, [movie, user, isAuthenticated]);
 
+  const handleSelectMatch = async (selectedMatch: any) => {
+    setIsLoading(true);
+    try {
+      const contentDetails = await getContentById(
+        selectedMatch.imdbID || selectedMatch.id,
+      );
+      if (contentDetails) {
+        // Add recommendation reason from original recommendation if available
+        if (
+          locationState?.recommendation?.reason ||
+          locationState?.recommendation?.recommendationReason
+        ) {
+          contentDetails.recommendationReason =
+            locationState.recommendation.reason ||
+            locationState.recommendation.recommendationReason;
+        }
+
+        // Add synopsis from original recommendation if available and if OMDB doesn't have one
+        if (
+          (locationState?.recommendation?.synopsis ||
+            locationState?.recommendation?.overview) &&
+          (!contentDetails.overview || contentDetails.overview.trim() === "")
+        ) {
+          contentDetails.synopsis =
+            locationState.recommendation.synopsis ||
+            locationState.recommendation.overview;
+        }
+
+        setMovie(contentDetails);
+        setNeedsUserSelection(false);
+        setVerificationStatus("User selected content match");
+      } else {
+        throw new Error("Failed to load selected content details");
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to load selected content",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     const fetchMovieDetails = async () => {
       if (!id) return;
@@ -104,6 +150,21 @@ const MovieDetailPage = () => {
       setVerificationStatus("Starting verification process...");
 
       try {
+        // Get recommendation data from location state
+        const locationRecommendation = location.state?.recommendation;
+        const aiImdbId = locationRecommendation?.imdb_id;
+        const aiTitle = locationRecommendation?.title || decodeURIComponent(id);
+        const aiSynopsis =
+          locationRecommendation?.synopsis ||
+          locationRecommendation?.overview ||
+          "";
+
+        console.log("AI recommendation data:", {
+          title: aiTitle,
+          imdb_id: aiImdbId,
+          synopsis: aiSynopsis?.substring(0, 50) + "...",
+        });
+
         // First check if we have this movie in the RecommendationContext
         if (
           selectedRecommendation &&
@@ -133,12 +194,83 @@ const MovieDetailPage = () => {
 
         // If not in context, proceed with regular fetching
         let movieData;
-        let verifiedMovie = null;
 
-        // Check if this is an IMDB ID first - prioritize IMDB ID lookup
-        if (id.startsWith("tt")) {
+        // PRIORITY 1: If we have an IMDB ID from AI recommendation, use it directly
+        if (aiImdbId && aiImdbId.startsWith("tt")) {
+          console.log(
+            `Using AI-provided IMDB ID: ${aiImdbId} for title: ${aiTitle}`,
+          );
+
+          // Get content by IMDB ID
+          const imdbContent = await getContentById(aiImdbId);
+
+          if (imdbContent) {
+            // Check if the title from IMDB matches the AI-provided title
+            const titleMatches =
+              imdbContent.title.toLowerCase().includes(aiTitle.toLowerCase()) ||
+              aiTitle.toLowerCase().includes(imdbContent.title.toLowerCase());
+
+            console.log(
+              `IMDB title: "${imdbContent.title}", AI title: "${aiTitle}", match: ${titleMatches}`,
+            );
+
+            if (titleMatches) {
+              // IMDB ID is correct, use this content
+              console.log(
+                `IMDB ID ${aiImdbId} verified for "${aiTitle}", using IMDB data`,
+              );
+              movieData = imdbContent;
+              setVerificationStatus("IMDB ID verified, using official data");
+            } else {
+              // IMDB ID doesn't match title - we need to search by title
+              console.log(
+                `IMDB ID ${aiImdbId} returned title "${imdbContent.title}" which doesn't match "${aiTitle}". Searching by title.`,
+              );
+
+              // Search by title to see if we have multiple options
+              const searchResults = await searchContent(aiTitle);
+
+              if (searchResults && searchResults.length > 1) {
+                // Only show selection screen if we have multiple results for the title search
+                console.log(
+                  `Multiple results found for "${aiTitle}", showing selection screen`,
+                );
+                setPotentialMatches([imdbContent, ...searchResults]);
+                setNeedsUserSelection(true);
+                setIsLoading(false);
+                return;
+              } else if (searchResults && searchResults.length === 1) {
+                // If exactly one result from title search, use that
+                console.log(
+                  `Single result found for title "${aiTitle}": ${searchResults[0].title}. Using this instead of IMDB ID result.`,
+                );
+                movieData = await getContentById(searchResults[0].id);
+                setVerificationStatus(
+                  "Using title match instead of incorrect IMDB ID",
+                );
+              } else {
+                // If no results from title search, fall back to the IMDB content we already have
+                console.log(
+                  `No results found for title "${aiTitle}". Using IMDB data despite title mismatch: ${imdbContent.title}`,
+                );
+                movieData = imdbContent;
+                setVerificationStatus(
+                  "Using IMDB data (note: title may differ from recommendation)",
+                );
+              }
+            }
+          } else {
+            console.log(
+              `IMDB ID ${aiImdbId} not found, falling back to title search`,
+            );
+            // Fall back to title search
+          }
+        }
+
+        // PRIORITY 2: If we don't have movie data yet, check if URL parameter is an IMDB ID
+        if (!movieData && id.startsWith("tt")) {
           // If it's already an IMDB ID, just get the content directly from OMDB
-          console.log(`Looking up content by IMDB ID: ${id}`);
+          console.log(`Looking up content by IMDB ID from URL: ${id}`);
           movieData = await getContentById(id);
 
           if (!movieData) {
@@ -146,9 +278,11 @@ const MovieDetailPage = () => {
           }
 
           setVerificationStatus("Using IMDB data directly");
-        } else {
+        }
+        // PRIORITY 3: If we still don't have movie data, search by title
+        else if (!movieData) {
           // If not an IMDB ID, it's likely a title that needs verification
-          const decodedTitle = decodeURIComponent(id);
+          const decodedTitle = aiTitle || decodeURIComponent(id);
           console.log(`Looking up content by title: ${decodedTitle}`);
           console.log(`Searching OMDB for: ${decodedTitle}`);
 
@@ -160,15 +294,16 @@ const MovieDetailPage = () => {
               `Found ${searchResults.length} results in OMDB for title search`,
             );
 
-            // Create a temporary movie data object for verification
-            const tempMovieData = {
-              title: decodedTitle,
-              synopsis: "", // We might not have a synopsis yet
-              overview: "",
-              media_type: "movie", // Default to movie, will be updated during verification
-            };
-
-            setVerificationStatus("Verifying content with OMDB...");
+            // If we have multiple results, show selection screen
+            if (searchResults.length > 1) {
+              console.log(
+                `Multiple results found for "${decodedTitle}", showing selection screen`,
+              );
+              setPotentialMatches(searchResults);
+              setNeedsUserSelection(true);
+              setIsLoading(false);
+              return;
+            }
 
             // Try to find an exact title match first
             const exactMatch = searchResults.find(
@@ -181,101 +316,14 @@ const MovieDetailPage = () => {
               movieData = await getContentById(exactMatch.id);
               setVerificationStatus("Found exact title match in OMDB");
             } else {
-              // If no exact match, proceed with verification using synopsis
-              try {
-                // Get full details for the first result to use for verification
-                const firstResult = await getContentById(searchResults[0].id);
-
-                if (firstResult) {
-                  // Get synopsis from location state first, then context, then URL
-                  const locationSynopsis =
-                    location.state?.recommendation?.synopsis ||
-                    location.state?.recommendation?.overview ||
-                    location.state?.recommendation?.reason;
-
-                  const urlParams = new URLSearchParams(window.location.search);
-                  const aiSynopsis = urlParams.get("synopsis");
-                  const contextSynopsis =
-                    selectedRecommendation?.synopsis ||
-                    selectedRecommendation?.overview ||
-                    "";
-
-                  if (!locationSynopsis) {
-                    console.error(
-                      "CRITICAL ERROR: No synopsis in location state! Cannot verify content.",
-                    );
-                    console.log(
-                      "No synopsis available, showing user selection screen",
-                    );
-                    tempMovieData.synopsis = "No synopsis available";
-                  }
-
-                  console.log(
-                    "USING SYNOPSIS FROM LOCATION STATE FOR VERIFICATION:",
-                    locationSynopsis?.substring(0, 100) + "...",
-                  );
-
-                  // Set the synopsis for verification
-                  tempMovieData.synopsis =
-                    locationSynopsis || contextSynopsis || aiSynopsis || "";
-                  tempMovieData.overview =
-                    locationSynopsis || contextSynopsis || aiSynopsis || "";
-
-                  console.log(
-                    `USING SYNOPSIS FOR VERIFICATION: "${tempMovieData.synopsis?.substring(0, 100)}..."`,
-                  );
-
-                  console.log("Verifying content with OMDB...");
-                  verifiedMovie =
-                    await verifyRecommendationWithOmdb(tempMovieData);
-
-                  if (
-                    verifiedMovie &&
-                    verifiedMovie.verified &&
-                    verifiedMovie.imdb_id &&
-                    verifiedMovie.similarityScore > 0.7 // Require higher similarity score
-                  ) {
-                    console.log(
-                      `Successfully verified: ${verifiedMovie.title}`,
-                    );
-                    console.log("Verification details:", {
-                      originalTitle: decodedTitle,
-                      verifiedTitle: verifiedMovie.title,
-                      similarityScore: verifiedMovie.similarityScore,
-                      imdbId: verifiedMovie.imdb_id,
-                    });
-
-                    setVerificationStatus(
-                      "Content verified, loading details...",
-                    );
-
-                    // Now that we have a verified IMDB ID, use it to get the full details
-                    console.log(
-                      `Loading full details using verified IMDB ID: ${verifiedMovie.imdb_id}`,
-                    );
-                    movieData = await getContentById(verifiedMovie.imdb_id);
-                  } else {
-                    console.log(
-                      `Could not verify with high confidence (95% threshold): ${decodedTitle}, using first search result`,
-                    );
-                    setVerificationStatus(
-                      "Could not verify content with high confidence (95% threshold), using best match",
-                    );
-                    movieData = searchResults[0];
-                  }
-                } else {
-                  console.log(
-                    `No details found for first search result, using basic search result`,
-                  );
-                  movieData = searchResults[0];
-                }
-              } catch (verifyError) {
-                console.error("Error during verification:", verifyError);
-                setVerificationStatus(
-                  "Verification failed, using search results",
-                );
-                movieData = searchResults[0];
-              }
+              // If no exact match, use the first result
+              console.log(
+                `No exact match found, using first result: ${searchResults[0].title}`,
+              );
+              movieData = await getContentById(searchResults[0].id);
+              setVerificationStatus(
+                "Using best available match from search results",
+              );
             }
           } else {
             throw new Error("Content not found");
@@ -285,15 +333,20 @@ const MovieDetailPage = () => {
         // Set the movie data
         setMovie(movieData as ContentItem);
 
-        // Update verification status for display
-        if (verifiedMovie && verifiedMovie.verified) {
-          setVerificationStatus(
-            `Content verified with ${(verifiedMovie.similarityScore || 0) * 100}% confidence`,
-          );
-        } else if (id.startsWith("tt")) {
-          setVerificationStatus("Using IMDB data directly");
-        } else {
-          setVerificationStatus("Using best available match");
+        // If we have AI recommendation data, add it to the movie data
+        if (locationRecommendation) {
+          setMovie((prev) => {
+            if (!prev) return movieData as ContentItem;
+            return {
+              ...prev,
+              recommendationReason:
+                locationRecommendation.reason ||
+                locationRecommendation.recommendationReason,
+              synopsis:
+                prev.synopsis || prev.plot || locationRecommendation.synopsis,
+              aiRecommended: true,
+            };
+          });
         }
       } catch (err) {
         setError(
@@ -376,8 +429,6 @@ const MovieDetailPage = () => {
     );
   }
 
-  const needsUserSelection = false; // We're no longer using this flag since we don't need synopsis verification
-
   if (needsUserSelection) {
     return (
       <div className="min-h-screen bg-background font-body">
@@ -407,6 +458,7 @@ const MovieDetailPage = () => {
                 locationState?.recommendation?.synopsis ||
                 locationState?.recommendation?.overview,
             }}
+            potentialMatches={potentialMatches}
             onSelectMatch={handleSelectMatch}
             onCancel={() => navigate(-1)}
           />
@@ -648,7 +700,7 @@ const MovieDetailPage = () => {
       <div className="container py-8">
         <Separator className="my-8" />
         <SimilarContentCarousel
-          contentId={id || ""}
+          contentId={movie.imdb_id || id || ""}
           mediaType={movie.media_type || "movie"}
           limit={8}
         />

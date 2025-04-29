@@ -74,6 +74,9 @@ exports.handler = async (event, context) => {
     }
 
     // Construct the prompt for Gemini
+    const finalTitle = title || "";
+    const finalOverview = overview || "";
+
     const prompt = `I'm looking for content similar to "${finalTitle}" which is a ${mediaType === "movie" ? "movie" : "TV show"}. 
     Here's the plot: "${finalOverview}"
     
@@ -95,7 +98,10 @@ exports.handler = async (event, context) => {
     ]
     
     ULTRA IMPORTANT: Use the EXACT title spelling and formatting as it appears in IMDB - this is critical for matching.
-    ULTRA IMPORTANT: Make sure the IMDB ID and URL are correct and match the actual IMDB entry for the title.
+    ULTRA IMPORTANT: For each recommendation, you MUST search the web to find the correct IMDB page for that exact title and year. Then extract the precise IMDB ID and URL from that page. Do not guess or make up IMDB IDs.
+    
+    CRITICAL: Verify that each IMDB ID actually corresponds to the title you're recommending. Double-check that the title on the IMDB page matches your recommendation exactly.
+    
     CRITICAL: Only return the JSON array, no other text.`;
 
     // Construct the API endpoint URL

@@ -383,6 +383,28 @@ export async function getPersonalizedRecommendations(
       `[getPersonalizedRecommendations] Getting recommendations based on preferences`,
     );
 
+    // If we have AI recommendations from the quiz and if the AI call was successful
+    if (
+      preferences.isAiRecommendationSuccess &&
+      preferences.aiRecommendations &&
+      preferences.aiRecommendations.length > 0
+    ) {
+      console.log(
+        "Using AI recommendations from quiz",
+        preferences.aiRecommendations,
+      );
+
+      // Log the IMDB IDs for debugging
+      console.log(
+        "AI recommendation IMDB IDs:",
+        preferences.aiRecommendations.map((rec) => ({
+          title: rec.title,
+          imdb_id: rec.imdb_id,
+          year: rec.year,
+        })),
+      );
+    }
+
     // Call the Netlify function to get personalized recommendations
     const response = await fetch("/.netlify/functions/ai-recommendations", {
       method: "POST",

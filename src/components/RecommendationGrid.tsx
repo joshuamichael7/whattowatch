@@ -287,7 +287,10 @@ const RecommendationGrid = ({
                 state={{
                   recommendation: {
                     ...rec,
-                    imdb_url: rec.imdb_url, // Ensure imdb_url is passed in state
+                    imdb_url: rec.imdb_url,
+                    synopsis: rec.synopsis,
+                    overview: rec.overview,
+                    reason: rec.reason || rec.recommendationReason,
                   },
                   fromRecommendations: true,
                 }}
