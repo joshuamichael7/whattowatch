@@ -1014,7 +1014,8 @@ function convertOmdbToContentItem(omdbData: any): ContentItem {
     runtime: omdbData.Runtime !== "N/A" ? omdbData.Runtime : "",
     director: omdbData.Director !== "N/A" ? omdbData.Director : "",
     actors: omdbData.Actors !== "N/A" ? omdbData.Actors : "",
-    // imdb_url will be added separately to preserve the URL from the recommendation
+    poster: omdbData.Poster !== "N/A" ? omdbData.Poster : "",
+    contentRating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
   };
 }
 

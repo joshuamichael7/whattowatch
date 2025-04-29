@@ -56,6 +56,8 @@ const Dashboard = () => {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [useDirectApi, setUseDirectApi] = useState(false);
+  const [selectedRecommendation, setSelectedRecommendation] =
+    useState<ContentItem | null>(null);
   // Define default ratings
   const defaultRatings = ["G", "PG", "PG-13", "TV-Y", "TV-PG", "TV-14"];
 
@@ -238,6 +240,7 @@ const Dashboard = () => {
                     detailedContent.Poster !== "N/A"
                   ) {
                     posterPath = detailedContent.Poster;
+                    detailedContent.poster_path = posterPath;
                     console.log(`Using Poster as poster_path: ${posterPath}`);
                   }
 
@@ -476,6 +479,7 @@ const Dashboard = () => {
                     detailedContent.Poster !== "N/A"
                   ) {
                     posterPath = detailedContent.Poster;
+                    detailedContent.poster_path = posterPath;
                     console.log(`Using Poster as poster_path: ${posterPath}`);
                   }
 

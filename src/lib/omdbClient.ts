@@ -576,9 +576,12 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     contentItem.id = generateUUID();
     contentItem.imdb_id = imdbId;
 
-    // Add these fields for UI compatibility but they won't be saved to the database
+    // Map fields for UI compatibility
     contentItem.poster = data.Poster !== "N/A" ? data.Poster : "";
     contentItem.contentRating = data.Rated !== "N/A" ? data.Rated : undefined;
+    // Ensure we're using the correct column names for the database
+    contentItem.poster_path = data.Poster !== "N/A" ? data.Poster : "";
+    contentItem.content_rating = data.Rated !== "N/A" ? data.Rated : undefined;
     contentItem.ratings = data.Ratings || [];
 
     // Try to add this content to Supabase for future use
