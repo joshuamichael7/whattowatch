@@ -44,6 +44,12 @@ export async function addContentToVectorDb(
 ): Promise<boolean> {
   try {
     console.log("Using Netlify function for vector database operations");
+    console.log("Content to add:", {
+      id: content.id,
+      imdb_id: content.imdb_id,
+      title: content.title,
+      media_type: content.media_type,
+    });
 
     // Create metadata from OMDB fields
     const metadata = {
@@ -89,9 +95,12 @@ export async function addContentToVectorDb(
     console.log("Sending vector to Pinecone:", {
       id: vector.id,
       metadata: vector.metadata,
+      textLength: vector.text.length,
+      textSample: vector.text.substring(0, 100) + "...",
     });
 
     // Use Netlify function to upsert to Pinecone
+    console.log("Preparing to call Netlify function");
     const response = await fetch("/.netlify/functions/pinecone-operations", {
       method: "POST",
       headers: {
@@ -102,6 +111,8 @@ export async function addContentToVectorDb(
         params: { vectors: [vector] },
       }),
     });
+
+    console.log(`Netlify function response status: ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -114,6 +125,14 @@ export async function addContentToVectorDb(
     return data.success || false;
   } catch (error) {
     console.error("Error adding content to vector database:", error);
+    console.error(
+      "Error message:",
+      error instanceof Error ? error.message : String(error),
+    );
+    console.error(
+      "Error stack:",
+      error instanceof Error ? error.stack : "No stack trace",
+    );
     return false;
   }
 }

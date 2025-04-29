@@ -100,18 +100,30 @@ const VectorDatabaseDemo: React.FC = () => {
     setError(null);
 
     try {
+      console.log(`Getting content details for ID: ${contentId}`);
       // Get content details
       const content = await getContentById(contentId);
       if (!content) {
+        console.error(`Content with ID ${contentId} not found`);
         setError(`Content with ID ${contentId} not found`);
         setIsStoring(false);
         return;
       }
 
+      console.log(`Content details retrieved:`, {
+        title: content.title,
+        id: content.id,
+        imdb_id: content.imdb_id,
+        media_type: content.media_type,
+      });
       setContentDetails(content as ContentItem);
 
       // Store in vector database
+      console.log(
+        `Attempting to add content to vector database: ${content.title}`,
+      );
       const success = await addContentToVectorDb(content as ContentItem);
+      console.log(`Vector database add result: ${success}`);
       setStoreSuccess(success);
       if (!success) {
         setError("Failed to store content in vector database");
@@ -122,8 +134,14 @@ const VectorDatabaseDemo: React.FC = () => {
         });
       }
     } catch (err) {
-      setError("Error storing content in vector database");
       console.error("Vector DB storage error:", err);
+      console.error(
+        "Error details:",
+        err instanceof Error ? err.message : String(err),
+      );
+      setError(
+        `Error storing content in vector database: ${err instanceof Error ? err.message : String(err)}`,
+      );
     } finally {
       setIsStoring(false);
     }

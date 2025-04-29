@@ -196,11 +196,20 @@ async function createPineconeIndex() {
  * Upsert content vectors to Pinecone
  */
 async function upsertVectors(vectors) {
+  console.log("Starting upsertVectors function");
   const index = await getPineconeIndex();
-  if (!index) return false;
+  if (!index) {
+    console.error("Failed to get Pinecone index");
+    return false;
+  }
 
   try {
     console.log(`Upserting ${vectors.length} vectors to Pinecone`);
+    console.log("Pinecone API Key exists:", !!process.env.PINECONE_API_KEY);
+    console.log(
+      "Pinecone Index Name:",
+      process.env.PINECONE_INDEX_NAME || "omdb-database",
+    );
 
     // Log the first vector for debugging
     if (vectors.length > 0) {
@@ -210,6 +219,9 @@ async function upsertVectors(vectors) {
         hasText: !!vectors[0].text,
         textLength: vectors[0].text ? vectors[0].text.length : 0,
       });
+
+      // Log the full text for debugging
+      console.log("Vector text sample:", vectors[0].text.substring(0, 200));
     }
 
     // Ensure each vector has the required format for Pinecone
@@ -222,12 +234,14 @@ async function upsertVectors(vectors) {
       text: vector.text,
     }));
 
+    console.log("About to call index.upsert with formatted vectors");
     await index.upsert(formattedVectors);
     console.log("Vectors successfully upserted to Pinecone");
     return true;
   } catch (error) {
     console.error("Error upserting vectors to Pinecone:", error);
     console.error("Error details:", error.message);
+    console.error("Error stack:", error.stack);
     return false;
   }
 }
