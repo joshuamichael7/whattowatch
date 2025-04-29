@@ -74,8 +74,8 @@ exports.handler = async (event, context) => {
     }
 
     // Construct the prompt for Gemini
-    const prompt = `I'm looking for content similar to "${title}" which is a ${mediaType === "movie" ? "movie" : "TV show"}. 
-    Here's the plot: "${overview}"
+    const prompt = `I'm looking for content similar to "${finalTitle}" which is a ${mediaType === "movie" ? "movie" : "TV show"}. 
+    Here's the plot: "${finalOverview}"
     
     Please provide exactly ${limit} titles of movies AND TV shows that are similar in plot, themes, tone, and style. 
     Consider factors like genre, setting, character dynamics, and emotional impact.

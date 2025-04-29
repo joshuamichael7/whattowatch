@@ -1026,12 +1026,12 @@ export async function getSimilarContent(
       `[getSimilarContent] Calling similar-content function with params: ${params.toString()}`,
     );
 
-    console.log("[DEBUG] Before calling OMDB API endpoint");
+    console.log("[DEBUG] Before calling similar-content Netlify function");
     const response = await fetch(
-      `${API_ENDPOINT}/similar-content?${params.toString()}`,
+      `/.netlify/functions/similar-content?${params.toString()}`,
     );
     console.log(
-      "[DEBUG] After calling OMDB API endpoint, status:",
+      "[DEBUG] After calling similar-content Netlify function, status:",
       response.status,
     );
 
@@ -1177,6 +1177,22 @@ async function processAiRecommendations(
             aiTitle.recommendationReason !== "Similar in style and themes"
               ? aiTitle.recommendationReason
               : `AI recommended based on similarity to "${originalContent.title}"`;
+
+          // If AI provided a synopsis/overview, use it
+          if (
+            aiTitle.synopsis &&
+            (!match.overview || match.overview.trim() === "")
+          ) {
+            match.overview = aiTitle.synopsis;
+            match.plot = aiTitle.synopsis;
+          } else if (
+            aiTitle.overview &&
+            (!match.overview || match.overview.trim() === "")
+          ) {
+            match.overview = aiTitle.overview;
+            match.plot = aiTitle.overview;
+          }
+
           console.log(
             `[processAiRecommendations] Setting reason for "${match.title}": ${match.recommendationReason}`,
           );

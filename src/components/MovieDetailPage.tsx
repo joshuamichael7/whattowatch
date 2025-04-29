@@ -583,11 +583,9 @@ const MovieDetailPage = () => {
             </div>
 
             <div className="mb-6">
-              <h2 className="text-xl font-semibold mb-2 font-heading">
-                Overview
-              </h2>
+              <h2 className="text-xl font-semibold mb-2 font-heading">Plot</h2>
               <p className="text-muted-foreground">
-                {movie.overview || movie.Plot || "No overview available."}
+                {movie.plot || movie.synopsis || "No plot available."}
               </p>
             </div>
 

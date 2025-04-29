@@ -519,8 +519,8 @@ const RecommendationGrid = ({
                                 Why we recommend this
                               </h4>
                               <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md italic font-body">
-                                {selectedItem.recommendationReason ||
-                                  selectedItem.reason ||
+                                {selectedItem.reason ||
+                                  selectedItem.recommendationReason ||
                                   "Matches your preferences"}
                               </p>
                             </div>
