@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getSimilarContent } from "@/lib/omdbClient";
+import { getSimilarContent, getContentById } from "@/lib/omdbClient";
 import { ContentItem } from "@/types/omdb";
 
 interface SimilarContentCarouselProps {
@@ -32,11 +32,35 @@ const SimilarContentCarousel: React.FC<SimilarContentCarouselProps> = ({
       setError(null);
 
       try {
+        // Check if contentId is an IMDB ID (starts with 'tt' followed by numbers)
+        const isImdbId =
+          contentId.startsWith("tt") && /^tt\d+$/.test(contentId);
+        let idToUse = contentId;
+
+        // If not an IMDB ID, try to get the content details first to find the IMDB ID
+        if (!isImdbId) {
+          console.log(
+            `[SimilarContentCarousel] ID is not an IMDB ID, looking up content details first`,
+          );
+          const contentDetails = await getContentById(contentId);
+
+          if (contentDetails && contentDetails.imdb_id) {
+            console.log(
+              `[SimilarContentCarousel] Found IMDB ID: ${contentDetails.imdb_id} for content: ${contentId}`,
+            );
+            idToUse = contentDetails.imdb_id;
+          } else {
+            console.log(
+              `[SimilarContentCarousel] Could not find IMDB ID for content: ${contentId}, using original ID`,
+            );
+          }
+        }
+
         // Using the enhanced getSimilarContent function with the new similarity algorithm
         console.log(
-          `[SimilarContentCarousel] Calling getSimilarContent with useKeywords=true`,
+          `[SimilarContentCarousel] Calling getSimilarContent with ID: ${idToUse}`,
         );
-        const content = await getSimilarContent(contentId, true, limit);
+        const content = await getSimilarContent(idToUse, true, limit);
         console.log(
           `[SimilarContentCarousel] Received ${content.length} similar items:`,
           content,

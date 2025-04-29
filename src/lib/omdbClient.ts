@@ -577,12 +577,9 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     contentItem.imdb_id = imdbId;
 
     // Map fields for UI compatibility
-    contentItem.poster = data.Poster !== "N/A" ? data.Poster : "";
-    contentItem.contentRating = data.Rated !== "N/A" ? data.Rated : undefined;
     // Ensure we're using the correct column names for the database
     contentItem.poster_path = data.Poster !== "N/A" ? data.Poster : "";
     contentItem.content_rating = data.Rated !== "N/A" ? data.Rated : undefined;
-    contentItem.ratings = data.Ratings || [];
 
     // Try to add this content to Supabase for future use
     try {
@@ -1007,8 +1004,11 @@ export async function getSimilarContent(
     }
 
     // Call the Netlify function for similar content (fallback or if AI is not used)
+    // Make sure we're using the IMDB ID if available
+    const idToUse = contentDetails.imdb_id || id;
+
     const params = new URLSearchParams({
-      id: id,
+      id: idToUse,
       limit: limit.toString(),
       useAi: useAi.toString(),
       useVectorDb: useVectorDb.toString(),
@@ -1017,6 +1017,10 @@ export async function getSimilarContent(
     if (contentDetails.media_type) {
       params.append("type", contentDetails.media_type);
     }
+
+    console.log(
+      `[getSimilarContent] Using ID for similar-content function: ${idToUse} (original ID: ${id})`,
+    );
 
     console.log(
       `[getSimilarContent] Calling similar-content function with params: ${params.toString()}`,
