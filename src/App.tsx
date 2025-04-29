@@ -17,6 +17,8 @@ import DebugPanel from "./components/DebugPanel";
 import DebugRecommendations from "./components/DebugRecommendations";
 import SupabaseConnectionTest from "./components/SupabaseConnectionTest";
 import UserDashboard from "./components/UserDashboard";
+import VectorDatabaseManager from "./components/VectorDatabaseManager";
+import VectorDatabaseDemo from "./components/VectorDatabaseDemo";
 import { RecommendationProvider } from "./contexts/RecommendationContext";
 
 // Lazy load authentication components
@@ -64,6 +66,14 @@ function App() {
                   element={<SupabaseConnectionTest />}
                 />
                 <Route path="/user-dashboard" element={<UserDashboard />} />
+                <Route
+                  path="/vector-database"
+                  element={<VectorDatabaseManager />}
+                />
+                <Route
+                  path="/vector-database-demo"
+                  element={<VectorDatabaseDemo />}
+                />
                 {import.meta.env.VITE_TEMPO === "true" && (
                   <Route path="/tempobook/*" />
                 )}

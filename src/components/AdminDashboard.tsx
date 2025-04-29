@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Card,
@@ -194,6 +194,17 @@ const AdminDashboard: React.FC = () => {
                     </Button>
                   </CardContent>
                 </Card>
+              </div>
+              <div className="mt-4 space-y-2">
+                <Button asChild className="w-full">
+                  <Link to="/admin-debug">Admin Role Debugger</Link>
+                </Button>
+                <Button asChild className="w-full">
+                  <Link to="/vector-database">Vector Database Manager</Link>
+                </Button>
+                <Button asChild className="w-full">
+                  <Link to="/vector-database-demo">Vector Database Demo</Link>
+                </Button>
               </div>
             </TabsContent>
 

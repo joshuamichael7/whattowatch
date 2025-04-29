@@ -1,52 +1,233 @@
-import { ContentItem } from "../types/omdb";
+import { ContentItem } from "@/types/omdb";
+import {
+  createPineconeIndex,
+  upsertVectors,
+  querySimilarContent,
+} from "@/lib/pineconeClient";
+import { v4 as uuidv4 } from "uuid";
 
 /**
- * Store content in the vector database
- * @param content The content item to store
- * @returns Success status
+ * Initialize the vector database
  */
-export async function storeContentVector(
-  content: ContentItem,
-): Promise<boolean> {
-  console.log("[vectorService] Vector database functionality has been removed");
-  // Return true to avoid breaking existing code
-  return true;
+export async function initVectorDatabase(): Promise<boolean> {
+  return await createPineconeIndex();
 }
 
 /**
- * Query the vector database for similar content
- * @param contentId The ID of the content to find similar items for
- * @param embedding Optional pre-computed embedding (no longer used)
- * @param limit The number of similar items to return
- * @returns Array of similar content IDs
+ * Add content to the vector database
+ * @param content The content item to add
+ * @returns Success status
  */
-export async function querySimilarContent(
-  contentId: string,
-  embedding?: any,
+export async function addContentToVectorDb(
+  content: ContentItem,
+): Promise<boolean> {
+  try {
+    // Create metadata from OMDB fields
+    const metadata = {
+      title: content.Title || content.title,
+      year: content.Year || content.year,
+      type: content.Type || content.media_type,
+      imdbID: content.imdbID || content.imdb_id,
+      plot: content.Plot || content.overview || content.synopsis,
+      genre:
+        content.Genre ||
+        (content.genre_strings ? content.genre_strings.join(", ") : ""),
+      director: content.Director || content.director,
+      actors: content.Actors || content.actors,
+      language: content.Language || content.language,
+      country: content.Country || content.country,
+      poster: content.Poster || content.poster_path,
+      rated: content.Rated || content.content_rating,
+      runtime: content.Runtime || content.runtime,
+      imdbRating: content.imdbRating || content.vote_average,
+      imdbVotes: content.imdbVotes || content.vote_count,
+    };
+
+    // Create vector record
+    const vector = {
+      id: content.imdbID || content.imdb_id || uuidv4(),
+      metadata,
+      text: [
+        `Title: ${content.Title || content.title || ""}`,
+        `Type: ${content.Type || content.media_type || ""}`,
+        `Year: ${content.Year || content.year || ""}`,
+        `Plot: ${content.Plot || content.overview || content.synopsis || ""}`,
+        `Genre: ${content.Genre || (content.genre_strings ? content.genre_strings.join(", ") : "")}`,
+        `Director: ${content.Director || content.director || ""}`,
+        `Actors: ${content.Actors || content.actors || ""}`,
+        `Language: ${content.Language || content.language || ""}`,
+        `Country: ${content.Country || content.country || ""}`,
+      ]
+        .filter((line) => !line.endsWith(": "))
+        .join("\n"),
+    };
+
+    // Upsert to Pinecone
+    return await upsertVectors([vector]);
+  } catch (error) {
+    console.error("Error adding content to vector database:", error);
+    return false;
+  }
+}
+
+/**
+ * Add multiple content items to the vector database in batches
+ * @param contentItems Array of content items to add
+ * @param batchSize Size of each batch
+ * @returns Number of successfully added items
+ */
+export async function batchAddContentToVectorDb(
+  contentItems: any[],
+  batchSize: number = 10,
+): Promise<number> {
+  let successCount = 0;
+
+  try {
+    // Process in batches
+    for (let i = 0; i < contentItems.length; i += batchSize) {
+      const batch = contentItems.slice(i, i + batchSize);
+      const vectors = [];
+
+      // Generate vectors for each item in the batch
+      for (const content of batch) {
+        // Create metadata
+        const metadata = {
+          title: content.Title || content.title,
+          year: content.Year || content.year,
+          type: content.Type || content.media_type,
+          imdbID: content.imdbID || content.imdb_id,
+          plot: content.Plot || content.overview || content.synopsis,
+          genre:
+            content.Genre ||
+            (content.genre_strings ? content.genre_strings.join(", ") : ""),
+          director: content.Director || content.director,
+          actors: content.Actors || content.actors,
+          language: content.Language || content.language,
+          country: content.Country || content.country,
+          poster: content.Poster || content.poster_path,
+          rated: content.Rated || content.content_rating,
+          runtime: content.Runtime || content.runtime,
+          imdbRating: content.imdbRating || content.vote_average,
+          imdbVotes: content.imdbVotes || content.vote_count,
+        };
+
+        // Create text for integrated embedding
+        const text = [
+          `Title: ${content.Title || content.title || ""}`,
+          `Type: ${content.Type || content.media_type || ""}`,
+          `Year: ${content.Year || content.year || ""}`,
+          `Plot: ${content.Plot || content.overview || content.synopsis || ""}`,
+          `Genre: ${content.Genre || (content.genre_strings ? content.genre_strings.join(", ") : "")}`,
+          `Director: ${content.Director || content.director || ""}`,
+          `Actors: ${content.Actors || content.actors || ""}`,
+          `Language: ${content.Language || content.language || ""}`,
+          `Country: ${content.Country || content.country || ""}`,
+        ]
+          .filter((line) => !line.endsWith(": "))
+          .join("\n");
+
+        // Create vector
+        vectors.push({
+          id: content.imdbID || content.imdb_id || uuidv4(),
+          metadata,
+          text,
+        });
+      }
+
+      // Upsert batch to Pinecone
+      if (vectors.length > 0) {
+        const success = await upsertVectors(vectors);
+        if (success) {
+          successCount += vectors.length;
+        }
+      }
+
+      // Log progress
+      console.log(
+        `Processed ${i + batch.length} of ${contentItems.length} items`,
+      );
+    }
+
+    return successCount;
+  } catch (error) {
+    console.error("Error batch adding content to vector database:", error);
+    return successCount;
+  }
+}
+
+/**
+ * Search for similar content based on a query
+ * @param query The query text
+ * @param limit Maximum number of results to return
+ * @returns Array of similar content items
+ */
+export async function searchSimilarContentByText(
+  query: string,
   limit: number = 10,
-): Promise<string[]> {
-  console.log("[vectorService] Vector database functionality has been removed");
+): Promise<ContentItem[]> {
+  try {
+    // Query Pinecone using integrated embeddings
+    const matches = await querySimilarContent(query, limit);
 
-  // Fallback to hardcoded IDs since Pinecone is removed
-  const movieIds = [
-    "tt0111161",
-    "tt0068646",
-    "tt0071562",
-    "tt0468569",
-    "tt0050083",
-  ];
-  const tvIds = [
-    "tt0944947",
-    "tt0903747",
-    "tt0108778",
-    "tt0098904",
-    "tt0386676",
-  ];
+    // Convert matches to ContentItem format
+    return matches.map((match) => {
+      const metadata = match.metadata;
+      return {
+        id: match.id,
+        title: metadata.title,
+        imdb_id: metadata.imdbID,
+        media_type: metadata.type,
+        overview: metadata.plot,
+        poster_path: metadata.poster,
+        content_rating: metadata.rated,
+        vote_average: parseFloat(metadata.imdbRating) || 0,
+        vote_count: parseInt(metadata.imdbVotes?.replace(/,/g, "")) || 0,
+        genre_strings: metadata.genre?.split(", "),
+        year: metadata.year,
+        runtime: metadata.runtime,
+        director: metadata.director,
+        actors: metadata.actors,
+        language: metadata.language,
+        country: metadata.country,
+        similarity: match.score,
+      } as ContentItem;
+    });
+  } catch (error) {
+    console.error("Error searching similar content by text:", error);
+    return [];
+  }
+}
 
-  // Return a subset of IDs based on the content ID prefix (tt0 pattern suggests movies)
-  const isMovie = contentId.startsWith("tt0");
-  const similarIds = isMovie ? movieIds : tvIds;
+/**
+ * Search for similar content based on a content item
+ * @param contentItem The content item to find similar content for
+ * @param limit Maximum number of results to return
+ * @returns Array of similar content items
+ */
+export async function searchSimilarContent(
+  contentItem: ContentItem,
+  limit: number = 10,
+): Promise<ContentItem[]> {
+  try {
+    // Create text representation for the content item
+    const text = [
+      `Title: ${contentItem.title || contentItem.Title || ""}`,
+      `Type: ${contentItem.media_type || contentItem.Type || ""}`,
+      `Year: ${contentItem.year || contentItem.Year || ""}`,
+      `Plot: ${contentItem.overview || contentItem.Plot || contentItem.synopsis || ""}`,
+      `Genre: ${contentItem.genre_strings ? contentItem.genre_strings.join(", ") : contentItem.Genre || ""}`,
+      `Director: ${contentItem.director || contentItem.Director || ""}`,
+      `Actors: ${contentItem.actors || contentItem.Actors || ""}`,
+      `Language: ${contentItem.language || contentItem.Language || ""}`,
+      `Country: ${contentItem.country || contentItem.Country || ""}`,
+    ]
+      .filter((line) => !line.endsWith(": "))
+      .join("\n");
 
-  // Filter out the original content ID
-  return similarIds.filter((id) => id !== contentId).slice(0, limit);
+    // Query Pinecone using integrated embeddings
+    return await searchSimilarContentByText(text, limit);
+  } catch (error) {
+    console.error("Error searching similar content:", error);
+    return [];
+  }
 }

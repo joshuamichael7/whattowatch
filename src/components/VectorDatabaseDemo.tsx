@@ -1,27 +1,39 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { Loader2 } from "lucide-react";
+import { Textarea } from "./ui/textarea";
 import {
-  storeContentVector,
-  querySimilarContent,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "./ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { Loader2, Check } from "lucide-react";
+import { toast } from "./ui/use-toast";
+import {
+  initVectorDatabase,
+  addContentToVectorDb,
+  searchSimilarContentByText,
 } from "@/services/vectorService";
 import { getContentById } from "@/lib/omdbClient";
 import { ContentItem } from "@/types/omdb";
 
 const VectorDatabaseDemo: React.FC = () => {
+  const [activeTab, setActiveTab] = useState("setup");
   const [isInitializing, setIsInitializing] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [contentId, setContentId] = useState("");
   const [isStoring, setIsStoring] = useState(false);
   const [storeSuccess, setStoreSuccess] = useState<boolean | null>(null);
   const [isQuerying, setIsQuerying] = useState(false);
-  const [queryResults, setQueryResults] = useState<string[]>([]);
+  const [queryResults, setQueryResults] = useState<ContentItem[]>([]);
   const [contentDetails, setContentDetails] = useState<ContentItem | null>(
     null,
   );
+  const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   // Initialize the vector database on component mount
@@ -44,6 +56,37 @@ const VectorDatabaseDemo: React.FC = () => {
 
     initialize();
   }, []);
+
+  const handleInitialize = async () => {
+    setIsInitializing(true);
+    setError(null);
+    try {
+      const success = await initVectorDatabase();
+      if (success) {
+        setIsInitialized(true);
+        toast({
+          title: "Vector Database Initialized",
+          description: "Pinecone index created successfully",
+        });
+      } else {
+        toast({
+          title: "Initialization Failed",
+          description: "Failed to create Pinecone index",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error("Error initializing vector database:", err);
+      setError("Error initializing vector database");
+      toast({
+        title: "Initialization Error",
+        description: "An error occurred while initializing the vector database",
+        variant: "destructive",
+      });
+    } finally {
+      setIsInitializing(false);
+    }
+  };
 
   // Handle storing content in the vector database
   const handleStoreContent = async () => {
@@ -68,16 +111,47 @@ const VectorDatabaseDemo: React.FC = () => {
       setContentDetails(content as ContentItem);
 
       // Store in vector database
-      const success = await storeContentVector(content as ContentItem);
+      const success = await addContentToVectorDb(content as ContentItem);
       setStoreSuccess(success);
       if (!success) {
         setError("Failed to store content in vector database");
+      } else {
+        toast({
+          title: "Content Added",
+          description: `Successfully added "${content.title}" to vector database`,
+        });
       }
     } catch (err) {
       setError("Error storing content in vector database");
       console.error("Vector DB storage error:", err);
     } finally {
       setIsStoring(false);
+    }
+  };
+
+  // Handle searching by text query
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      setError("Please enter a search query");
+      return;
+    }
+
+    setIsQuerying(true);
+    setQueryResults([]);
+    setError(null);
+
+    try {
+      const results = await searchSimilarContentByText(searchQuery);
+      setQueryResults(results);
+
+      if (results.length === 0) {
+        setError("No similar content found for your query");
+      }
+    } catch (err) {
+      setError("Error searching vector database");
+      console.error("Vector DB search error:", err);
+    } finally {
+      setIsQuerying(false);
     }
   };
 
@@ -95,9 +169,26 @@ const VectorDatabaseDemo: React.FC = () => {
     try {
       // Query similar content
       const results = await querySimilarContent(contentId, undefined, 5);
-      setQueryResults(results);
-      if (results.length === 0) {
-        setError("No similar content found or vector database not configured");
+      if (Array.isArray(results)) {
+        // Convert string IDs to ContentItem objects if needed
+        const contentItems = results.map((id) => ({
+          id,
+          title: id,
+          media_type: "unknown",
+          vote_average: 0,
+          vote_count: 0,
+          genre_ids: [],
+          overview: "",
+          poster_path: "",
+        }));
+        setQueryResults(contentItems);
+        if (contentItems.length === 0) {
+          setError(
+            "No similar content found or vector database not configured",
+          );
+        }
+      } else {
+        setError("Invalid response format from vector database");
       }
     } catch (err) {
       setError("Error querying similar content");
@@ -108,157 +199,242 @@ const VectorDatabaseDemo: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6">
-        Vector Database Integration Demo
-      </h1>
+    <div className="container mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-6">Vector Database Demo</h1>
 
-      {/* Initialization Status */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Vector Database Status</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center">
-            <div className="mr-4">
-              {isInitializing ? (
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              ) : isInitialized ? (
-                <div className="h-6 w-6 rounded-full bg-green-500"></div>
-              ) : (
-                <div className="h-6 w-6 rounded-full bg-red-500"></div>
-              )}
-            </div>
-            <div>
-              {isInitializing
-                ? "Initializing vector database..."
-                : isInitialized
-                  ? "Vector database initialized successfully"
-                  : "Vector database not initialized"}
-            </div>
-          </div>
-          {error && <p className="text-red-500 mt-2">{error}</p>}
-        </CardContent>
-      </Card>
-
-      {/* Content ID Input */}
-      <div className="mb-6">
-        <label htmlFor="contentId" className="block text-sm font-medium mb-2">
-          Content ID (IMDB ID)
-        </label>
-        <div className="flex gap-2">
-          <Input
-            id="contentId"
-            value={contentId}
-            onChange={(e) => setContentId(e.target.value)}
-            placeholder="e.g., tt0111161"
-            disabled={!isInitialized || isStoring || isQuerying}
-          />
-        </div>
-      </div>
-
-      {/* Operations Tabs */}
-      <Tabs defaultValue="store">
-        <TabsList className="mb-4">
-          <TabsTrigger value="store">Store Content</TabsTrigger>
-          <TabsTrigger value="query">Query Similar Content</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="setup">Setup</TabsTrigger>
+          <TabsTrigger value="add">Add Content</TabsTrigger>
+          <TabsTrigger value="search">Search</TabsTrigger>
         </TabsList>
 
-        {/* Store Content Tab */}
-        <TabsContent value="store">
+        <TabsContent value="setup" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Store Content in Vector Database</CardTitle>
+              <CardTitle>Initialize Vector Database</CardTitle>
+              <CardDescription>
+                Create a Pinecone index for storing movie and TV show data
+              </CardDescription>
             </CardHeader>
             <CardContent>
+              <p className="mb-4">
+                This will create a new Pinecone index with the following
+                configuration:
+              </p>
+              <ul className="list-disc pl-6 mb-4 space-y-2">
+                <li>
+                  Index name: <code>omdb-database</code>
+                </li>
+                <li>
+                  Dimension: <code>1024</code>
+                </li>
+                <li>
+                  Metric: <code>cosine</code>
+                </li>
+                <li>
+                  Cloud: <code>aws</code>
+                </li>
+                <li>
+                  Region: <code>us-east-1</code>
+                </li>
+              </ul>
+              <p className="text-sm text-muted-foreground">
+                Note: Make sure you have set the{" "}
+                <code>VITE_PINECONE_API_KEY</code> environment variable.
+              </p>
+            </CardContent>
+            <CardFooter>
+              <Button
+                onClick={handleInitialize}
+                disabled={isInitializing || isInitialized}
+                className="w-full"
+              >
+                {isInitializing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Initializing...
+                  </>
+                ) : isInitialized ? (
+                  <>
+                    <Check className="mr-2 h-4 w-4" />
+                    Initialized
+                  </>
+                ) : (
+                  "Initialize Vector Database"
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="add" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Add Content to Vector Database</CardTitle>
+              <CardDescription>
+                Add a movie or TV show to the vector database using its IMDB ID
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label
+                    htmlFor="contentId"
+                    className="block text-sm font-medium mb-2"
+                  >
+                    Content ID (IMDB ID)
+                  </label>
+                  <Input
+                    id="contentId"
+                    value={contentId}
+                    onChange={(e) => setContentId(e.target.value)}
+                    placeholder="e.g., tt0111161"
+                    disabled={!isInitialized || isStoring}
+                  />
+                </div>
+
+                {storeSuccess !== null && (
+                  <div
+                    className={`mt-4 p-3 rounded-md ${
+                      storeSuccess
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {storeSuccess
+                      ? "Content stored successfully"
+                      : "Failed to store content"}
+                  </div>
+                )}
+
+                {contentDetails && (
+                  <div className="mt-4">
+                    <h3 className="font-semibold mb-2">Content Details:</h3>
+                    <p>
+                      <strong>Title:</strong> {contentDetails.title}
+                    </p>
+                    <p>
+                      <strong>Type:</strong> {contentDetails.media_type}
+                    </p>
+                    <p>
+                      <strong>Release Date:</strong>{" "}
+                      {contentDetails.release_date ||
+                        contentDetails.first_air_date ||
+                        "Unknown"}
+                    </p>
+                    <p>
+                      <strong>Rating:</strong> {contentDetails.vote_average}
+                    </p>
+                  </div>
+                )}
+
+                {error && <p className="text-red-500 mt-2">{error}</p>}
+              </div>
+            </CardContent>
+            <CardFooter>
               <Button
                 onClick={handleStoreContent}
                 disabled={!isInitialized || !contentId.trim() || isStoring}
+                className="w-full"
               >
                 {isStoring ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Storing...
+                    Adding Content...
                   </>
                 ) : (
-                  "Store Content"
+                  "Add Content"
                 )}
               </Button>
-
-              {storeSuccess !== null && (
-                <div
-                  className={`mt-4 p-3 rounded-md ${
-                    storeSuccess
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800"
-                  }`}
-                >
-                  {storeSuccess
-                    ? "Content stored successfully"
-                    : "Failed to store content"}
-                </div>
-              )}
-
-              {contentDetails && (
-                <div className="mt-4">
-                  <h3 className="font-semibold mb-2">Content Details:</h3>
-                  <p>
-                    <strong>Title:</strong> {contentDetails.title}
-                  </p>
-                  <p>
-                    <strong>Type:</strong> {contentDetails.media_type}
-                  </p>
-                  <p>
-                    <strong>Release Date:</strong>{" "}
-                    {contentDetails.release_date ||
-                      contentDetails.first_air_date ||
-                      "Unknown"}
-                  </p>
-                  <p>
-                    <strong>Rating:</strong> {contentDetails.vote_average}
-                  </p>
-                </div>
-              )}
-            </CardContent>
+            </CardFooter>
           </Card>
         </TabsContent>
 
-        {/* Query Similar Content Tab */}
-        <TabsContent value="query">
+        <TabsContent value="search" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Query Similar Content</CardTitle>
+              <CardTitle>Search Vector Database</CardTitle>
+              <CardDescription>
+                Search for similar content using natural language
+              </CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label
+                    htmlFor="searchQuery"
+                    className="block text-sm font-medium mb-2"
+                  >
+                    Search Query
+                  </label>
+                  <Textarea
+                    id="searchQuery"
+                    placeholder="e.g., A Korean drama about a man in his 40s and a woman in her 20s who help each other through life's struggles"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    disabled={isQuerying}
+                    rows={4}
+                  />
+                </div>
+
+                {error && <p className="text-red-500 mt-2">{error}</p>}
+
+                {queryResults.length > 0 && (
+                  <div className="space-y-4 mt-4">
+                    <h3 className="font-medium">Search Results</h3>
+                    {queryResults.map((result, index) => (
+                      <div key={index} className="p-4 border rounded-md">
+                        <div className="flex items-start gap-4">
+                          {result.poster_path && (
+                            <img
+                              src={result.poster_path}
+                              alt={result.title}
+                              className="w-20 h-auto rounded"
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                              }}
+                            />
+                          )}
+                          <div>
+                            <h4 className="font-medium">
+                              {result.title}{" "}
+                              {result.year ? `(${result.year})` : ""}
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                              {result.media_type}
+                            </p>
+                            <p className="text-sm mt-1">{result.overview}</p>
+                            {result.similarity !== undefined && (
+                              <p className="text-sm font-medium mt-1">
+                                Similarity:{" "}
+                                {(result.similarity * 100).toFixed(2)}%
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+            <CardFooter>
               <Button
-                onClick={handleQuerySimilarContent}
-                disabled={!isInitialized || !contentId.trim() || isQuerying}
+                onClick={handleSearch}
+                disabled={!isInitialized || !searchQuery.trim() || isQuerying}
+                className="w-full"
               >
                 {isQuerying ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Querying...
+                    Searching...
                   </>
                 ) : (
-                  "Find Similar Content"
+                  "Search"
                 )}
               </Button>
-
-              {queryResults.length > 0 ? (
-                <div className="mt-4">
-                  <h3 className="font-semibold mb-2">Similar Content:</h3>
-                  <ul className="list-disc pl-5">
-                    {queryResults.map((id) => (
-                      <li key={id}>{id}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : isQuerying ? (
-                <p className="mt-4">Searching for similar content...</p>
-              ) : error ? (
-                <p className="mt-4 text-red-500">{error}</p>
-              ) : null}
-            </CardContent>
+            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
