@@ -22,6 +22,8 @@ export async function addContentToVectorDb(
   content: ContentItem,
 ): Promise<boolean> {
   try {
+    console.log("Using Netlify function for vector database operations");
+
     // Create metadata from OMDB fields
     const metadata = {
       title: content.Title || content.title,
@@ -62,8 +64,24 @@ export async function addContentToVectorDb(
         .join("\n"),
     };
 
-    // Upsert to Pinecone
-    return await upsertVectors([vector]);
+    // Use Netlify function to upsert to Pinecone
+    const response = await fetch("/.netlify/functions/pinecone-operations", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        operation: "upsertVectors",
+        params: { vectors: [vector] },
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Function returned status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.success || false;
   } catch (error) {
     console.error("Error adding content to vector database:", error);
     return false;

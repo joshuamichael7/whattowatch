@@ -240,8 +240,8 @@ const VectorDatabaseDemo: React.FC = () => {
                 </li>
               </ul>
               <p className="text-sm text-muted-foreground">
-                Note: Make sure you have set the{" "}
-                <code>VITE_PINECONE_API_KEY</code> environment variable.
+                Note: Make sure you have set the <code>PINECONE_API_KEY</code>{" "}
+                environment variable in your Netlify environment settings.
               </p>
             </CardContent>
             <CardFooter>

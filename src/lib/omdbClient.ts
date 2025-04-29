@@ -581,33 +581,41 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     contentItem.poster_path = data.Poster !== "N/A" ? data.Poster : "";
     contentItem.content_rating = data.Rated !== "N/A" ? data.Rated : undefined;
 
-    // Try to add this content to Supabase for future use
-    try {
-      // Verify we have all required fields before attempting to add to Supabase
-      if (contentItem && contentItem.title && contentItem.imdb_id) {
-        const { addContentToSupabase } = await import("../lib/supabaseClient");
-        // Log the content item for debugging
-        console.log(
-          `[omdbClient] Attempting to add to Supabase: ${contentItem.title}`,
-          {
-            id: contentItem.id,
-            imdb_id: contentItem.imdb_id,
-            media_type: contentItem.media_type,
-          },
-        );
-        const result = await addContentToSupabase(contentItem);
-        console.log(
-          `[omdbClient] Added content to Supabase: ${contentItem.title}, result: ${result}`,
-        );
-      } else {
-        console.error(
-          "[omdbClient] Cannot add incomplete content to Supabase:",
-          contentItem,
-        );
+    // Skip adding to Supabase when called from VectorDatabaseDemo
+    if (!window.location.pathname.includes("vector-database")) {
+      try {
+        // Verify we have all required fields before attempting to add to Supabase
+        if (contentItem && contentItem.title && contentItem.imdb_id) {
+          const { addContentToSupabase } = await import(
+            "../lib/supabaseClient"
+          );
+          // Log the content item for debugging
+          console.log(
+            `[omdbClient] Attempting to add to Supabase: ${contentItem.title}`,
+            {
+              id: contentItem.id,
+              imdb_id: contentItem.imdb_id,
+              media_type: contentItem.media_type,
+            },
+          );
+          const result = await addContentToSupabase(contentItem);
+          console.log(
+            `[omdbClient] Added content to Supabase: ${contentItem.title}, result: ${result}`,
+          );
+        } else {
+          console.error(
+            "[omdbClient] Cannot add incomplete content to Supabase:",
+            contentItem,
+          );
+        }
+      } catch (supabaseError) {
+        console.error("Error adding content to Supabase:", supabaseError);
+        // Continue even if adding to Supabase fails
       }
-    } catch (supabaseError) {
-      console.error("Error adding content to Supabase:", supabaseError);
-      // Continue even if adding to Supabase fails
+    } else {
+      console.log(
+        `[omdbClient] Skipping Supabase storage for Vector Database Demo`,
+      );
     }
 
     return contentItem;
