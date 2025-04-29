@@ -268,37 +268,48 @@ async function upsertVectors(vectors) {
       }
     }
 
-    // Ensure each vector has the required format for Pinecone
-    const formattedVectors = vectors.map((vector) => {
-      // Ensure ID is a string
-      const id = String(vector.id);
-
-      // Ensure metadata values are strings (Pinecone requirement)
-      const metadata = {};
-      if (vector.metadata) {
-        Object.entries(vector.metadata).forEach(([key, value]) => {
-          // Convert all values to strings to avoid Pinecone errors
-          metadata[key] =
-            value !== null && value !== undefined ? String(value) : "";
-        });
-      }
-
-      return {
-        id,
-        metadata,
-        // text for Pinecone's text embedding API
-        text: vector.text,
-      };
-    });
+    // Define the namespace for content
+    const namespace = "content";
+    console.log(`Using namespace for upsert: ${namespace}`);
 
     try {
-      console.log("About to call index.upsert with formatted vectors");
-      const upsertResponse = await index.upsert(formattedVectors);
+      // Format vectors for upsertRecords with integrated embedding
+      const formattedRecords = vectors.map((vector) => {
+        // Create a record object with _id and chunk_text field
+        const record = {
+          _id: String(vector.id),
+          chunk_text: vector.text, // Using chunk_text as the field for embedding
+        };
+
+        // Add metadata fields directly to the record
+        if (vector.metadata) {
+          Object.entries(vector.metadata).forEach(([key, value]) => {
+            // Convert all values to strings to avoid Pinecone errors
+            record[key] =
+              value !== null && value !== undefined ? String(value) : "";
+          });
+        }
+
+        return record;
+      });
+
+      console.log(
+        "About to call index.namespace(namespace).upsertRecords with formatted records",
+      );
+      console.log("Sample record format:", formattedRecords[0]);
+
+      // Use the namespace-specific upsertRecords method for integrated embedding
+      const upsertResponse = await index
+        .namespace(namespace)
+        .upsertRecords(formattedRecords);
       console.log("Upsert response:", upsertResponse);
       console.log("Vectors successfully upserted to Pinecone");
       return true;
     } catch (upsertError) {
-      console.error("Error during index.upsert call:", upsertError);
+      console.error(
+        "Error during index.namespace(namespace).upsertRecords call:",
+        upsertError,
+      );
       console.error("Error message:", upsertError.message);
       console.error("Error details:", JSON.stringify(upsertError, null, 2));
 
@@ -310,7 +321,8 @@ async function upsertVectors(vectors) {
         console.log("Index not found error - attempting to create index");
         await createPineconeIndex();
         console.log("Index created, retrying upsert");
-        await index.upsert(formattedVectors);
+        // Retry with the namespace-specific upsertRecords method
+        await index.namespace(namespace).upsertRecords(formattedRecords);
         return true;
       }
 
