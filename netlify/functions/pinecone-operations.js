@@ -200,10 +200,34 @@ async function upsertVectors(vectors) {
   if (!index) return false;
 
   try {
-    await index.upsert(vectors);
+    console.log(`Upserting ${vectors.length} vectors to Pinecone`);
+
+    // Log the first vector for debugging
+    if (vectors.length > 0) {
+      console.log("First vector:", {
+        id: vectors[0].id,
+        metadata: vectors[0].metadata,
+        hasText: !!vectors[0].text,
+        textLength: vectors[0].text ? vectors[0].text.length : 0,
+      });
+    }
+
+    // Ensure each vector has the required format for Pinecone
+    const formattedVectors = vectors.map((vector) => ({
+      id: vector.id,
+      metadata: vector.metadata,
+      // values is optional when using text
+      values: vector.values || [],
+      // Use text for Pinecone's text embedding API
+      text: vector.text,
+    }));
+
+    await index.upsert(formattedVectors);
+    console.log("Vectors successfully upserted to Pinecone");
     return true;
   } catch (error) {
     console.error("Error upserting vectors to Pinecone:", error);
+    console.error("Error details:", error.message);
     return false;
   }
 }

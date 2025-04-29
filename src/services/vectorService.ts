@@ -10,7 +10,28 @@ import { v4 as uuidv4 } from "uuid";
  * Initialize the vector database
  */
 export async function initVectorDatabase(): Promise<boolean> {
-  return await createPineconeIndex();
+  try {
+    console.log("Using Netlify function for vector database operations");
+    const response = await fetch("/.netlify/functions/pinecone-operations", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        operation: "createIndex",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Function returned status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.success || false;
+  } catch (error) {
+    console.error("Error initializing vector database:", error);
+    return false;
+  }
 }
 
 /**
@@ -49,6 +70,7 @@ export async function addContentToVectorDb(
     const vector = {
       id: content.imdbID || content.imdb_id || uuidv4(),
       metadata,
+      values: [], // Empty values array as we're using text-based embedding
       text: [
         `Title: ${content.Title || content.title || ""}`,
         `Type: ${content.Type || content.media_type || ""}`,
@@ -64,6 +86,11 @@ export async function addContentToVectorDb(
         .join("\n"),
     };
 
+    console.log("Sending vector to Pinecone:", {
+      id: vector.id,
+      metadata: vector.metadata,
+    });
+
     // Use Netlify function to upsert to Pinecone
     const response = await fetch("/.netlify/functions/pinecone-operations", {
       method: "POST",
@@ -77,10 +104,13 @@ export async function addContentToVectorDb(
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Pinecone API error (${response.status}):`, errorText);
       throw new Error(`Function returned status: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log("Pinecone response:", data);
     return data.success || false;
   } catch (error) {
     console.error("Error adding content to vector database:", error);

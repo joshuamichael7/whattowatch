@@ -167,28 +167,30 @@ const VectorDatabaseDemo: React.FC = () => {
     setError(null);
 
     try {
-      // Query similar content
-      const results = await querySimilarContent(contentId, undefined, 5);
-      if (Array.isArray(results)) {
-        // Convert string IDs to ContentItem objects if needed
-        const contentItems = results.map((id) => ({
-          id,
-          title: id,
-          media_type: "unknown",
-          vote_average: 0,
-          vote_count: 0,
-          genre_ids: [],
-          overview: "",
-          poster_path: "",
-        }));
-        setQueryResults(contentItems);
-        if (contentItems.length === 0) {
-          setError(
-            "No similar content found or vector database not configured",
-          );
-        }
-      } else {
-        setError("Invalid response format from vector database");
+      // First get the content details
+      const content = await getContentById(contentId);
+      if (!content) {
+        setError(`Content with ID ${contentId} not found`);
+        setIsQuerying(false);
+        return;
+      }
+
+      // Create text representation for the content
+      const text = [
+        `Title: ${content.title || ""}`,
+        `Type: ${content.media_type || ""}`,
+        `Plot: ${content.overview || content.synopsis || ""}`,
+        `Genre: ${content.genre_strings ? content.genre_strings.join(", ") : ""}`,
+      ]
+        .filter((line) => !line.endsWith(": "))
+        .join("\n");
+
+      // Query similar content using text
+      const results = await searchSimilarContentByText(text, 5);
+      setQueryResults(results);
+
+      if (results.length === 0) {
+        setError("No similar content found or vector database not configured");
       }
     } catch (err) {
       setError("Error querying similar content");
