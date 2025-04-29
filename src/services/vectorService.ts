@@ -11,14 +11,15 @@ import { v4 as uuidv4 } from "uuid";
  */
 export async function initVectorDatabase(): Promise<boolean> {
   try {
-    console.log("Using Netlify function for vector database operations");
+    console.log("Checking Pinecone connection");
+    // Instead of creating an index, just check if we can connect to Pinecone
     const response = await fetch("/.netlify/functions/pinecone-operations", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        operation: "createIndex",
+        operation: "checkConnection",
       }),
     });
 
@@ -29,7 +30,7 @@ export async function initVectorDatabase(): Promise<boolean> {
     const data = await response.json();
     return data.success || false;
   } catch (error) {
-    console.error("Error initializing vector database:", error);
+    console.error("Error checking Pinecone connection:", error);
     return false;
   }
 }
@@ -84,9 +85,17 @@ export async function addContentToVectorDb(
         `Plot: ${content.Plot || content.overview || content.synopsis || ""}`,
         `Genre: ${content.Genre || (content.genre_strings ? content.genre_strings.join(", ") : "")}`,
         `Director: ${content.Director || content.director || ""}`,
+        `Writer: ${content.Writer || content.writer || ""}`,
         `Actors: ${content.Actors || content.actors || ""}`,
         `Language: ${content.Language || content.language || ""}`,
         `Country: ${content.Country || content.country || ""}`,
+        `Awards: ${content.Awards || content.awards || ""}`,
+        `Released: ${content.Released || content.release_date || ""}`,
+        `Runtime: ${content.Runtime || content.runtime || ""}`,
+        `Rated: ${content.Rated || content.content_rating || ""}`,
+        `IMDb Rating: ${content.imdbRating || (content.vote_average ? content.vote_average.toString() : "")}`,
+        `Metascore: ${content.Metascore || content.metascore || ""}`,
+        `Total Seasons: ${content.totalSeasons || ""}`,
       ]
         .filter((line) => !line.endsWith(": "))
         .join("\n"),
@@ -186,9 +195,17 @@ export async function batchAddContentToVectorDb(
           `Plot: ${content.Plot || content.overview || content.synopsis || ""}`,
           `Genre: ${content.Genre || (content.genre_strings ? content.genre_strings.join(", ") : "")}`,
           `Director: ${content.Director || content.director || ""}`,
+          `Writer: ${content.Writer || content.writer || ""}`,
           `Actors: ${content.Actors || content.actors || ""}`,
           `Language: ${content.Language || content.language || ""}`,
           `Country: ${content.Country || content.country || ""}`,
+          `Awards: ${content.Awards || content.awards || ""}`,
+          `Released: ${content.Released || content.release_date || ""}`,
+          `Runtime: ${content.Runtime || content.runtime || ""}`,
+          `Rated: ${content.Rated || content.content_rating || ""}`,
+          `IMDb Rating: ${content.imdbRating || (content.vote_average ? content.vote_average.toString() : "")}`,
+          `Metascore: ${content.Metascore || content.metascore || ""}`,
+          `Total Seasons: ${content.totalSeasons || ""}`,
         ]
           .filter((line) => !line.endsWith(": "))
           .join("\n");
@@ -233,19 +250,44 @@ export async function searchSimilarContentByText(
   limit: number = 10,
 ): Promise<ContentItem[]> {
   try {
-    // Query Pinecone using integrated embeddings
-    const matches = await querySimilarContent(query, limit);
+    console.log(`Searching for similar content with query: "${query}"`);
+
+    // Call the Netlify function to query Pinecone
+    const response = await fetch("/.netlify/functions/pinecone-operations", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        operation: "querySimilarContent",
+        params: { text: query, limit },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Pinecone API error (${response.status}):`, errorText);
+      throw new Error(`Function returned status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Pinecone query response:", data);
+
+    if (!data.matches || !Array.isArray(data.matches)) {
+      console.error("Invalid response format from Pinecone");
+      return [];
+    }
 
     // Convert matches to ContentItem format
-    return matches.map((match) => {
-      const metadata = match.metadata;
+    return data.matches.map((match: any) => {
+      const metadata = match.metadata || {};
       return {
         id: match.id,
-        title: metadata.title,
+        title: metadata.title || "Unknown Title",
         imdb_id: metadata.imdbID,
-        media_type: metadata.type,
-        overview: metadata.plot,
-        poster_path: metadata.poster,
+        media_type: metadata.type || "unknown",
+        overview: metadata.plot || "",
+        poster_path: metadata.poster || "",
         content_rating: metadata.rated,
         vote_average: parseFloat(metadata.imdbRating) || 0,
         vote_count: parseInt(metadata.imdbVotes?.replace(/,/g, "")) || 0,

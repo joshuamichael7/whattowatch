@@ -193,12 +193,22 @@ const VectorDatabaseDemo: React.FC = () => {
         return;
       }
 
-      // Create text representation for the content
+      // Create rich text representation for the content
       const text = [
         `Title: ${content.title || ""}`,
         `Type: ${content.media_type || ""}`,
+        `Year: ${content.year || ""}`,
         `Plot: ${content.overview || content.synopsis || ""}`,
         `Genre: ${content.genre_strings ? content.genre_strings.join(", ") : ""}`,
+        `Director: ${content.director || ""}`,
+        `Writer: ${content.writer || ""}`,
+        `Actors: ${content.actors || ""}`,
+        `Language: ${content.language || ""}`,
+        `Country: ${content.country || ""}`,
+        `Released: ${content.release_date || ""}`,
+        `Runtime: ${content.runtime || ""}`,
+        `Rated: ${content.content_rating || ""}`,
+        `IMDb Rating: ${content.vote_average || ""}`,
       ]
         .filter((line) => !line.endsWith(": "))
         .join("\n");
@@ -461,8 +471,8 @@ const VectorDatabaseDemo: React.FC = () => {
 
       <div className="mt-6 text-sm text-gray-500">
         <p>
-          Note: This demo requires proper configuration of the vector database
-          API keys and endpoints in your environment variables.
+          Note: Make sure you have set the <code>PINECONE_API_KEY</code>{" "}
+          environment variable in your Netlify environment settings.
         </p>
       </div>
     </div>
