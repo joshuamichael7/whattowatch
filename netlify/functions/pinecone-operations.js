@@ -335,7 +335,6 @@ async function querySimilarContent(text, limit = 10, namespace = "content") {
     console.log(`Querying Pinecone with text: "${text.substring(0, 50)}..."`);
 
     // Use Pinecone's query method with namespace and integrated embedding
-    const namespace = "content";
     console.log(`Using namespace for query: ${namespace}`);
     const queryResponse = await index.namespace(namespace).query({
       topK: limit,
