@@ -42,10 +42,17 @@ const VectorDatabaseDemo: React.FC = () => {
       setIsInitializing(true);
       setError(null);
       try {
-        // Vector database initialization has been removed
-        console.log("Vector database functionality has been removed");
-        // Set initialized to true to allow component to function
-        setIsInitialized(true);
+        // Check if Pinecone is initialized
+        const success = await initVectorDatabase();
+        if (success) {
+          console.log("Vector database initialized successfully");
+          setIsInitialized(true);
+        } else {
+          console.log("Vector database initialization failed");
+          setError(
+            "Failed to initialize vector database. Please check your API key.",
+          );
+        }
       } catch (err) {
         setError("Error initializing vector database");
         console.error("Vector DB initialization error:", err);

@@ -198,7 +198,7 @@ async function createPineconeIndex() {
       return true;
     }
 
-    // Create the index
+    // Create the index - using dimension 1024 for Pinecone's built-in embeddings
     await client.createIndex({
       name: indexName,
       dimension: 1024,
@@ -264,6 +264,7 @@ async function upsertVectors(vectors) {
         console.error(
           "Vector text is missing or too short for effective embedding",
         );
+        return false;
       }
     }
 
@@ -290,10 +291,31 @@ async function upsertVectors(vectors) {
       };
     });
 
-    console.log("About to call index.upsert with formatted vectors");
-    await index.upsert(formattedVectors);
-    console.log("Vectors successfully upserted to Pinecone");
-    return true;
+    try {
+      console.log("About to call index.upsert with formatted vectors");
+      const upsertResponse = await index.upsert(formattedVectors);
+      console.log("Upsert response:", upsertResponse);
+      console.log("Vectors successfully upserted to Pinecone");
+      return true;
+    } catch (upsertError) {
+      console.error("Error during index.upsert call:", upsertError);
+      console.error("Error message:", upsertError.message);
+      console.error("Error details:", JSON.stringify(upsertError, null, 2));
+
+      // Check if this is an index not found error
+      if (
+        upsertError.message &&
+        upsertError.message.includes("index not found")
+      ) {
+        console.log("Index not found error - attempting to create index");
+        await createPineconeIndex();
+        console.log("Index created, retrying upsert");
+        await index.upsert(formattedVectors);
+        return true;
+      }
+
+      throw upsertError;
+    }
   } catch (error) {
     console.error("Error upserting vectors to Pinecone:", error);
     console.error("Error details:", error.message);

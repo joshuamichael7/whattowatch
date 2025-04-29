@@ -52,64 +52,72 @@ export async function addContentToVectorDb(
       media_type: content.media_type,
     });
 
-    // Create metadata from OMDB fields
-    const metadata = {
-      title: content.Title || content.title,
-      year: content.Year || content.year,
-      type: content.Type || content.media_type,
-      imdbID: content.imdbID || content.imdb_id,
-      plot: content.Plot || content.overview || content.synopsis,
-      genre:
+    // IMPORTANT: Make sure we have an IMDB ID
+    if (!content.imdb_id) {
+      console.error("Cannot add content without IMDB ID");
+      return false;
+    }
+
+    // Create metadata from OMDB fields - ensure all values are strings
+    const metadata: Record<string, string> = {
+      title: String(content.Title || content.title || ""),
+      year: String(content.Year || content.year || ""),
+      type: String(content.Type || content.media_type || ""),
+      imdbID: String(content.imdbID || content.imdb_id || ""),
+      plot: String(content.Plot || content.overview || content.synopsis || ""),
+      genre: String(
         content.Genre ||
-        (content.genre_strings ? content.genre_strings.join(", ") : ""),
-      director: content.Director || content.director,
-      actors: content.Actors || content.actors,
-      language: content.Language || content.language,
-      country: content.Country || content.country,
-      poster: content.Poster || content.poster_path,
-      rated: content.Rated || content.content_rating,
-      runtime: content.Runtime || content.runtime,
-      imdbRating: content.imdbRating || content.vote_average,
-      imdbVotes: content.imdbVotes || content.vote_count,
+          (content.genre_strings ? content.genre_strings.join(", ") : ""),
+      ),
+      director: String(content.Director || content.director || ""),
+      actors: String(content.Actors || content.actors || ""),
+      language: String(content.Language || content.language || ""),
+      country: String(content.Country || content.country || ""),
+      poster: String(content.Poster || content.poster_path || ""),
+      rated: String(content.Rated || content.content_rating || ""),
+      runtime: String(content.Runtime || content.runtime || ""),
+      imdbRating: String(content.imdbRating || content.vote_average || ""),
+      imdbVotes: String(content.imdbVotes || content.vote_count || ""),
     };
 
-    // Create vector record
+    // Create text for embedding - filter out empty fields
+    const textLines = [
+      `Title: ${content.Title || content.title || ""}`,
+      `Type: ${content.Type || content.media_type || ""}`,
+      `Year: ${content.Year || content.year || ""}`,
+      `Plot: ${content.Plot || content.overview || content.synopsis || ""}`,
+      `Genre: ${content.Genre || (content.genre_strings ? content.genre_strings.join(", ") : "")}`,
+      `Director: ${content.Director || content.director || ""}`,
+      `Writer: ${content.Writer || content.writer || ""}`,
+      `Actors: ${content.Actors || content.actors || ""}`,
+      `Language: ${content.Language || content.language || ""}`,
+      `Country: ${content.Country || content.country || ""}`,
+      `Awards: ${content.Awards || content.awards || ""}`,
+      `Released: ${content.Released || content.release_date || ""}`,
+      `Runtime: ${content.Runtime || content.runtime || ""}`,
+      `Rated: ${content.Rated || content.content_rating || ""}`,
+      `IMDb Rating: ${content.imdbRating || (content.vote_average ? content.vote_average.toString() : "")}`,
+    ].filter((line) => {
+      const parts = line.split(": ");
+      return parts.length > 1 && parts[1] !== "" && parts[1] !== "N/A";
+    });
+
+    // Create vector record - using Pinecone's built-in embeddings
     const vector = {
-      id: content.imdbID || content.imdb_id || uuidv4(),
+      id: content.imdb_id, // Always use IMDB ID as the primary key
       metadata,
-      values: [], // Empty values array as we're using text-based embedding
-      text: [
-        `Title: ${content.Title || content.title || ""}`,
-        `Type: ${content.Type || content.media_type || ""}`,
-        `Year: ${content.Year || content.year || ""}`,
-        `Plot: ${content.Plot || content.overview || content.synopsis || ""}`,
-        `Genre: ${content.Genre || (content.genre_strings ? content.genre_strings.join(", ") : "")}`,
-        `Director: ${content.Director || content.director || ""}`,
-        `Writer: ${content.Writer || content.writer || ""}`,
-        `Actors: ${content.Actors || content.actors || ""}`,
-        `Language: ${content.Language || content.language || ""}`,
-        `Country: ${content.Country || content.country || ""}`,
-        `Awards: ${content.Awards || content.awards || ""}`,
-        `Released: ${content.Released || content.release_date || ""}`,
-        `Runtime: ${content.Runtime || content.runtime || ""}`,
-        `Rated: ${content.Rated || content.content_rating || ""}`,
-        `IMDb Rating: ${content.imdbRating || (content.vote_average ? content.vote_average.toString() : "")}`,
-        `Metascore: ${content.Metascore || content.metascore || ""}`,
-        `Total Seasons: ${content.totalSeasons || ""}`,
-      ]
-        .filter((line) => !line.endsWith(": "))
-        .join("\n"),
+      text: textLines.join("\n"),
     };
 
     console.log("Sending vector to Pinecone:", {
       id: vector.id,
-      metadata: vector.metadata,
+      metadata: Object.keys(vector.metadata),
       textLength: vector.text.length,
       textSample: vector.text.substring(0, 100) + "...",
     });
 
     // Use Netlify function to upsert to Pinecone
-    console.log("Preparing to call Netlify function");
+    console.log("Calling Netlify function to upsert vector");
     const response = await fetch("/.netlify/functions/pinecone-operations", {
       method: "POST",
       headers: {
