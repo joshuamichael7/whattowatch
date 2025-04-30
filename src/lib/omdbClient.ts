@@ -525,7 +525,7 @@ function formatOMDBData(data: any): ContentItem {
     country: data.Country !== "N/A" ? data.Country : "",
     awards: data.Awards !== "N/A" ? data.Awards : "",
     metascore: data.Metascore !== "N/A" ? data.Metascore : "",
-    production: data.Production !== "N/A" ? data.Production : "",
+    // production: data.Production !== "N/A" ? data.Production : "", // Removed as this column doesn't exist in Supabase
     website: data.Website !== "N/A" ? data.Website : "",
     // BoxOffice field is not in the database schema, so we don't include it
     imdb_rating: data.imdbRating !== "N/A" ? data.imdbRating : "",
