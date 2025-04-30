@@ -24,6 +24,11 @@ import {
   CheckCircle,
   Clock,
   Cloud,
+  Info,
+  XCircle,
+  SkipForward,
+  BarChart,
+  Server,
 } from "lucide-react";
 import {
   defaultImportProgress,
