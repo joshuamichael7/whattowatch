@@ -26,6 +26,7 @@ import AdminPasswordReset from "./admin/AdminPasswordReset";
 import AdminPasswordForm from "./AdminPasswordForm";
 import HomepageContentManager from "./admin/HomepageContentManager";
 import GenreUpdater from "./GenreUpdater";
+import AutomatedImporter from "./admin/AutomatedImporter";
 
 const AdminDashboard: React.FC = () => {
   const { user, profile, isLoading, isAdmin, isAdminVerified, refreshProfile } =
