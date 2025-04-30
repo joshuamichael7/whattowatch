@@ -527,7 +527,7 @@ function formatOMDBData(data: any): ContentItem {
     metascore: data.Metascore !== "N/A" ? data.Metascore : "",
     production: data.Production !== "N/A" ? data.Production : "",
     website: data.Website !== "N/A" ? data.Website : "",
-    boxOffice: data.BoxOffice !== "N/A" ? data.BoxOffice : "",
+    // BoxOffice field is not in the database schema, so we don't include it
     imdb_rating: data.imdbRating !== "N/A" ? data.imdbRating : "",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
