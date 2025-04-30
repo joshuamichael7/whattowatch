@@ -34,6 +34,8 @@ function transformTmdbSearchResult(item) {
   return {
     id: item.id.toString(),
     title: mediaType === "tv" ? item.name : item.title,
+    original_title:
+      mediaType === "tv" ? item.original_name : item.original_title,
     poster_path: item.poster_path
       ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
       : "",
@@ -196,6 +198,7 @@ function transformTmdbTvDetails(show) {
     tmdb_id: show.id.toString(),
     imdb_id: show.external_ids?.imdb_id || "",
     title: show.name,
+    original_title: show.original_name || show.name,
     original_title: show.original_name || show.name,
     poster_path: show.poster_path
       ? `https://image.tmdb.org/t/p/w500${show.poster_path}`
