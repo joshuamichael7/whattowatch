@@ -424,3 +424,69 @@ export async function getTvChanges(
     return [];
   }
 }
+
+/**
+ * Search for multiple movies by their IDs
+ * @param ids Array of TMDB movie IDs
+ * @param includeDetails Whether to include additional details
+ * @returns Array of ContentItem objects
+ */
+export async function searchMoviesByIds(
+  ids: number[],
+  includeDetails: boolean = true,
+): Promise<ContentItem[]> {
+  try {
+    const results: ContentItem[] = [];
+
+    // Process in smaller batches to avoid rate limiting
+    const batchSize = 20;
+    for (let i = 0; i < ids.length; i += batchSize) {
+      const batch = ids.slice(i, i + batchSize);
+      const promises = batch.map((id) => getMovieById(id, includeDetails));
+      const batchResults = await Promise.all(promises);
+
+      // Filter out null results and add to results array
+      results.push(
+        ...(batchResults.filter((item) => item !== null) as ContentItem[]),
+      );
+    }
+
+    return results;
+  } catch (error) {
+    console.error(`Error searching for movies by IDs:`, error);
+    return [];
+  }
+}
+
+/**
+ * Search for multiple TV shows by their IDs
+ * @param ids Array of TMDB TV show IDs
+ * @param includeDetails Whether to include additional details
+ * @returns Array of ContentItem objects
+ */
+export async function searchTvShowsByIds(
+  ids: number[],
+  includeDetails: boolean = true,
+): Promise<ContentItem[]> {
+  try {
+    const results: ContentItem[] = [];
+
+    // Process in smaller batches to avoid rate limiting
+    const batchSize = 20;
+    for (let i = 0; i < ids.length; i += batchSize) {
+      const batch = ids.slice(i, i + batchSize);
+      const promises = batch.map((id) => getTvShowById(id, includeDetails));
+      const batchResults = await Promise.all(promises);
+
+      // Filter out null results and add to results array
+      results.push(
+        ...(batchResults.filter((item) => item !== null) as ContentItem[]),
+      );
+    }
+
+    return results;
+  } catch (error) {
+    console.error(`Error searching for TV shows by IDs:`, error);
+    return [];
+  }
+}
