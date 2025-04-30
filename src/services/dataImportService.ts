@@ -165,25 +165,10 @@ export async function processBatch(
   // Determine if we're using a list of IDs or generating them sequentially
   const useIdList = Array.isArray(imdbIds) && imdbIds.length > 0;
 
-  // Sort IDs by popularity if requested
-  if (useIdList && prioritizePopular && imdbIds) {
-    addLog("Sorting IMDB IDs by estimated popularity...");
-    imdbIds = [...imdbIds].sort((a, b) => {
-      return getPopularityScore(b) - getPopularityScore(a);
-    });
-    addLog(
-      "Sorted IDs by popularity. Processing higher priority content first.",
-    );
-  }
-
   if (useIdList) {
-    addLog(
-      `Starting batch processing of ${imdbIds.length} IMDB IDs${prioritizePopular ? " (prioritizing popular content)" : ""}`,
-    );
+    addLog(`Starting batch processing of ${imdbIds.length} IMDB IDs`);
   } else {
-    addLog(
-      `Starting batch processing from ${startId}${prioritizePopular ? " (prioritizing popular content)" : ""}`,
-    );
+    addLog(`Starting batch processing from ${startId}`);
   }
 
   // Process IDs in smaller batches

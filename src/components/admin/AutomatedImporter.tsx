@@ -499,11 +499,8 @@ const AutomatedImporter: React.FC = () => {
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Progress</span>
             <span className="text-sm text-muted-foreground">
-              {progress.processed} /{" "}
-              {importMode === "list"
-                ? parseImdbIds(imdbIdList).length || 0
-                : batchCount}{" "}
-              ({calculateProgressPercentage().toFixed(1)}%)
+              {progress.processed} / {batchCount} (
+              {calculateProgressPercentage().toFixed(1)}%)
             </span>
           </div>
           <Progress value={calculateProgressPercentage()} className="h-2" />
