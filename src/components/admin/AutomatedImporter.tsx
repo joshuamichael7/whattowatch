@@ -30,6 +30,13 @@ import {
   ImportProgress,
   processBatch,
 } from "@/services/dataImportService";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const AutomatedImporter: React.FC = () => {
   const [progress, setProgress] = useState<ImportProgress>(

@@ -138,6 +138,13 @@ const AdminDashboard: React.FC = () => {
                 <Upload className="h-4 w-4" />
                 Import Data
               </TabsTrigger>
+              <TabsTrigger
+                value="automated"
+                className="flex items-center gap-2"
+              >
+                <Server className="h-4 w-4" />
+                Automated Import
+              </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4" />
                 Security
