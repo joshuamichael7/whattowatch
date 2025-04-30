@@ -10,7 +10,9 @@ const TMDB_API_BASE_URL = "https://api.themoviedb.org/3";
 
 // Get TMDB access token from environment variables
 const getAccessToken = (): string => {
+  // Access token directly from process.env for Netlify functions
   const accessToken = process.env.TMDB_ACCESS_TOKEN;
+
   if (!accessToken) {
     console.error("TMDB access token not found in environment variables");
     return "";
