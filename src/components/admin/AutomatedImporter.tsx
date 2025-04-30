@@ -400,7 +400,8 @@ const AutomatedImporter: React.FC = () => {
                 }}
                 disabled={progress.isRunning}
                 placeholder="Enter IMDB IDs, one per line (e.g. tt0111161)\ntt0068646\ntt0071562\n..."
-                className="w-full h-32 p-2 border rounded-md font-mono text-sm"
+                className="w-full h-32 p-2 border rounded-md font-mono text-sm text-black dark:text-white bg-white dark:bg-gray-800"
+                style={{ color: "inherit" }}
               />
               {invalidIds.length > 0 && (
                 <div className="text-red-500 text-sm">
