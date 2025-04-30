@@ -10,7 +10,7 @@ const TMDB_API_BASE_URL = "https://api.themoviedb.org/3";
 
 // Get TMDB access token from environment variables
 const getAccessToken = (): string => {
-  // Access token directly from process.env for Netlify functions
+  // For Netlify functions
   const accessToken = process.env.TMDB_ACCESS_TOKEN;
 
   if (!accessToken) {
@@ -92,7 +92,7 @@ async function makeApiCall<T>(
         const response = await axios.get(`${TMDB_API_BASE_URL}${endpoint}`, {
           params: { ...params },
           headers: {
-            "Content-Type": "application/json",
+            accept: "application/json",
             Authorization: `Bearer ${accessToken}`,
           },
         });
