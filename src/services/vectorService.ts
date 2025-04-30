@@ -48,55 +48,118 @@ export async function addContentToVectorDb(
     console.log("Content to add:", {
       id: content.id,
       imdb_id: content.imdb_id,
+      tmdb_id: content.tmdb_id,
       title: content.title,
       media_type: content.media_type,
     });
 
-    // IMPORTANT: Make sure we have an IMDB ID
-    if (!content.imdb_id) {
-      console.error("Cannot add content without IMDB ID");
+    // IMPORTANT: Make sure we have an ID (IMDB ID or TMDB ID)
+    if (!content.imdb_id && !content.tmdb_id) {
+      console.error("Cannot add content without IMDB ID or TMDB ID");
       return false;
     }
 
-    // Create metadata from OMDB fields - ensure all values are strings
+    // Use TMDB ID if available, otherwise use IMDB ID
+    const contentId = content.tmdb_id
+      ? `tmdb-${content.media_type === "movie" ? "movie" : "tv"}-${content.tmdb_id}`
+      : content.imdb_id;
+
+    // Create metadata from content fields - ensure all values are strings
     const metadata: Record<string, string> = {
-      title: String(content.Title || content.title || ""),
-      year: String(content.Year || content.year || ""),
-      type: String(content.Type || content.media_type || ""),
-      imdbID: String(content.imdbID || content.imdb_id || ""),
-      plot: String(content.Plot || content.overview || content.synopsis || ""),
-      genre: String(
-        content.Genre ||
-          (content.genre_strings ? content.genre_strings.join(", ") : ""),
+      title: String(content.title || ""),
+      year: String(
+        content.release_date
+          ? new Date(content.release_date).getFullYear()
+          : content.year || "",
       ),
-      director: String(content.Director || content.director || ""),
-      actors: String(content.Actors || content.actors || ""),
-      language: String(content.Language || content.language || ""),
-      country: String(content.Country || content.country || ""),
-      poster: String(content.Poster || content.poster_path || ""),
-      rated: String(content.Rated || content.content_rating || ""),
-      runtime: String(content.Runtime || content.runtime || ""),
-      imdbRating: String(content.imdbRating || content.vote_average || ""),
-      imdbVotes: String(content.imdbVotes || content.vote_count || ""),
+      type: String(content.media_type || ""),
+      imdbID: String(content.imdb_id || ""),
+      tmdbID: String(content.tmdb_id || ""),
+      plot: String(content.overview || content.synopsis || ""),
+      genre: String(
+        (content.genre_strings ? content.genre_strings.join(", ") : "") ||
+          (content.genres
+            ? content.genres.map((g: any) => g.name).join(", ")
+            : ""),
+      ),
+      director: String(content.director || ""),
+      actors: String(
+        content.actors ||
+          (content.cast
+            ? content.cast
+                .slice(0, 10)
+                .map((c: any) => c.name)
+                .join(", ")
+            : ""),
+      ),
+      language: String(content.language || content.original_language || ""),
+      country: String(
+        content.country ||
+          content.production_countries?.map((c: any) => c.name).join(", ") ||
+          "",
+      ),
+      poster: String(content.poster_path || ""),
+      rated: String(content.content_rating || ""),
+      runtime: String(content.runtime || ""),
+      rating: String(content.vote_average || ""),
+      votes: String(content.vote_count || ""),
+      popularity: String(content.popularity || ""),
+      streamingProviders: String(
+        content.streaming_providers
+          ? Object.keys(content.streaming_providers).join(", ")
+          : "",
+      ),
     };
 
     // Create text for embedding - filter out empty fields
     const textLines = [
-      `Title: ${content.Title || content.title || ""}`,
-      `Type: ${content.Type || content.media_type || ""}`,
-      `Year: ${content.Year || content.year || ""}`,
-      `Plot: ${content.Plot || content.overview || content.synopsis || ""}`,
-      `Genre: ${content.Genre || (content.genre_strings ? content.genre_strings.join(", ") : "")}`,
-      `Director: ${content.Director || content.director || ""}`,
-      `Writer: ${content.Writer || content.writer || ""}`,
-      `Actors: ${content.Actors || content.actors || ""}`,
-      `Language: ${content.Language || content.language || ""}`,
-      `Country: ${content.Country || content.country || ""}`,
-      `Awards: ${content.Awards || content.awards || ""}`,
-      `Released: ${content.Released || content.release_date || ""}`,
-      `Runtime: ${content.Runtime || content.runtime || ""}`,
-      `Rated: ${content.Rated || content.content_rating || ""}`,
-      `IMDb Rating: ${content.imdbRating || (content.vote_average ? content.vote_average.toString() : "")}`,
+      `Title: ${content.title || ""}`,
+      `Type: ${content.media_type || ""}`,
+      `Year: ${content.release_date ? new Date(content.release_date).getFullYear() : content.year || ""}`,
+      `Plot: ${content.overview || content.synopsis || ""}`,
+      `Genre: ${
+        (content.genre_strings ? content.genre_strings.join(", ") : "") ||
+        (content.genres
+          ? content.genres.map((g: any) => g.name).join(", ")
+          : "")
+      }`,
+      `Director: ${
+        content.director ||
+        (content.crew
+          ? content.crew
+              .filter((c: any) => c.job === "Director")
+              .map((c: any) => c.name)
+              .join(", ")
+          : "")
+      }`,
+      `Writer: ${
+        content.writer ||
+        (content.crew
+          ? content.crew
+              .filter((c: any) => c.job === "Screenplay" || c.job === "Writer")
+              .map((c: any) => c.name)
+              .join(", ")
+          : "")
+      }`,
+      `Actors: ${
+        content.actors ||
+        (content.cast
+          ? content.cast
+              .slice(0, 10)
+              .map((c: any) => c.name)
+              .join(", ")
+          : "")
+      }`,
+      `Language: ${content.language || content.original_language || ""}`,
+      `Country: ${content.country || (content.production_countries ? content.production_countries.map((c: any) => c.name).join(", ") : "")}`,
+      `Released: ${content.release_date || ""}`,
+      `Runtime: ${content.runtime || ""}`,
+      `Rated: ${content.content_rating || ""}`,
+      `Rating: ${content.vote_average ? content.vote_average.toString() : ""}`,
+      `Popularity: ${content.popularity ? content.popularity.toString() : ""}`,
+      `Streaming On: ${content.streaming_providers ? Object.keys(content.streaming_providers).join(", ") : ""}`,
+      `TMDB ID: ${content.tmdb_id || ""}`,
+      `IMDB ID: ${content.imdb_id || ""}`,
     ].filter((line) => {
       const parts = line.split(": ");
       return parts.length > 1 && parts[1] !== "" && parts[1] !== "N/A";
@@ -104,7 +167,7 @@ export async function addContentToVectorDb(
 
     // Create vector record - using Pinecone's built-in embeddings
     const vector = {
-      id: content.imdb_id, // Always use IMDB ID as the primary key
+      id: contentId, // Use TMDB ID if available, otherwise use IMDB ID
       metadata,
       text: textLines.join("\n"),
     };
@@ -174,53 +237,120 @@ export async function batchAddContentToVectorDb(
 
       // Generate vectors for each item in the batch
       for (const content of batch) {
+        // Use TMDB ID if available, otherwise use IMDB ID
+        const contentId = content.tmdb_id
+          ? `tmdb-${content.media_type === "movie" ? "movie" : "tv"}-${content.tmdb_id}`
+          : content.imdbID || content.imdb_id || uuidv4();
+
         // Create metadata
         const metadata = {
-          title: content.Title || content.title,
-          year: content.Year || content.year,
-          type: content.Type || content.media_type,
-          imdbID: content.imdbID || content.imdb_id,
-          plot: content.Plot || content.overview || content.synopsis,
+          title: content.title || "",
+          year: content.release_date
+            ? new Date(content.release_date).getFullYear().toString()
+            : content.year || "",
+          type: content.media_type || "",
+          imdbID: content.imdb_id || "",
+          tmdbID: content.tmdb_id ? content.tmdb_id.toString() : "",
+          plot: content.overview || content.synopsis || "",
           genre:
-            content.Genre ||
-            (content.genre_strings ? content.genre_strings.join(", ") : ""),
-          director: content.Director || content.director,
-          actors: content.Actors || content.actors,
-          language: content.Language || content.language,
-          country: content.Country || content.country,
-          poster: content.Poster || content.poster_path,
-          rated: content.Rated || content.content_rating,
-          runtime: content.Runtime || content.runtime,
-          imdbRating: content.imdbRating || content.vote_average,
-          imdbVotes: content.imdbVotes || content.vote_count,
+            (content.genre_strings ? content.genre_strings.join(", ") : "") ||
+            (content.genres
+              ? content.genres.map((g: any) => g.name).join(", ")
+              : ""),
+          director:
+            content.director ||
+            (content.crew
+              ? content.crew
+                  .filter((c: any) => c.job === "Director")
+                  .map((c: any) => c.name)
+                  .join(", ")
+              : ""),
+          actors:
+            content.actors ||
+            (content.cast
+              ? content.cast
+                  .slice(0, 10)
+                  .map((c: any) => c.name)
+                  .join(", ")
+              : ""),
+          language: content.language || content.original_language || "",
+          country:
+            content.country ||
+            (content.production_countries
+              ? content.production_countries.map((c: any) => c.name).join(", ")
+              : ""),
+          poster: content.poster_path || "",
+          rated: content.content_rating || "",
+          runtime: content.runtime ? content.runtime.toString() : "",
+          rating: content.vote_average ? content.vote_average.toString() : "",
+          votes: content.vote_count ? content.vote_count.toString() : "",
+          popularity: content.popularity ? content.popularity.toString() : "",
+          streamingProviders: content.streaming_providers
+            ? Object.keys(content.streaming_providers).join(", ")
+            : "",
         };
 
         // Create text for integrated embedding
         const text = [
-          `Title: ${content.Title || content.title || ""}`,
-          `Type: ${content.Type || content.media_type || ""}`,
-          `Year: ${content.Year || content.year || ""}`,
-          `Plot: ${content.Plot || content.overview || content.synopsis || ""}`,
-          `Genre: ${content.Genre || (content.genre_strings ? content.genre_strings.join(", ") : "")}`,
-          `Director: ${content.Director || content.director || ""}`,
-          `Writer: ${content.Writer || content.writer || ""}`,
-          `Actors: ${content.Actors || content.actors || ""}`,
-          `Language: ${content.Language || content.language || ""}`,
-          `Country: ${content.Country || content.country || ""}`,
-          `Awards: ${content.Awards || content.awards || ""}`,
-          `Released: ${content.Released || content.release_date || ""}`,
-          `Runtime: ${content.Runtime || content.runtime || ""}`,
-          `Rated: ${content.Rated || content.content_rating || ""}`,
-          `IMDb Rating: ${content.imdbRating || (content.vote_average ? content.vote_average.toString() : "")}`,
-          `Metascore: ${content.Metascore || content.metascore || ""}`,
-          `Total Seasons: ${content.totalSeasons || ""}`,
+          `Title: ${content.title || ""}`,
+          `Type: ${content.media_type || ""}`,
+          `Year: ${content.release_date ? new Date(content.release_date).getFullYear() : content.year || ""}`,
+          `Plot: ${content.overview || content.synopsis || ""}`,
+          `Genre: ${
+            (content.genre_strings ? content.genre_strings.join(", ") : "") ||
+            (content.genres
+              ? content.genres.map((g: any) => g.name).join(", ")
+              : "")
+          }`,
+          `Director: ${
+            content.director ||
+            (content.crew
+              ? content.crew
+                  .filter((c: any) => c.job === "Director")
+                  .map((c: any) => c.name)
+                  .join(", ")
+              : "")
+          }`,
+          `Writer: ${
+            content.writer ||
+            (content.crew
+              ? content.crew
+                  .filter(
+                    (c: any) => c.job === "Screenplay" || c.job === "Writer",
+                  )
+                  .map((c: any) => c.name)
+                  .join(", ")
+              : "")
+          }`,
+          `Actors: ${
+            content.actors ||
+            (content.cast
+              ? content.cast
+                  .slice(0, 10)
+                  .map((c: any) => c.name)
+                  .join(", ")
+              : "")
+          }`,
+          `Language: ${content.language || content.original_language || ""}`,
+          `Country: ${content.country || (content.production_countries ? content.production_countries.map((c: any) => c.name).join(", ") : "")}`,
+          `Released: ${content.release_date || ""}`,
+          `Runtime: ${content.runtime || ""}`,
+          `Rated: ${content.content_rating || ""}`,
+          `Rating: ${content.vote_average ? content.vote_average.toString() : ""}`,
+          `Popularity: ${content.popularity ? content.popularity.toString() : ""}`,
+          `Streaming On: ${content.streaming_providers ? Object.keys(content.streaming_providers).join(", ") : ""}`,
+          `TMDB ID: ${content.tmdb_id || ""}`,
+          `IMDB ID: ${content.imdb_id || ""}`,
         ]
-          .filter((line) => !line.endsWith(": "))
+          .filter((line) => {
+            const parts = line.split(": ");
+            return parts.length > 1 && parts[1] !== "" && parts[1] !== "N/A";
+          })
           .join("\n");
 
         // Create vector
         vectors.push({
-          id: content.imdbID || content.imdb_id || uuidv4(),
+          id: contentId,
           metadata,
           text,
         });
@@ -328,17 +458,45 @@ export async function searchSimilarContent(
   try {
     // Create text representation for the content item
     const text = [
-      `Title: ${contentItem.title || contentItem.Title || ""}`,
-      `Type: ${contentItem.media_type || contentItem.Type || ""}`,
-      `Year: ${contentItem.year || contentItem.Year || ""}`,
-      `Plot: ${contentItem.overview || contentItem.Plot || contentItem.synopsis || ""}`,
-      `Genre: ${contentItem.genre_strings ? contentItem.genre_strings.join(", ") : contentItem.Genre || ""}`,
-      `Director: ${contentItem.director || contentItem.Director || ""}`,
-      `Actors: ${contentItem.actors || contentItem.Actors || ""}`,
-      `Language: ${contentItem.language || contentItem.Language || ""}`,
-      `Country: ${contentItem.country || contentItem.Country || ""}`,
+      `Title: ${contentItem.title || ""}`,
+      `Type: ${contentItem.media_type || ""}`,
+      `Year: ${contentItem.release_date ? new Date(contentItem.release_date).getFullYear() : contentItem.year || ""}`,
+      `Plot: ${contentItem.overview || contentItem.synopsis || ""}`,
+      `Genre: ${
+        (contentItem.genre_strings
+          ? contentItem.genre_strings.join(", ")
+          : "") ||
+        (contentItem.genres
+          ? contentItem.genres.map((g: any) => g.name).join(", ")
+          : "")
+      }`,
+      `Director: ${
+        contentItem.director ||
+        (contentItem.crew
+          ? contentItem.crew
+              .filter((c: any) => c.job === "Director")
+              .map((c: any) => c.name)
+              .join(", ")
+          : "")
+      }`,
+      `Actors: ${
+        contentItem.actors ||
+        (contentItem.cast
+          ? contentItem.cast
+              .slice(0, 10)
+              .map((c: any) => c.name)
+              .join(", ")
+          : "")
+      }`,
+      `Language: ${contentItem.language || contentItem.original_language || ""}`,
+      `Country: ${contentItem.country || (contentItem.production_countries ? contentItem.production_countries.map((c: any) => c.name).join(", ") : "")}`,
+      `TMDB ID: ${contentItem.tmdb_id || ""}`,
+      `IMDB ID: ${contentItem.imdb_id || ""}`,
     ]
-      .filter((line) => !line.endsWith(": "))
+      .filter((line) => {
+        const parts = line.split(": ");
+        return parts.length > 1 && parts[1] !== "" && parts[1] !== "N/A";
+      })
       .join("\n");
 
     // Query Pinecone using integrated embeddings

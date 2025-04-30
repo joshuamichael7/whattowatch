@@ -525,9 +525,10 @@ function formatOMDBData(data: any): ContentItem {
     country: data.Country !== "N/A" ? data.Country : "",
     awards: data.Awards !== "N/A" ? data.Awards : "",
     metascore: data.Metascore !== "N/A" ? data.Metascore : "",
-    // production: data.Production !== "N/A" ? data.Production : "", // Removed as this column doesn't exist in Supabase
-    website: data.Website !== "N/A" ? data.Website : "",
-    // BoxOffice field is not in the database schema, so we don't include it
+    // Fields below are from OMDB API but don't exist in our Supabase schema
+    // production: data.Production !== "N/A" ? data.Production : "",
+    // website: data.Website !== "N/A" ? data.Website : "",
+    // boxOffice: data.BoxOffice !== "N/A" ? data.BoxOffice : "",
     imdb_rating: data.imdbRating !== "N/A" ? data.imdbRating : "",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),

@@ -36,6 +36,12 @@ import {
   ImportProgress,
   processBatch,
 } from "@/services/dataImportService";
+import {
+  defaultTmdbImportProgress,
+  TmdbImportProgress,
+  importTmdbData,
+  parseTmdbJsonList,
+} from "@/services/tmdbImportService";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
@@ -45,8 +51,17 @@ import {
 } from "@/components/ui/tooltip";
 
 const AutomatedImporter: React.FC = () => {
+  // Import mode toggle between OMDB and TMDB
+  const [dataSource, setDataSource] = useState<"omdb" | "tmdb">("omdb");
+
+  // OMDB import progress state
   const [progress, setProgress] = useState<ImportProgress>(
     defaultImportProgress,
+  );
+
+  // TMDB import progress state
+  const [tmdbProgress, setTmdbProgress] = useState<TmdbImportProgress>(
+    defaultTmdbImportProgress,
   );
   const [startId, setStartId] = useState<string>("tt0000001");
   const [endId, setEndId] = useState<string>("tt0010000");
@@ -56,6 +71,8 @@ const AutomatedImporter: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("overview");
   const [prioritizePopular, setPrioritizePopular] = useState<boolean>(false);
   const [importMode, setImportMode] = useState<"range" | "list">("range");
+  const [tmdbJsonData, setTmdbJsonData] = useState<string>("");
+  const [clearExistingData, setClearExistingData] = useState<boolean>(false);
   const [imdbIdList, setImdbIdList] = useState<string>("");
   const [invalidIds, setInvalidIds] = useState<string[]>([]);
   const [errorDetails, setErrorDetails] = useState<{ [key: string]: string[] }>(
@@ -67,29 +84,155 @@ const AutomatedImporter: React.FC = () => {
   const shouldContinueRef = useRef<boolean>(true);
   const startTimeRef = useRef<Date | null>(null);
 
-  // Track errors by category
-  const trackError = (imdbId: string, errorMessage: string) => {
+  // Track errors by category with additional context
+  const trackError = (
+    id: string,
+    errorMessage: string,
+    additionalContext: string = "",
+  ) => {
     setErrorDetails((prev) => {
       const category = categorizeError(errorMessage);
+      const errorEntry = additionalContext
+        ? `${id} (${additionalContext})`
+        : id;
+
+      // Limit the number of errors per category to prevent UI overload
+      const existingErrors = prev[category] || [];
+      const maxErrorsPerCategory = 100;
+
+      // If we already have too many errors of this type, only add if it's a new pattern
+      if (existingErrors.length >= maxErrorsPerCategory) {
+        // Only add if this seems like a new pattern (simple heuristic)
+        const shouldAdd = existingErrors.every(
+          (entry) => !entry.startsWith(id.substring(0, 4)), // Check if we already have errors with similar ID prefix
+        );
+
+        if (!shouldAdd) return prev;
+
+        // Remove oldest error to make room
+        const updatedErrors = [...existingErrors.slice(1), errorEntry];
+        return {
+          ...prev,
+          [category]: updatedErrors,
+        };
+      }
+
       return {
         ...prev,
-        [category]: [...(prev[category] || []), imdbId],
+        [category]: [...existingErrors, errorEntry],
       };
     });
   };
 
   // Categorize errors for better reporting
   const categorizeError = (errorMessage: string): string => {
-    if (errorMessage.includes("Content not found")) return "Not Found";
+    // Convert to lowercase for case-insensitive matching
+    const lowerCaseError = errorMessage.toLowerCase();
+
+    // Not Found errors
     if (
-      errorMessage.includes("API limit") ||
-      errorMessage.includes("rate limit")
+      lowerCaseError.includes("content not found") ||
+      lowerCaseError.includes("not found") ||
+      lowerCaseError.includes("404") ||
+      lowerCaseError.includes("no results") ||
+      lowerCaseError.includes("does not exist")
+    )
+      return "Not Found";
+
+    // API Limit errors
+    if (
+      lowerCaseError.includes("api limit") ||
+      lowerCaseError.includes("rate limit") ||
+      lowerCaseError.includes("too many requests") ||
+      lowerCaseError.includes("429") ||
+      lowerCaseError.includes("quota exceeded") ||
+      lowerCaseError.includes("throttled") ||
+      lowerCaseError.includes("limit reached")
     )
       return "API Limits";
-    if (errorMessage.includes("network") || errorMessage.includes("timeout"))
+
+    // Network errors
+    if (
+      lowerCaseError.includes("network") ||
+      lowerCaseError.includes("timeout") ||
+      lowerCaseError.includes("connection") ||
+      lowerCaseError.includes("econnrefused") ||
+      lowerCaseError.includes("etimedout") ||
+      lowerCaseError.includes("unreachable") ||
+      lowerCaseError.includes("dns") ||
+      lowerCaseError.includes("socket")
+    )
       return "Network Issues";
-    if (errorMessage.includes("vector") || errorMessage.includes("Pinecone"))
+
+    // Vector DB errors
+    if (
+      lowerCaseError.includes("vector") ||
+      lowerCaseError.includes("pinecone") ||
+      lowerCaseError.includes("database") ||
+      lowerCaseError.includes("index not found") ||
+      lowerCaseError.includes("upsert failed") ||
+      lowerCaseError.includes("embedding") ||
+      lowerCaseError.includes("dimension mismatch")
+    )
       return "Vector DB Issues";
+
+    // Data Format errors
+    if (
+      lowerCaseError.includes("parse") ||
+      lowerCaseError.includes("json") ||
+      lowerCaseError.includes("format") ||
+      lowerCaseError.includes("invalid") ||
+      lowerCaseError.includes("malformed") ||
+      lowerCaseError.includes("syntax") ||
+      lowerCaseError.includes("unexpected token")
+    )
+      return "Data Format Issues";
+
+    // Authentication errors
+    if (
+      lowerCaseError.includes("authentication") ||
+      lowerCaseError.includes("unauthorized") ||
+      lowerCaseError.includes("401") ||
+      lowerCaseError.includes("403") ||
+      lowerCaseError.includes("permission") ||
+      lowerCaseError.includes("forbidden") ||
+      lowerCaseError.includes("access denied") ||
+      lowerCaseError.includes("invalid key") ||
+      lowerCaseError.includes("invalid token")
+    )
+      return "Authentication Issues";
+
+    // Server errors
+    if (
+      lowerCaseError.includes("server") ||
+      lowerCaseError.includes("500") ||
+      lowerCaseError.includes("502") ||
+      lowerCaseError.includes("503") ||
+      lowerCaseError.includes("504") ||
+      lowerCaseError.includes("internal error") ||
+      lowerCaseError.includes("bad gateway") ||
+      lowerCaseError.includes("service unavailable")
+    )
+      return "Server Issues";
+
+    // Content-specific errors
+    if (
+      lowerCaseError.includes("adult content") ||
+      lowerCaseError.includes("content filter") ||
+      lowerCaseError.includes("restricted") ||
+      lowerCaseError.includes("mature content")
+    )
+      return "Content Restrictions";
+
+    // Duplicate errors
+    if (
+      lowerCaseError.includes("duplicate") ||
+      lowerCaseError.includes("already exists") ||
+      lowerCaseError.includes("conflict") ||
+      lowerCaseError.includes("409")
+    )
+      return "Duplicate Content";
+
     return "Other Errors";
   };
 
@@ -109,8 +252,22 @@ const AutomatedImporter: React.FC = () => {
   };
 
   const startImport = async () => {
-    if (progress.isRunning) return;
+    if (
+      (dataSource === "omdb" && progress.isRunning) ||
+      (dataSource === "tmdb" && tmdbProgress.isRunning)
+    )
+      return;
 
+    // Reset error tracking before starting a new import
+    setErrorDetails({});
+
+    // If TMDB is selected, use the TMDB import process
+    if (dataSource === "tmdb") {
+      await startTmdbImport();
+      return;
+    }
+
+    // OMDB import process
     if (importMode === "list") {
       // Validate the IMDB ID list
       const invalidIds = validateImdbIds(imdbIdList);
@@ -140,6 +297,7 @@ const AutomatedImporter: React.FC = () => {
       }));
 
       shouldContinueRef.current = true;
+      startTimeRef.current = new Date();
 
       try {
         // For now, only client-side processing for list mode
@@ -148,10 +306,60 @@ const AutomatedImporter: React.FC = () => {
           "", // startId not used in list mode
           idList.length,
           batchSize,
-          setProgress,
+          (updater) => {
+            setProgress((prev) => {
+              const updated = updater(prev);
+
+              // Calculate processing speed and ETA
+              if (startTimeRef.current && updated.processed > 0) {
+                const elapsedSeconds =
+                  (new Date().getTime() - startTimeRef.current.getTime()) /
+                  1000;
+                const speed = updated.processed / elapsedSeconds;
+                setProcessingSpeed(speed);
+
+                const remainingItems = batchCount - updated.processed;
+                if (speed > 0) {
+                  const remainingSeconds = remainingItems / speed;
+                  setEstimatedTimeRemaining(
+                    formatTimeRemaining(remainingSeconds),
+                  );
+                }
+              }
+
+              // Track errors for IMDB items
+              if (updated.logs && updated.logs.length > 0) {
+                const latestLog = updated.logs[updated.logs.length - 1];
+                if (
+                  latestLog.includes("Error") ||
+                  latestLog.includes("Failed")
+                ) {
+                  // Extract IMDB ID and error message from log
+                  const idMatch = latestLog.match(/IMDB ID: (tt\d+)/);
+                  const errorMatch =
+                    latestLog.match(/Error: (.+)/) ||
+                    latestLog.match(/Failed to add "(.+?)" to vector database/);
+
+                  if (idMatch && idMatch[1]) {
+                    const imdbId = idMatch[1];
+                    const errorMessage = errorMatch
+                      ? errorMatch[1]
+                      : "Unknown error";
+                    // Extract title if available
+                    const titleMatch = latestLog.match(
+                      /"([^"]+)" to vector database/,
+                    );
+                    const title = titleMatch ? titleMatch[1] : "";
+                    trackError(imdbId, errorMessage, title);
+                  }
+                }
+              }
+
+              return updated;
+            });
+          },
           () => shouldContinueRef.current,
           idList, // Pass the list of IDs
-          prioritizePopular,
         );
       } catch (error) {
         const errorMessage =
@@ -185,6 +393,7 @@ const AutomatedImporter: React.FC = () => {
       }));
 
       shouldContinueRef.current = true;
+      startTimeRef.current = new Date();
 
       try {
         if (useServerless) {
@@ -196,10 +405,62 @@ const AutomatedImporter: React.FC = () => {
             startId,
             batchCount,
             batchSize,
-            setProgress,
+            (updater) => {
+              setProgress((prev) => {
+                const updated = updater(prev);
+
+                // Calculate processing speed and ETA
+                if (startTimeRef.current && updated.processed > 0) {
+                  const elapsedSeconds =
+                    (new Date().getTime() - startTimeRef.current.getTime()) /
+                    1000;
+                  const speed = updated.processed / elapsedSeconds;
+                  setProcessingSpeed(speed);
+
+                  const remainingItems = batchCount - updated.processed;
+                  if (speed > 0) {
+                    const remainingSeconds = remainingItems / speed;
+                    setEstimatedTimeRemaining(
+                      formatTimeRemaining(remainingSeconds),
+                    );
+                  }
+                }
+
+                // Track errors for IMDB items
+                if (updated.logs && updated.logs.length > 0) {
+                  const latestLog = updated.logs[updated.logs.length - 1];
+                  if (
+                    latestLog.includes("Error") ||
+                    latestLog.includes("Failed")
+                  ) {
+                    // Extract IMDB ID and error message from log
+                    const idMatch = latestLog.match(/IMDB ID: (tt\d+)/);
+                    const errorMatch =
+                      latestLog.match(/Error: (.+)/) ||
+                      latestLog.match(
+                        /Failed to add "(.+?)" to vector database/,
+                      );
+
+                    if (idMatch && idMatch[1]) {
+                      const imdbId = idMatch[1];
+                      const errorMessage = errorMatch
+                        ? errorMatch[1]
+                        : "Unknown error";
+                      // Extract title if available
+                      const titleMatch = latestLog.match(
+                        /"([^"]+)" to vector database/,
+                      );
+                      const title = titleMatch ? titleMatch[1] : "";
+                      trackError(imdbId, errorMessage, title);
+                    }
+                  }
+                }
+
+                return updated;
+              });
+            },
             () => shouldContinueRef.current,
             undefined,
-            prioritizePopular,
           );
         }
       } catch (error) {
@@ -273,70 +534,296 @@ const AutomatedImporter: React.FC = () => {
 
   const stopImport = () => {
     shouldContinueRef.current = false;
-    setProgress((prev) => ({
-      ...prev,
-      logs: [
-        ...prev.logs,
-        "Import process stopping... (will complete current batch)",
-      ],
-      lastUpdated: new Date(),
-    }));
+
+    if (dataSource === "omdb") {
+      setProgress((prev) => ({
+        ...prev,
+        logs: [
+          ...prev.logs,
+          "Import process stopping... (will complete current batch)",
+        ],
+        lastUpdated: new Date(),
+      }));
+    } else {
+      setTmdbProgress((prev) => ({
+        ...prev,
+        logs: [
+          ...prev.logs,
+          "TMDB import process stopping... (will complete current batch)",
+        ],
+        lastUpdated: new Date(),
+      }));
+    }
   };
 
   const resetImport = () => {
-    if (progress.isRunning) return;
-    setProgress(defaultImportProgress);
-    setInvalidIds([]);
+    if (
+      (dataSource === "omdb" && progress.isRunning) ||
+      (dataSource === "tmdb" && tmdbProgress.isRunning)
+    )
+      return;
+
+    if (dataSource === "omdb") {
+      setProgress(defaultImportProgress);
+      setInvalidIds([]);
+    } else {
+      setTmdbProgress(defaultTmdbImportProgress);
+      setTmdbJsonData("");
+    }
   };
 
   const calculateProgressPercentage = (): number => {
-    if (!progress.processed) return 0;
-    return Math.min(100, (progress.processed / batchCount) * 100);
+    if (dataSource === "omdb") {
+      if (!progress.processed) return 0;
+      return Math.min(100, (progress.processed / batchCount) * 100);
+    } else {
+      if (!tmdbProgress.processed) return 0;
+      return Math.min(
+        100,
+        (tmdbProgress.processed / tmdbProgress.totalItems) * 100,
+      );
+    }
+  };
+
+  // Start TMDB import process
+  const startTmdbImport = async () => {
+    if (tmdbProgress.isRunning) return;
+
+    // Validate TMDB JSON data
+    const tmdbItems = parseTmdbJsonList(tmdbJsonData);
+    if (tmdbItems.length === 0) {
+      setTmdbProgress((prev) => ({
+        ...prev,
+        logs: [
+          ...prev.logs,
+          "Error: No valid TMDB items found in the provided JSON",
+        ],
+        lastUpdated: new Date(),
+      }));
+      return;
+    }
+
+    // Reset progress and start import
+    setTmdbProgress((prev) => ({
+      ...defaultTmdbImportProgress,
+      isRunning: true,
+      totalItems: tmdbItems.length,
+      logs: [
+        `Starting import of ${tmdbItems.length} TMDB items with batch size ${batchSize}`,
+      ],
+      lastUpdated: new Date(),
+    }));
+
+    shouldContinueRef.current = true;
+    startTimeRef.current = new Date();
+
+    try {
+      await importTmdbData(
+        tmdbJsonData,
+        batchSize,
+        (updater) => {
+          setTmdbProgress((prev) => {
+            const updated = updater(prev);
+
+            // Calculate processing speed and ETA
+            if (startTimeRef.current && updated.processed > 0) {
+              const elapsedSeconds =
+                (new Date().getTime() - startTimeRef.current.getTime()) / 1000;
+              const speed = updated.processed / elapsedSeconds;
+              setProcessingSpeed(speed);
+
+              const remainingItems = updated.totalItems - updated.processed;
+              if (speed > 0) {
+                const remainingSeconds = remainingItems / speed;
+                setEstimatedTimeRemaining(
+                  formatTimeRemaining(remainingSeconds),
+                );
+              }
+            }
+
+            // Track errors for TMDB items
+            if (updated.logs && updated.logs.length > 0) {
+              const latestLog = updated.logs[updated.logs.length - 1];
+              if (latestLog.includes("Error") || latestLog.includes("Failed")) {
+                // Extract TMDB ID and error message from log
+                const idMatch = latestLog.match(/TMDB ID: (\d+)/);
+                const errorMatch =
+                  latestLog.match(/Error: (.+)/) ||
+                  latestLog.match(/Failed to add "(.+?)" to vector database/);
+
+                if (idMatch && idMatch[1]) {
+                  const tmdbId = idMatch[1];
+                  const errorMessage = errorMatch
+                    ? errorMatch[1]
+                    : "Unknown error";
+                  // Extract title if available
+                  const titleMatch = latestLog.match(
+                    /"([^"]+)" to vector database/,
+                  );
+                  const title = titleMatch ? titleMatch[1] : "";
+                  trackError(tmdbId, errorMessage, title);
+                }
+              }
+            }
+
+            return updated;
+          });
+        },
+        () => shouldContinueRef.current,
+        clearExistingData,
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      setTmdbProgress((prev) => ({
+        ...prev,
+        isRunning: false,
+        logs: [...prev.logs, `Error: ${errorMessage}`],
+        lastUpdated: new Date(),
+      }));
+    } finally {
+      setTmdbProgress((prev) => ({
+        ...prev,
+        isRunning: false,
+        lastUpdated: new Date(),
+      }));
+    }
+  };
+
+  // Format time remaining in a human-readable format
+  const formatTimeRemaining = (seconds: number): string => {
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    if (seconds < 3600)
+      return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
   };
 
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="text-xl font-bold">
-          Automated OMDB to Pinecone Importer
+          Automated Content Importer
         </CardTitle>
         <CardDescription>
-          Automatically import content from OMDB to Pinecone by IMDB ID range or
-          list
+          Import content from OMDB or TMDB to Pinecone database
         </CardDescription>
-      </CardHeader>
 
-      <CardContent className="space-y-4">
-        {/* Import Mode Selection */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Import Mode</label>
+        {/* Data Source Toggle */}
+        <div className="mt-4 space-y-2">
+          <label className="text-sm font-medium">Data Source</label>
           <div className="flex space-x-4">
             <div className="flex items-center space-x-2">
               <input
                 type="radio"
-                id="range-mode"
-                name="import-mode"
-                checked={importMode === "range"}
-                onChange={() => setImportMode("range")}
-                disabled={progress.isRunning}
+                id="omdb-source"
+                name="data-source"
+                checked={dataSource === "omdb"}
+                onChange={() => setDataSource("omdb")}
+                disabled={progress.isRunning || tmdbProgress.isRunning}
                 className="h-4 w-4"
               />
-              <Label htmlFor="range-mode">ID Range</Label>
+              <Label htmlFor="omdb-source">OMDB (IMDb IDs)</Label>
             </div>
             <div className="flex items-center space-x-2">
               <input
                 type="radio"
-                id="list-mode"
-                name="import-mode"
-                checked={importMode === "list"}
-                onChange={() => setImportMode("list")}
-                disabled={progress.isRunning}
+                id="tmdb-source"
+                name="data-source"
+                checked={dataSource === "tmdb"}
+                onChange={() => setDataSource("tmdb")}
+                disabled={progress.isRunning || tmdbProgress.isRunning}
                 className="h-4 w-4"
               />
-              <Label htmlFor="list-mode">ID List</Label>
+              <Label htmlFor="tmdb-source">TMDB (JSON List)</Label>
             </div>
           </div>
         </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {dataSource === "omdb" ? (
+          /* OMDB Import Options */
+          <>
+            {/* Import Mode Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Import Mode</label>
+              <div className="flex space-x-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="range-mode"
+                    name="import-mode"
+                    checked={importMode === "range"}
+                    onChange={() => setImportMode("range")}
+                    disabled={progress.isRunning}
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="range-mode">ID Range</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="list-mode"
+                    name="import-mode"
+                    checked={importMode === "list"}
+                    onChange={() => setImportMode("list")}
+                    disabled={progress.isRunning}
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="list-mode">ID List</Label>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          /* TMDB Import Options */
+          <>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">TMDB JSON Data</label>
+              <div className="space-y-1">
+                <textarea
+                  value={tmdbJsonData}
+                  onChange={(e) => setTmdbJsonData(e.target.value)}
+                  disabled={tmdbProgress.isRunning}
+                  placeholder={
+                    'Enter TMDB JSON data, one object per line:\n{"id": 550, "original_title": "Fight Club", "adult": false, "popularity": 0.5, "video": false}\n{"id": 551, "original_title": "Another Movie", "adult": false, "popularity": 0.4, "video": false}'
+                  }
+                  className="w-full h-32 p-2 border rounded-md font-mono text-sm text-black dark:text-white bg-white dark:bg-gray-800"
+                  style={{ color: "inherit" }}
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>
+                    {parseTmdbJsonList(tmdbJsonData).length} valid items
+                  </span>
+                  <button
+                    onClick={() => setTmdbJsonData("")}
+                    className="text-blue-500 hover:underline"
+                    disabled={tmdbProgress.isRunning || !tmdbJsonData}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              {/* Clear Existing Data Option */}
+              <div className="flex items-center space-x-2 mt-4">
+                <Switch
+                  id="clear-existing-data"
+                  checked={clearExistingData}
+                  onCheckedChange={setClearExistingData}
+                  disabled={tmdbProgress.isRunning}
+                />
+                <Label
+                  htmlFor="clear-existing-data"
+                  className="flex items-center gap-2"
+                >
+                  <Server className="h-4 w-4" />
+                  Clear existing vector database before import
+                </Label>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Configuration */}
         {importMode === "range" ? (
@@ -500,15 +987,24 @@ const AutomatedImporter: React.FC = () => {
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Progress</span>
             <span className="text-sm text-muted-foreground">
-              {progress.processed} / {batchCount} (
-              {calculateProgressPercentage().toFixed(1)}%)
+              {dataSource === "omdb" ? (
+                <>
+                  {progress.processed} / {batchCount} (
+                  {calculateProgressPercentage().toFixed(1)}%)
+                </>
+              ) : (
+                <>
+                  {tmdbProgress.processed} / {tmdbProgress.totalItems} (
+                  {calculateProgressPercentage().toFixed(1)}%)
+                </>
+              )}
             </span>
           </div>
           <Progress value={calculateProgressPercentage()} className="h-2" />
         </div>
 
         {/* Processing Speed and ETA */}
-        {progress.isRunning && (
+        {(progress.isRunning || tmdbProgress.isRunning) && (
           <div className="flex justify-between items-center text-sm">
             <div>
               <span className="font-medium">Speed:</span>{" "}
@@ -534,24 +1030,34 @@ const AutomatedImporter: React.FC = () => {
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               <div className="bg-muted rounded-md p-2 text-center">
-                <div className="text-2xl font-bold">{progress.processed}</div>
+                <div className="text-2xl font-bold">
+                  {dataSource === "omdb"
+                    ? progress.processed
+                    : tmdbProgress.processed}
+                </div>
                 <div className="text-xs text-muted-foreground">Processed</div>
               </div>
               <div className="bg-muted rounded-md p-2 text-center">
                 <div className="text-2xl font-bold text-green-500">
-                  {progress.successful}
+                  {dataSource === "omdb"
+                    ? progress.successful
+                    : tmdbProgress.successful}
                 </div>
                 <div className="text-xs text-muted-foreground">Successful</div>
               </div>
               <div className="bg-muted rounded-md p-2 text-center">
                 <div className="text-2xl font-bold text-red-500">
-                  {progress.failed}
+                  {dataSource === "omdb"
+                    ? progress.failed
+                    : tmdbProgress.failed}
                 </div>
                 <div className="text-xs text-muted-foreground">Failed</div>
               </div>
               <div className="bg-muted rounded-md p-2 text-center">
                 <div className="text-2xl font-bold text-yellow-500">
-                  {progress.skipped}
+                  {dataSource === "omdb"
+                    ? progress.skipped
+                    : tmdbProgress.skipped}
                 </div>
                 <div className="text-xs text-muted-foreground">Skipped</div>
               </div>
@@ -559,35 +1065,104 @@ const AutomatedImporter: React.FC = () => {
 
             {/* Current Status */}
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Current ID:</span>
-              <Badge variant="outline">{progress.currentId || startId}</Badge>
+              {dataSource === "omdb" ? (
+                <>
+                  <span className="text-sm font-medium">Current ID:</span>
+                  <Badge variant="outline">
+                    {progress.currentId || startId}
+                  </Badge>
+                </>
+              ) : (
+                <>
+                  <span className="text-sm font-medium">Progress:</span>
+                  <Badge variant="outline">
+                    {tmdbProgress.currentIndex} / {tmdbProgress.totalItems}
+                  </Badge>
+                </>
+              )}
               <span className="text-sm font-medium ml-4">Status:</span>
-              {progress.isRunning ? (
+              {dataSource === "omdb" ? (
+                progress.isRunning ? (
+                  <Badge className="bg-blue-500">Running</Badge>
+                ) : progress.processed > 0 ? (
+                  <Badge className="bg-green-500">Completed</Badge>
+                ) : (
+                  <Badge variant="outline">Ready</Badge>
+                )
+              ) : tmdbProgress.isRunning ? (
                 <Badge className="bg-blue-500">Running</Badge>
-              ) : progress.processed > 0 ? (
+              ) : tmdbProgress.processed > 0 ? (
                 <Badge className="bg-green-500">Completed</Badge>
               ) : (
                 <Badge variant="outline">Ready</Badge>
               )}
             </div>
 
+            {/* Error Summary */}
+            {Object.keys(errorDetails).length > 0 && (
+              <div className="mt-4">
+                <h3 className="text-sm font-medium mb-2">Error Summary</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {Object.entries(errorDetails).map(([category, ids]) => (
+                    <div
+                      key={category}
+                      className="flex items-center justify-between bg-muted rounded-md p-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        {category === "Not Found" ? (
+                          <XCircle className="h-4 w-4 text-yellow-500" />
+                        ) : category === "API Limits" ? (
+                          <Clock className="h-4 w-4 text-orange-500" />
+                        ) : category === "Network Issues" ? (
+                          <Cloud className="h-4 w-4 text-blue-500" />
+                        ) : category === "Vector DB Issues" ? (
+                          <Server className="h-4 w-4 text-purple-500" />
+                        ) : category === "Authentication Issues" ? (
+                          <AlertCircle className="h-4 w-4 text-red-500" />
+                        ) : (
+                          <Info className="h-4 w-4 text-gray-500" />
+                        )}
+                        <span className="text-xs">{category}</span>
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        {ids.length}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Success Rate */}
-            {progress.processed > 0 && (
+            {(dataSource === "omdb"
+              ? progress.processed
+              : tmdbProgress.processed) > 0 && (
               <div className="mt-4">
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-sm font-medium">Success Rate</span>
                   <span className="text-sm">
-                    {((progress.successful / progress.processed) * 100).toFixed(
-                      1,
-                    )}
+                    {dataSource === "omdb"
+                      ? (
+                          (progress.successful / progress.processed) *
+                          100
+                        ).toFixed(1)
+                      : (
+                          (tmdbProgress.successful / tmdbProgress.processed) *
+                          100
+                        ).toFixed(1)}
                     %
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
                   <div
                     className="bg-green-500 h-2.5 rounded-full"
                     style={{
-                      width: `${(progress.successful / progress.processed) * 100}%`,
+                      width: `${
+                        dataSource === "omdb"
+                          ? (progress.successful / progress.processed) * 100
+                          : (tmdbProgress.successful / tmdbProgress.processed) *
+                            100
+                      }%`,
                     }}
                   ></div>
                 </div>
@@ -603,7 +1178,23 @@ const AutomatedImporter: React.FC = () => {
                   <div key={category} className="border rounded-md p-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <XCircle className="h-4 w-4 text-red-500" />
+                        {category === "Not Found" ? (
+                          <XCircle className="h-4 w-4 text-yellow-500" />
+                        ) : category === "API Limits" ? (
+                          <Clock className="h-4 w-4 text-orange-500" />
+                        ) : category === "Network Issues" ? (
+                          <Cloud className="h-4 w-4 text-blue-500" />
+                        ) : category === "Vector DB Issues" ? (
+                          <Server className="h-4 w-4 text-purple-500" />
+                        ) : category === "Authentication Issues" ? (
+                          <AlertCircle className="h-4 w-4 text-red-500" />
+                        ) : category === "Server Issues" ? (
+                          <AlertCircle className="h-4 w-4 text-red-500" />
+                        ) : category === "Data Format Issues" ? (
+                          <AlertCircle className="h-4 w-4 text-orange-500" />
+                        ) : (
+                          <Info className="h-4 w-4 text-gray-500" />
+                        )}
                         <h3 className="font-medium">{category}</h3>
                       </div>
                       <Badge variant="outline">{ids.length}</Badge>
@@ -613,14 +1204,15 @@ const AutomatedImporter: React.FC = () => {
                         <summary className="text-sm text-blue-500 cursor-pointer">
                           Show affected IDs
                         </summary>
-                        <div className="mt-2 text-sm grid grid-cols-3 gap-1">
+                        <div className="mt-2 text-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1">
                           {ids.map((id, idx) => (
-                            <code
+                            <div
                               key={idx}
-                              className="bg-gray-100 px-1 rounded"
+                              className="bg-gray-100 px-2 py-1 rounded dark:bg-gray-800 overflow-hidden text-ellipsis"
+                              title={id}
                             >
                               {id}
-                            </code>
+                            </div>
                           ))}
                         </div>
                       </details>
@@ -642,11 +1234,17 @@ const AutomatedImporter: React.FC = () => {
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">Logs</span>
                 <span className="text-xs text-muted-foreground">
-                  Last updated: {progress.lastUpdated.toLocaleTimeString()}
+                  Last updated:{" "}
+                  {dataSource === "omdb"
+                    ? progress.lastUpdated.toLocaleTimeString()
+                    : tmdbProgress.lastUpdated.toLocaleTimeString()}
                 </span>
               </div>
               <ScrollArea className="h-[300px] border rounded-md p-2">
-                {progress.logs.map((log, index) => (
+                {(dataSource === "omdb"
+                  ? progress.logs
+                  : tmdbProgress.logs
+                ).map((log, index) => (
                   <div key={index} className="py-1 text-sm">
                     {log.includes("Error") ? (
                       <div className="flex items-start gap-2">
@@ -658,7 +1256,7 @@ const AutomatedImporter: React.FC = () => {
                         <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
                         <span>{log}</span>
                       </div>
-                    ) : log.includes("skipping") ? (
+                    ) : log.includes("skipping") || log.includes("Skipped") ? (
                       <div className="flex items-start gap-2">
                         <SkipForward className="h-4 w-4 text-yellow-500 mt-0.5" />
                         <span>{log}</span>
@@ -682,7 +1280,7 @@ const AutomatedImporter: React.FC = () => {
           <Button
             variant="outline"
             onClick={resetImport}
-            disabled={progress.isRunning}
+            disabled={progress.isRunning || tmdbProgress.isRunning}
             className="mr-2"
           >
             <RotateCcw className="h-4 w-4 mr-2" />
@@ -690,7 +1288,9 @@ const AutomatedImporter: React.FC = () => {
           </Button>
         </div>
         <div>
-          {!progress.isRunning ? (
+          {!(dataSource === "omdb"
+            ? progress.isRunning
+            : tmdbProgress.isRunning) ? (
             <Button
               onClick={startImport}
               className="bg-green-600 hover:bg-green-700"
