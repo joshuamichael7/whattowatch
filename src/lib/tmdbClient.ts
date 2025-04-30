@@ -8,14 +8,14 @@ import {
 // Base URL for TMDB API
 const TMDB_API_BASE_URL = "https://api.themoviedb.org/3";
 
-// Get API key from environment variables
-const getApiKey = (): string => {
-  const apiKey = import.meta.env.VITE_TMDB_API_KEY;
-  if (!apiKey) {
-    console.error("TMDB API key not found in environment variables");
+// Get TMDB access token from environment variables
+const getAccessToken = (): string => {
+  const accessToken = process.env.TMDB_ACCESS_TOKEN;
+  if (!accessToken) {
+    console.error("TMDB access token not found in environment variables");
     return "";
   }
-  return apiKey;
+  return accessToken;
 };
 
 // Rate limiting implementation
@@ -81,16 +81,17 @@ async function makeApiCall<T>(
   return new Promise((resolve, reject) => {
     rateLimiter.enqueue(async () => {
       try {
-        const apiKey = getApiKey();
-        if (!apiKey) {
-          reject(new Error("TMDB API key not found"));
+        const accessToken = getAccessToken();
+        if (!accessToken) {
+          reject(new Error("TMDB access token not found"));
           return;
         }
 
         const response = await axios.get(`${TMDB_API_BASE_URL}${endpoint}`, {
-          params: { ...params, api_key: apiKey },
+          params: { ...params },
           headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
           },
         });
 
