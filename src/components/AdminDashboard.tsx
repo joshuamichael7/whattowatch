@@ -243,6 +243,19 @@ const AdminDashboard: React.FC = () => {
               </div>
             </TabsContent>
 
+            <TabsContent value="automated" className="space-y-4">
+              <h3 className="text-lg font-medium">
+                Automated OMDB to Pinecone Import
+              </h3>
+              <p className="text-muted-foreground">
+                Automatically import content from OMDB to Pinecone by IMDB ID
+                range.
+              </p>
+              <div className="mt-6">
+                <AutomatedImporter />
+              </div>
+            </TabsContent>
+
             <TabsContent value="settings" className="space-y-4">
               <h3 className="text-lg font-medium">Security Settings</h3>
               <p className="text-muted-foreground">

@@ -48,6 +48,38 @@ async function getPineconeIndex() {
 }
 
 // Handler for Netlify function
+/**
+ * Check if a vector exists in Pinecone by ID
+ * @param {string} id The vector ID to check
+ * @returns {Promise<boolean>} Whether the vector exists
+ */
+async function checkVectorExists(id) {
+  const index = await getPineconeIndex();
+  if (!index) return false;
+
+  try {
+    console.log(`Checking if vector with ID ${id} exists in Pinecone`);
+
+    // Define the namespace for content
+    const namespace = "content";
+
+    // Use the namespace-specific fetch method
+    const fetchResponse = await index.namespace(namespace).fetch([id]);
+
+    // Check if the vector was found
+    const exists =
+      fetchResponse.vectors && Object.keys(fetchResponse.vectors).length > 0;
+    console.log(
+      `Vector ${id} ${exists ? "exists" : "does not exist"} in Pinecone`,
+    );
+
+    return exists;
+  } catch (error) {
+    console.error(`Error checking if vector ${id} exists:`, error);
+    return false;
+  }
+}
+
 exports.handler = async (event, context) => {
   // Set CORS headers
   const headers = {
