@@ -92,11 +92,34 @@ function transformTmdbMovieDetails(movie) {
   // Extract genre names
   const genreStrings = movie.genres?.map((genre) => genre.name) || [];
 
+  // Extract US content rating from release_dates
+  let contentRating = "";
+  if (movie.release_dates && movie.release_dates.results) {
+    const usReleaseInfo = movie.release_dates.results.find(
+      (country) => country.iso_3166_1 === "US",
+    );
+
+    if (
+      usReleaseInfo &&
+      usReleaseInfo.release_dates &&
+      usReleaseInfo.release_dates.length > 0
+    ) {
+      // Use the first certification found
+      const certification = usReleaseInfo.release_dates.find(
+        (date) => date.certification,
+      )?.certification;
+      if (certification) {
+        contentRating = certification;
+      }
+    }
+  }
+
   return {
     id: movie.id.toString(),
     tmdb_id: movie.id.toString(),
     imdb_id: movie.imdb_id,
     title: movie.title,
+    original_title: movie.original_title || movie.title,
     poster_path: movie.poster_path
       ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
       : "",
@@ -111,7 +134,7 @@ function transformTmdbMovieDetails(movie) {
     genre_strings: genreStrings,
     overview: movie.overview || "",
     runtime: movie.runtime || 0,
-    content_rating: "", // TMDB doesn't provide content rating directly
+    content_rating: contentRating,
     streaming_providers:
       Object.keys(streamingProviders).length > 0 ? streamingProviders : null,
     popularity: movie.popularity || 0,
@@ -156,11 +179,24 @@ function transformTmdbTvDetails(show) {
   // Extract genre names
   const genreStrings = show.genres?.map((genre) => genre.name) || [];
 
+  // Extract US content rating from content_ratings
+  let contentRating = "";
+  if (show.content_ratings && show.content_ratings.results) {
+    const usRatingInfo = show.content_ratings.results.find(
+      (country) => country.iso_3166_1 === "US",
+    );
+
+    if (usRatingInfo && usRatingInfo.rating) {
+      contentRating = usRatingInfo.rating;
+    }
+  }
+
   return {
     id: show.id.toString(),
     tmdb_id: show.id.toString(),
     imdb_id: show.external_ids?.imdb_id || "",
     title: show.name,
+    original_title: show.original_name || show.name,
     poster_path: show.poster_path
       ? `https://image.tmdb.org/t/p/w500${show.poster_path}`
       : "",
@@ -175,7 +211,7 @@ function transformTmdbTvDetails(show) {
     genre_strings: genreStrings,
     overview: show.overview || "",
     runtime: show.episode_run_time?.[0] || 0,
-    content_rating: "", // TMDB doesn't provide content rating directly
+    content_rating: contentRating,
     streaming_providers:
       Object.keys(streamingProviders).length > 0 ? streamingProviders : null,
     popularity: show.popularity || 0,
@@ -259,7 +295,7 @@ exports.handler = async (event, context) => {
         }
 
         const movieData = await makeApiCall(`/movie/${movieId}`, {
-          append_to_response: "credits,watch/providers",
+          append_to_response: "credits,watch/providers,release_dates",
           language: "en-US",
         });
 
@@ -277,7 +313,7 @@ exports.handler = async (event, context) => {
         }
 
         const tvData = await makeApiCall(`/tv/${tvId}`, {
-          append_to_response: "credits,watch/providers",
+          append_to_response: "credits,watch/providers,content_ratings",
           language: "en-US",
         });
 
