@@ -47,7 +47,41 @@ const AutomatedImporter: React.FC = () => {
   const [batchSize, setBatchSize] = useState<number>(10);
   const [batchCount, setBatchCount] = useState<number>(1000);
   const [useServerless, setUseServerless] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<string>("overview");
+  const [errorDetails, setErrorDetails] = useState<{ [key: string]: string[] }>(
+    {},
+  );
+  const [processingSpeed, setProcessingSpeed] = useState<number>(0);
+  const [estimatedTimeRemaining, setEstimatedTimeRemaining] =
+    useState<string>("");
   const shouldContinueRef = useRef<boolean>(true);
+  const startTimeRef = useRef<Date | null>(null);
+
+  // Track errors by category
+  const trackError = (imdbId: string, errorMessage: string) => {
+    setErrorDetails((prev) => {
+      const category = categorizeError(errorMessage);
+      return {
+        ...prev,
+        [category]: [...(prev[category] || []), imdbId],
+      };
+    });
+  };
+
+  // Categorize errors for better reporting
+  const categorizeError = (errorMessage: string): string => {
+    if (errorMessage.includes("Content not found")) return "Not Found";
+    if (
+      errorMessage.includes("API limit") ||
+      errorMessage.includes("rate limit")
+    )
+      return "API Limits";
+    if (errorMessage.includes("network") || errorMessage.includes("timeout"))
+      return "Network Issues";
+    if (errorMessage.includes("vector") || errorMessage.includes("Pinecone"))
+      return "Vector DB Issues";
+    return "Other Errors";
+  };
 
   const startImport = async () => {
     if (progress.isRunning) return;
