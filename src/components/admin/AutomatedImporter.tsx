@@ -420,13 +420,7 @@ const AutomatedImporter: React.FC = () => {
                 </div>
               )}
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>
-                  {
-                    imdbIdList.split(/\r?\n/).filter((id) => id.trim() !== "")
-                      .length
-                  }{" "}
-                  IDs
-                </span>
+                <span>{parseImdbIds(imdbIdList).length} valid IDs</span>
                 <button
                   onClick={() => setImdbIdList("")}
                   className="text-blue-500 hover:underline"
