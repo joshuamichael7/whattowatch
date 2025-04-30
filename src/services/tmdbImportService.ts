@@ -3,7 +3,7 @@ import {
   getTvShowById,
   searchMoviesByIds,
   searchTvShowsByIds,
-} from "@/lib/tmdbClient";
+} from "@/lib/tmdbClientProxy";
 import { addContentToVectorDb } from "@/services/vectorService";
 import { ContentItem } from "@/types/omdb";
 import { clearPineconeIndex } from "@/lib/pineconeClient";
