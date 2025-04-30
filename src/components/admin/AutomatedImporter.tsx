@@ -29,6 +29,7 @@ import {
   SkipForward,
   BarChart,
   Server,
+  TrendingUp,
 } from "lucide-react";
 import {
   defaultImportProgress,
@@ -53,6 +54,10 @@ const AutomatedImporter: React.FC = () => {
   const [batchCount, setBatchCount] = useState<number>(1000);
   const [useServerless, setUseServerless] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("overview");
+  const [prioritizePopular, setPrioritizePopular] = useState<boolean>(false);
+  const [importMode, setImportMode] = useState<"range" | "list">("range");
+  const [imdbIdList, setImdbIdList] = useState<string>("");
+  const [invalidIds, setInvalidIds] = useState<string[]>([]);
   const [errorDetails, setErrorDetails] = useState<{ [key: string]: string[] }>(
     {},
   );
@@ -88,53 +93,131 @@ const AutomatedImporter: React.FC = () => {
     return "Other Errors";
   };
 
+  // Validate IMDB IDs from the textarea input
+  const validateImdbIds = (idList: string): string[] => {
+    const ids = idList.split(/\r?\n/).filter((id) => id.trim() !== "");
+    const invalidIds = ids.filter((id) => !id.match(/^tt\d+$/));
+    return invalidIds;
+  };
+
+  // Parse valid IMDB IDs from the textarea input
+  const parseImdbIds = (idList: string): string[] => {
+    return idList
+      .split(/\r?\n/)
+      .map((id) => id.trim())
+      .filter((id) => id !== "" && id.match(/^tt\d+$/));
+  };
+
   const startImport = async () => {
     if (progress.isRunning) return;
 
-    // Reset progress
-    setProgress((prev) => ({
-      ...defaultImportProgress,
-      startId,
-      endId,
-      currentId: startId,
-      isRunning: true,
-      logs: [
-        `Starting import from ${startId} to ${endId} with batch size ${batchSize}`,
-      ],
-      lastUpdated: new Date(),
-    }));
+    if (importMode === "list") {
+      // Validate the IMDB ID list
+      const invalidIds = validateImdbIds(imdbIdList);
+      if (invalidIds.length > 0) {
+        setInvalidIds(invalidIds);
+        return;
+      }
 
-    shouldContinueRef.current = true;
+      const idList = parseImdbIds(imdbIdList);
+      if (idList.length === 0) {
+        setProgress((prev) => ({
+          ...prev,
+          logs: [...prev.logs, "Error: No valid IMDB IDs found in the list"],
+          lastUpdated: new Date(),
+        }));
+        return;
+      }
 
-    try {
-      if (useServerless) {
-        // Use the Netlify function for serverless processing
-        await startServerlessImport();
-      } else {
-        // Use the client-side processing
+      // Reset progress
+      setProgress((prev) => ({
+        ...defaultImportProgress,
+        isRunning: true,
+        logs: [
+          `Starting import of ${idList.length} IMDB IDs with batch size ${batchSize}`,
+        ],
+        lastUpdated: new Date(),
+      }));
+
+      shouldContinueRef.current = true;
+
+      try {
+        // For now, only client-side processing for list mode
+        // TODO: Add serverless support for list mode
         await processBatch(
-          startId,
-          batchCount,
+          "", // startId not used in list mode
+          idList.length,
           batchSize,
           setProgress,
           () => shouldContinueRef.current,
+          idList, // Pass the list of IDs
+          prioritizePopular,
         );
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        setProgress((prev) => ({
+          ...prev,
+          isRunning: false,
+          logs: [...prev.logs, `Error: ${errorMessage}`],
+          lastUpdated: new Date(),
+        }));
+      } finally {
+        setProgress((prev) => ({
+          ...prev,
+          isRunning: false,
+          lastUpdated: new Date(),
+        }));
       }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+    } else {
+      // Range mode - original implementation
+      // Reset progress
       setProgress((prev) => ({
-        ...prev,
-        isRunning: false,
-        logs: [...prev.logs, `Error: ${errorMessage}`],
+        ...defaultImportProgress,
+        startId,
+        endId,
+        currentId: startId,
+        isRunning: true,
+        logs: [
+          `Starting import from ${startId} to ${endId} with batch size ${batchSize}`,
+        ],
         lastUpdated: new Date(),
       }));
-    } finally {
-      setProgress((prev) => ({
-        ...prev,
-        isRunning: false,
-        lastUpdated: new Date(),
-      }));
+
+      shouldContinueRef.current = true;
+
+      try {
+        if (useServerless) {
+          // Use the Netlify function for serverless processing
+          await startServerlessImport();
+        } else {
+          // Use the client-side processing
+          await processBatch(
+            startId,
+            batchCount,
+            batchSize,
+            setProgress,
+            () => shouldContinueRef.current,
+            undefined,
+            prioritizePopular,
+          );
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        setProgress((prev) => ({
+          ...prev,
+          isRunning: false,
+          logs: [...prev.logs, `Error: ${errorMessage}`],
+          lastUpdated: new Date(),
+        }));
+      } finally {
+        setProgress((prev) => ({
+          ...prev,
+          isRunning: false,
+          lastUpdated: new Date(),
+        }));
+      }
     }
   };
 
@@ -203,6 +286,7 @@ const AutomatedImporter: React.FC = () => {
   const resetImport = () => {
     if (progress.isRunning) return;
     setProgress(defaultImportProgress);
+    setInvalidIds([]);
   };
 
   const calculateProgressPercentage = (): number => {
@@ -217,75 +301,202 @@ const AutomatedImporter: React.FC = () => {
           Automated OMDB to Pinecone Importer
         </CardTitle>
         <CardDescription>
-          Automatically import content from OMDB to Pinecone by IMDB ID range
+          Automatically import content from OMDB to Pinecone by IMDB ID range or
+          list
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Configuration */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Start IMDB ID</label>
-            <Input
-              value={startId}
-              onChange={(e) => setStartId(e.target.value)}
-              disabled={progress.isRunning}
-              placeholder="e.g. tt0000001"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              End IMDB ID (for reference)
-            </label>
-            <Input
-              value={endId}
-              onChange={(e) => setEndId(e.target.value)}
-              disabled={progress.isRunning}
-              placeholder="e.g. tt0010000"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Batch Size</label>
-            <Input
-              type="number"
-              value={batchSize}
-              onChange={(e) => setBatchSize(parseInt(e.target.value) || 10)}
-              disabled={progress.isRunning}
-              min={1}
-              max={50}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Number of IDs to Process
-            </label>
-            <Input
-              type="number"
-              value={batchCount}
-              onChange={(e) => setBatchCount(parseInt(e.target.value) || 1000)}
-              disabled={progress.isRunning}
-              min={1}
-              max={10000}
-            />
+        {/* Import Mode Selection */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Import Mode</label>
+          <div className="flex space-x-4">
+            <div className="flex items-center space-x-2">
+              <input
+                type="radio"
+                id="range-mode"
+                name="import-mode"
+                checked={importMode === "range"}
+                onChange={() => setImportMode("range")}
+                disabled={progress.isRunning}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="range-mode">ID Range</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="radio"
+                id="list-mode"
+                name="import-mode"
+                checked={importMode === "list"}
+                onChange={() => setImportMode("list")}
+                disabled={progress.isRunning}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="list-mode">ID List</Label>
+            </div>
           </div>
         </div>
 
-        {/* Processing Mode */}
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="serverless-mode"
-            checked={useServerless}
-            onCheckedChange={setUseServerless}
-            disabled={progress.isRunning}
-          />
-          <Label htmlFor="serverless-mode" className="flex items-center gap-2">
-            <Cloud className="h-4 w-4" />
-            Use serverless processing
-          </Label>
-          <div className="text-xs text-muted-foreground ml-2">
-            {useServerless
-              ? "Processing will run on the server (better for large batches)"
-              : "Processing will run in your browser (better for small batches)"}
+        {/* Configuration */}
+        {importMode === "range" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Start IMDB ID</label>
+              <Input
+                value={startId}
+                onChange={(e) => setStartId(e.target.value)}
+                disabled={progress.isRunning}
+                placeholder="e.g. tt0000001"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                End IMDB ID (for reference)
+              </label>
+              <Input
+                value={endId}
+                onChange={(e) => setEndId(e.target.value)}
+                disabled={progress.isRunning}
+                placeholder="e.g. tt0010000"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Batch Size</label>
+              <Input
+                type="number"
+                value={batchSize}
+                onChange={(e) => setBatchSize(parseInt(e.target.value) || 10)}
+                disabled={progress.isRunning}
+                min={1}
+                max={50}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Number of IDs to Process
+              </label>
+              <Input
+                type="number"
+                value={batchCount}
+                onChange={(e) =>
+                  setBatchCount(parseInt(e.target.value) || 1000)
+                }
+                disabled={progress.isRunning}
+                min={1}
+                max={10000}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <label className="text-sm font-medium">IMDB ID List</label>
+            <div className="space-y-1">
+              <textarea
+                value={imdbIdList}
+                onChange={(e) => {
+                  setImdbIdList(e.target.value);
+                  setInvalidIds([]);
+                }}
+                disabled={progress.isRunning}
+                placeholder="Enter IMDB IDs, one per line (e.g. tt0111161)\ntt0068646\ntt0071562\n..."
+                className="w-full h-32 p-2 border rounded-md font-mono text-sm"
+              />
+              {invalidIds.length > 0 && (
+                <div className="text-red-500 text-sm">
+                  <p>Invalid IMDB IDs detected:</p>
+                  <ul className="list-disc pl-5">
+                    {invalidIds.slice(0, 5).map((id, index) => (
+                      <li key={index}>{id}</li>
+                    ))}
+                    {invalidIds.length > 5 && (
+                      <li>...and {invalidIds.length - 5} more</li>
+                    )}
+                  </ul>
+                  <p>
+                    IMDB IDs must be in the format tt followed by numbers (e.g.
+                    tt0111161)
+                  </p>
+                </div>
+              )}
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>
+                  {
+                    imdbIdList.split(/\r?\n/).filter((id) => id.trim() !== "")
+                      .length
+                  }{" "}
+                  IDs
+                </span>
+                <button
+                  onClick={() => setImdbIdList("")}
+                  className="text-blue-500 hover:underline"
+                  disabled={progress.isRunning || !imdbIdList}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Batch Size</label>
+                <Input
+                  type="number"
+                  value={batchSize}
+                  onChange={(e) => setBatchSize(parseInt(e.target.value) || 10)}
+                  disabled={progress.isRunning}
+                  min={1}
+                  max={50}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Processing Options */}
+        <div className="space-y-4">
+          {/* Serverless Mode */}
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="serverless-mode"
+              checked={useServerless}
+              onCheckedChange={setUseServerless}
+              disabled={progress.isRunning || importMode === "list"}
+            />
+            <Label
+              htmlFor="serverless-mode"
+              className="flex items-center gap-2"
+            >
+              <Cloud className="h-4 w-4" />
+              Use serverless processing
+            </Label>
+            <div className="text-xs text-muted-foreground ml-2">
+              {importMode === "list"
+                ? "Serverless processing not available for ID List mode"
+                : useServerless
+                  ? "Processing will run on the server (better for large batches)"
+                  : "Processing will run in your browser (better for small batches)"}
+            </div>
+          </div>
+
+          {/* Prioritize Popular Content */}
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="prioritize-popular"
+              checked={prioritizePopular}
+              onCheckedChange={setPrioritizePopular}
+              disabled={progress.isRunning}
+            />
+            <Label
+              htmlFor="prioritize-popular"
+              className="flex items-center gap-2"
+            >
+              <TrendingUp className="h-4 w-4" />
+              Prioritize popular content
+            </Label>
+            <div className="text-xs text-muted-foreground ml-2">
+              Attempt to process more popular content first (based on IMDB ID
+              patterns)
+            </div>
           </div>
         </div>
 
@@ -294,8 +505,11 @@ const AutomatedImporter: React.FC = () => {
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Progress</span>
             <span className="text-sm text-muted-foreground">
-              {progress.processed} / {batchCount} (
-              {calculateProgressPercentage().toFixed(1)}%)
+              {progress.processed} /{" "}
+              {importMode === "list"
+                ? parseImdbIds(imdbIdList).length || 0
+                : batchCount}{" "}
+              ({calculateProgressPercentage().toFixed(1)}%)
             </span>
           </div>
           <Progress value={calculateProgressPercentage()} className="h-2" />

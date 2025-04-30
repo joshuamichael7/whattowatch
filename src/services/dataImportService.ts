@@ -133,11 +133,12 @@ export async function processImdbId(
 
 /**
  * Process a batch of IMDB IDs
- * @param startId Starting IMDB ID
+ * @param startId Starting IMDB ID (used only in range mode)
  * @param count Number of IDs to process
  * @param batchSize Size of each batch
  * @param updateProgress Function to update progress
  * @param shouldContinue Function that returns whether processing should continue
+ * @param imdbIds Optional array of specific IMDB IDs to process
  * @returns Final progress state
  */
 export async function processBatch(
@@ -146,6 +147,7 @@ export async function processBatch(
   batchSize: number,
   updateProgress: (updater: (prev: ImportProgress) => ImportProgress) => void,
   shouldContinue: () => boolean,
+  imdbIds?: string[],
 ): Promise<ImportProgress> {
   let currentId = startId;
   let processed = 0;
@@ -160,7 +162,29 @@ export async function processBatch(
     }));
   };
 
-  addLog(`Starting batch processing from ${startId}`);
+  // Determine if we're using a list of IDs or generating them sequentially
+  const useIdList = Array.isArray(imdbIds) && imdbIds.length > 0;
+
+  // Sort IDs by popularity if requested
+  if (useIdList && prioritizePopular && imdbIds) {
+    addLog("Sorting IMDB IDs by estimated popularity...");
+    imdbIds = [...imdbIds].sort((a, b) => {
+      return getPopularityScore(b) - getPopularityScore(a);
+    });
+    addLog(
+      "Sorted IDs by popularity. Processing higher priority content first.",
+    );
+  }
+
+  if (useIdList) {
+    addLog(
+      `Starting batch processing of ${imdbIds.length} IMDB IDs${prioritizePopular ? " (prioritizing popular content)" : ""}`,
+    );
+  } else {
+    addLog(
+      `Starting batch processing from ${startId}${prioritizePopular ? " (prioritizing popular content)" : ""}`,
+    );
+  }
 
   // Process IDs in smaller batches
   for (let i = 0; i < count && shouldContinue(); i += batchSize) {
@@ -169,9 +193,21 @@ export async function processBatch(
 
     // Create a batch of promises
     for (let j = 0; j < batchSize && i + j < count && shouldContinue(); j++) {
-      batchIds.push(currentId);
-      batchPromises.push(processImdbId(currentId, addLog));
-      currentId = getNextImdbId(currentId);
+      let idToProcess: string;
+
+      if (useIdList) {
+        // Use the provided list of IDs
+        idToProcess = imdbIds![i + j];
+        // Update currentId for progress tracking
+        currentId = idToProcess;
+      } else {
+        // Generate IDs sequentially
+        idToProcess = currentId;
+        currentId = getNextImdbId(currentId);
+      }
+
+      batchIds.push(idToProcess);
+      batchPromises.push(processImdbId(idToProcess, addLog));
     }
 
     // Wait for all promises in the batch to resolve
@@ -201,7 +237,7 @@ export async function processBatch(
       // Update progress after each item
       updateProgress((prev) => ({
         ...prev,
-        currentId,
+        currentId: useIdList ? batchIds[index] : currentId,
         processed,
         successful,
         failed,
