@@ -139,6 +139,24 @@ exports.handler = async (event, context) => {
         };
       }
 
+      case "checkVectorExists": {
+        const { id } = params || {};
+        if (!id) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: "Missing id parameter" }),
+          };
+        }
+        console.log(`Checking if vector with ID ${id} exists in Pinecone`);
+        const exists = await checkVectorExists(id);
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({ exists }),
+        };
+      }
+
       case "createIndex": {
         const result = await createPineconeIndex();
         return {
