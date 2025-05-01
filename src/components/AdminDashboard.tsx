@@ -214,6 +214,9 @@ const AdminDashboard: React.FC = () => {
                 <Button asChild className="w-full">
                   <Link to="/vector-database-demo">Vector Database Demo</Link>
                 </Button>
+                <Button asChild className="w-full">
+                  <Link to="/static-tmdb-import">Static TMDB Import</Link>
+                </Button>
               </div>
             </TabsContent>
 
@@ -262,6 +265,27 @@ const AdminDashboard: React.FC = () => {
               </p>
               <div className="mt-6">
                 <AutomatedImporter />
+              </div>
+              <div className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Static TMDB Import</CardTitle>
+                    <CardDescription>
+                      Import TMDB data from a static list of IDs
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="mb-4">
+                      Use the static TMDB import page to process a predefined
+                      list of TMDB IDs.
+                    </p>
+                    <Button asChild>
+                      <Link to="/static-tmdb-import">
+                        Go to Static TMDB Import
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
 

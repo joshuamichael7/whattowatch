@@ -19,6 +19,7 @@ import SupabaseConnectionTest from "./components/SupabaseConnectionTest";
 import UserDashboard from "./components/UserDashboard";
 import VectorDatabaseManager from "./components/VectorDatabaseManager";
 import VectorDatabaseDemo from "./components/VectorDatabaseDemo";
+import StaticTmdbImport from "./pages/StaticTmdbImport";
 import { RecommendationProvider } from "./contexts/RecommendationContext";
 
 // Lazy load authentication components
@@ -73,6 +74,10 @@ function App() {
                 <Route
                   path="/vector-database-demo"
                   element={<VectorDatabaseDemo />}
+                />
+                <Route
+                  path="/static-tmdb-import"
+                  element={<StaticTmdbImport />}
                 />
                 {import.meta.env.VITE_TEMPO === "true" && (
                   <Route path="/tempobook/*" />
