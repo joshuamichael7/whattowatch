@@ -114,13 +114,22 @@ async function startImport() {
   };
 
   // In a real implementation, you would start a background process to handle the import
-  // For now, we'll just simulate it with a timeout
-  console.log("[TMDB Import] Setting up timeout for processing");
+  // For now, we'll call the automated-import function directly
+  console.log("[TMDB Import] Setting up call to automated-import function");
   // Add immediate logging to verify execution path
-  console.log("[TMDB Import] About to start processing items");
+  console.log("[TMDB Import] About to call automated-import function");
   // Log the tmdbIds to verify they're being passed correctly
   console.log(`[TMDB Import] First item: ${JSON.stringify(tmdbIds[0])}`);
-  setTimeout(() => {
+  
+  // Call the automated-import function
+  const axios = require("axios");
+  const siteUrl = process.env.URL || "https://whattowatchapp.netlify.app";
+  const importUrl = `${siteUrl}/.netlify/functions/automated-import`;
+  
+  console.log(`[TMDB Import] Calling import function at: ${importUrl}`);
+  
+  // Make the call asynchronously so we can return immediately
+  setTimeout(async () => {
     try {
       console.log("[TMDB Import] Starting processing in timeout");
       // Simulate processing
@@ -129,64 +138,39 @@ async function startImport() {
       console.log("[TMDB Import] Updated import status with start message");
       console.log("[TMDB Import] Processing items count: " + tmdbIds.length);
 
-      // This would be replaced with actual processing logic
-      // For now, we'll just simulate it with random success/failure
-      console.log(
-        `[TMDB Import] Setting up processing for ${tmdbIds.length} items`,
-      );
-      for (let i = 0; i < tmdbIds.length; i++) {
-        console.log(
-          `[TMDB Import] Scheduling item ${i + 1}/${tmdbIds.length} for processing`,
-        );
-        // Use a shorter timeout for faster processing
-        setTimeout(() => {
-          console.log(
-            `[TMDB Import] Processing item ${i + 1} in inner timeout`,
-          );
-          try {
-            const item = tmdbIds[i];
-            console.log(
-              `[TMDB Import] Processing item ${i + 1}/${tmdbIds.length}: ID ${item.id} - ${item.original_title}`,
-            );
-            importStatus.processed++;
-
-            // Simulate random success/failure
-            const success = Math.random() > 0.2; // 80% success rate
-            if (success) {
-              importStatus.successful++;
-              const logMessage = `Successfully processed ID ${item.id}: ${item.original_title}`;
-              importStatus.logs.push(logMessage);
-              console.log(`[TMDB Import] ${logMessage}`);
-            } else {
-              importStatus.failed++;
-              const logMessage = `Failed to process ID ${item.id}: ${item.original_title}`;
-              importStatus.logs.push(logMessage);
-              console.log(`[TMDB Import] ${logMessage}`);
-            }
-
-            importStatus.lastUpdated = new Date().toISOString();
-
-            // Check if we're done
-            if (importStatus.processed >= importStatus.totalItems) {
-              importStatus.isRunning = false;
-              importStatus.logs.push("Import process completed");
-              importStatus.lastUpdated = new Date().toISOString();
-              console.log(
-                `[TMDB Import] Import process completed. Processed: ${importStatus.processed}, Successful: ${importStatus.successful}, Failed: ${importStatus.failed}`,
-              );
-            }
-          } catch (error) {
-            console.error(
-              `[TMDB Import] Error processing item ${i + 1}/${tmdbIds.length}:`,
-              error,
-            );
-            importStatus.failed++;
-            importStatus.logs.push(
-              `Error processing item: ${error.message || "Unknown error"}`,
-            );
-            importStatus.lastUpdated = new Date().toISOString();
-          }
-        }, i * 2000); // Process one item every 2 seconds
+      // Call the automated-import function with the TMDB IDs
+      try {
+        console.log(`[TMDB Import] Sending request to import function with ${tmdbIds.length} items`);
+        
+        // Call the automated-import function with the batch of IDs
+        const response = await axios.post(importUrl, {
+          startId: "tmdb-batch", // Not used for TMDB import
+          count: tmdbIds.length,
+          batchSize: 10, // Process 10 at a time
+          tmdbIds: tmdbIds, // Pass the actual TMDB IDs
+          clearExisting: true // Clear existing data before import
+        });
+        
+        console.log(`[TMDB Import] Import function response status: ${response.status}`);
+        console.log(`[TMDB Import] Import function response: ${JSON.stringify(response.data)}`);
+        
+        // Update the status based on the response
+        if (response.data && response.data.success) {
+          importStatus.logs.push("Import process started successfully");
+          importStatus.logs.push(`Sent ${tmdbIds.length} items to import function`);
+        } else {
+          importStatus.logs.push("Import process failed to start");
+          importStatus.logs.push(`Error: ${response.data?.error || "Unknown error"}`); 
+          importStatus.isRunning = false;
+        }
+        
+        importStatus.lastUpdated = new Date().toISOString();
+      } catch (error) {
+        console.error(`[TMDB Import] Error calling import function:`, error);
+        importStatus.logs.push(`Error calling import function: ${error.message || "Unknown error"}`);
+        importStatus.isRunning = false;
+        importStatus.lastUpdated = new Date().toISOString();
+      }
       }
     } catch (error) {
       console.error("[TMDB Import] Error in timeout function:", error);

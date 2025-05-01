@@ -10,6 +10,8 @@ import {
 } from "./ui/card";
 import { Progress } from "./ui/progress";
 import { ScrollArea } from "./ui/scroll-area";
+import { Badge } from "./ui/badge";
+import { AlertCircle, CheckCircle, RefreshCw } from "lucide-react";
 import axios from "axios";
 
 interface ImportStatus {
@@ -36,6 +38,7 @@ const TmdbImportMonitor: React.FC = () => {
   });
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
 
   // Poll for status updates when running
   useEffect(() => {
@@ -44,17 +47,15 @@ const TmdbImportMonitor: React.FC = () => {
     // Initial fetch when component mounts
     fetchStatus();
 
-    if (status.isRunning) {
-      interval = setInterval(fetchStatus, 5000); // Poll every 5 seconds
-    } else {
-      // Even if not running, poll occasionally to check for updates
-      interval = setInterval(fetchStatus, 10000); // Poll every 10 seconds
-    }
+    if (autoRefresh) {
+      const intervalTime = status.isRunning ? 3000 : 10000; // Poll more frequently when running
+      interval = setInterval(fetchStatus, intervalTime);
 
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [status.isRunning]);
+      return () => {
+        if (interval) clearInterval(interval);
+      };
+    }
+  }, [status.isRunning, autoRefresh]);
 
   const fetchStatus = async () => {
     console.log("Fetching import status...");
@@ -93,6 +94,8 @@ const TmdbImportMonitor: React.FC = () => {
 
       if (response.data) {
         setStatus(response.data);
+        // Ensure auto-refresh is enabled when starting an import
+        setAutoRefresh(true);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start import");
@@ -130,27 +133,38 @@ const TmdbImportMonitor: React.FC = () => {
       ? Math.round((status.processed / status.totalItems) * 100)
       : 0;
 
+  // Calculate time since last update
+  const getTimeSinceUpdate = () => {
+    const lastUpdate = new Date(status.lastUpdated).getTime();
+    const now = new Date().getTime();
+    const diffSeconds = Math.floor((now - lastUpdate) / 1000);
+
+    if (diffSeconds < 60) return `${diffSeconds} seconds ago`;
+    if (diffSeconds < 3600)
+      return `${Math.floor(diffSeconds / 60)} minutes ago`;
+    return `${Math.floor(diffSeconds / 3600)} hours ago`;
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>TMDB Import Monitor</CardTitle>
-        <CardDescription>
-          Monitor the progress of the server-side TMDB data import
-        </CardDescription>
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle>TMDB Import Monitor</CardTitle>
+            <CardDescription>
+              Monitor the progress of the server-side TMDB data import
+            </CardDescription>
+          </div>
+          <Badge
+            variant={status.isRunning ? "default" : "outline"}
+            className={status.isRunning ? "bg-green-500" : ""}
+          >
+            {status.isRunning ? "Running" : "Idle"}
+          </Badge>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Status</span>
-            <span className="text-sm">
-              {status.isRunning ? (
-                <span className="text-green-500 font-medium">Running</span>
-              ) : (
-                <span className="text-muted-foreground">Idle</span>
-              )}
-            </span>
-          </div>
-
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Progress</span>
@@ -184,15 +198,48 @@ const TmdbImportMonitor: React.FC = () => {
         </div>
 
         <div className="space-y-2">
-          <span className="text-sm font-medium">Logs</span>
-          <ScrollArea className="h-40 border rounded-md p-2">
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium">Logs</span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2"
+                onClick={() => setAutoRefresh(!autoRefresh)}
+              >
+                <RefreshCw
+                  className={`h-4 w-4 mr-1 ${autoRefresh ? "animate-spin" : ""}`}
+                />
+                {autoRefresh ? "Auto" : "Manual"}
+              </Button>
+            </div>
+          </div>
+          <ScrollArea className="h-60 border rounded-md p-2">
             {status.logs.length > 0 ? (
               <div className="space-y-1">
-                {status.logs.map((log, index) => (
-                  <div key={index} className="text-sm">
-                    {log}
-                  </div>
-                ))}
+                {status.logs.map((log, index) => {
+                  const isError =
+                    log.toLowerCase().includes("error") ||
+                    log.toLowerCase().includes("failed");
+                  const isSuccess =
+                    log.toLowerCase().includes("success") ||
+                    log.toLowerCase().includes("added");
+
+                  return (
+                    <div
+                      key={index}
+                      className={`text-sm flex items-start gap-1 ${isError ? "text-red-600" : isSuccess ? "text-green-600" : ""}`}
+                    >
+                      {isError && (
+                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      )}
+                      {isSuccess && (
+                        <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      )}
+                      <span>{log}</span>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="text-sm text-muted-foreground text-center py-4">
@@ -203,17 +250,27 @@ const TmdbImportMonitor: React.FC = () => {
         </div>
 
         {error && (
-          <div className="text-sm text-red-500 p-2 border border-red-200 rounded bg-red-50">
+          <div className="text-sm text-red-500 p-2 border border-red-200 rounded bg-red-50 flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
             {error}
           </div>
         )}
 
-        <div className="text-xs text-muted-foreground">
-          Last updated: {new Date(status.lastUpdated).toLocaleString()}
+        <div className="text-xs text-muted-foreground flex justify-between">
+          <span>
+            Last updated: {new Date(status.lastUpdated).toLocaleString()}
+          </span>
+          <span>{getTimeSinceUpdate()}</span>
         </div>
       </CardContent>
       <CardFooter className="flex justify-between">
-        <Button variant="outline" onClick={fetchStatus} disabled={loading}>
+        <Button
+          variant="outline"
+          onClick={fetchStatus}
+          disabled={loading}
+          className="flex items-center gap-1"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           Refresh Status
         </Button>
         <div className="space-x-2">
