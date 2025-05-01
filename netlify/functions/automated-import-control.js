@@ -22,12 +22,13 @@ let importStatus = {
 function readTmdbIds() {
   console.log("[TMDB Import] Reading TMDB IDs from data file");
   try {
-    // Try to read from the src/data/tmdbIds.json file
+    // Read from the src/data/tmdbIds.json file - no fallback
     const projectRoot = process.env.LAMBDA_TASK_ROOT || ".";
     const dataFilePath = path.join(projectRoot, "src", "data", "tmdbIds.json");
 
     console.log(`[TMDB Import] Looking for data file at: ${dataFilePath}`);
 
+    // Check if file exists - throw detailed error if not
     if (!fs.existsSync(dataFilePath)) {
       const errorMessage = `[TMDB Import] Error: Data file not found at ${dataFilePath}`;
       console.error(errorMessage);
@@ -44,12 +45,22 @@ function readTmdbIds() {
     } catch (readError) {
       console.error(`[TMDB Import] Error reading file: ${readError.message}`);
       console.error(`[TMDB Import] Error stack: ${readError.stack}`);
-      throw new Error(`Failed to read TMDB IDs file: ${readError.message}`);
+      throw readError; // Throw the original error to preserve stack trace
     }
 
     let ids;
     try {
       ids = JSON.parse(fileContent);
+
+      // Validate the parsed data
+      if (!Array.isArray(ids)) {
+        throw new Error("TMDB IDs file does not contain an array");
+      }
+
+      if (ids.length === 0) {
+        throw new Error("TMDB IDs array is empty");
+      }
+
       console.log(
         `[TMDB Import] Successfully parsed ${ids.length} TMDB IDs from file`,
       );
@@ -57,12 +68,12 @@ function readTmdbIds() {
     } catch (parseError) {
       console.error(`[TMDB Import] Error parsing JSON: ${parseError.message}`);
       console.error(`[TMDB Import] Error stack: ${parseError.stack}`);
-      throw new Error(`Failed to parse TMDB IDs JSON: ${parseError.message}`);
+      throw parseError; // Throw the original error to preserve stack trace
     }
   } catch (error) {
     console.error("[TMDB Import] Error reading TMDB IDs:", error);
     console.error(`[TMDB Import] Error stack: ${error.stack}`);
-    throw error;
+    throw error; // Preserve the original error
   }
 }
 
@@ -84,10 +95,11 @@ async function startImport() {
   } catch (error) {
     console.error(`[TMDB Import] Failed to read TMDB IDs: ${error.message}`);
     console.error(`[TMDB Import] Error stack: ${error.stack}`);
-    throw new Error(`Failed to read TMDB IDs: ${error.message}`);
+    // Preserve the original error instead of wrapping it
+    throw error;
   }
 
-  if (tmdbIds.length === 0) {
+  if (!tmdbIds || tmdbIds.length === 0) {
     console.log("[TMDB Import] No TMDB IDs found, aborting");
     return { success: false, message: "No TMDB IDs found" };
   }
@@ -239,7 +251,21 @@ exports.handler = async (event, context) => {
   try {
     // Parse request body
     console.log("[TMDB Import] Parsing request body");
-    const requestBody = JSON.parse(event.body);
+    let requestBody;
+    try {
+      requestBody = JSON.parse(event.body);
+    } catch (parseError) {
+      console.error("[TMDB Import] Error parsing request body:", parseError);
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          error: "Invalid JSON in request body",
+          details: parseError.message,
+        }),
+      };
+    }
+
     const { action } = requestBody;
     console.log(`[TMDB Import] Received action: ${action}`);
 
@@ -259,13 +285,35 @@ exports.handler = async (event, context) => {
       } catch (importError) {
         console.error("[TMDB Import] Error starting import:", importError);
         console.error(`[TMDB Import] Error stack: ${importError.stack}`);
+
+        // Provide more detailed error information
+        let errorDetails = "Failed to start TMDB import process";
+
+        // Check for specific error types
+        if (
+          importError.message &&
+          importError.message.includes("Data file not found")
+        ) {
+          errorDetails =
+            "TMDB IDs file not found. Please ensure src/data/tmdbIds.json exists and is accessible.";
+        } else if (
+          importError.message &&
+          importError.message.includes("parse")
+        ) {
+          errorDetails =
+            "TMDB IDs file contains invalid JSON. Please check the file format.";
+        } else if (importError.code === "ENOENT") {
+          errorDetails = `File not found: ${importError.path || "unknown path"}. Please check file paths.`;
+        }
+
         return {
           statusCode: 500,
           headers,
           body: JSON.stringify({
             error: importError.message || "Error starting import",
             stack: importError.stack,
-            details: "Failed to start TMDB import process",
+            details: errorDetails,
+            code: importError.code || "UNKNOWN_ERROR",
           }),
         };
       }
@@ -287,6 +335,8 @@ exports.handler = async (event, context) => {
   } catch (error) {
     console.error("[TMDB Import] Error processing request:", error);
     console.error(`[TMDB Import] Error stack: ${error.stack}`);
+
+    // Enhanced error response
     return {
       statusCode: 500,
       headers,
@@ -294,6 +344,9 @@ exports.handler = async (event, context) => {
         error: error.message || "Internal server error",
         stack: error.stack,
         details: "Failed to process TMDB import request",
+        code: error.code || "UNKNOWN_ERROR",
+        path: error.path || undefined,
+        timestamp: new Date().toISOString(),
       }),
     };
   }
