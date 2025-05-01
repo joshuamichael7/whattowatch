@@ -54,6 +54,7 @@
     "embla-carousel-react": "^8.1.5",
     "formidable": "^3.5.2",
     "framer-motion": "^11.18.0",
+    "fs": "^0.0.1-security",
     "lucide-react": "^0.394.0",
     "natural": "^8.0.1",
     "openai": "^4.96.0",

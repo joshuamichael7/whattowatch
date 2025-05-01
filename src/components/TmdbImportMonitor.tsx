@@ -155,12 +155,19 @@ const TmdbImportMonitor: React.FC = () => {
               Monitor the progress of the server-side TMDB data import
             </CardDescription>
           </div>
-          <Badge
-            variant={status.isRunning ? "default" : "outline"}
-            className={status.isRunning ? "bg-green-500" : ""}
-          >
-            {status.isRunning ? "Running" : "Idle"}
-          </Badge>
+          <div className="flex flex-col items-end gap-1">
+            <Badge
+              variant={status.isRunning ? "default" : "outline"}
+              className={status.isRunning ? "bg-green-500" : ""}
+            >
+              {status.isRunning ? "Running" : "Idle"}
+            </Badge>
+            {status.isRunning && (
+              <span className="text-xs text-green-600">
+                Continues in background
+              </span>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

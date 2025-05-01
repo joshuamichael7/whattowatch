@@ -158,75 +158,42 @@ async function startImport() {
 
   console.log(`[TMDB Import] Calling import function at: ${importUrl}`);
 
-  // Make the call asynchronously so we can return immediately
-  // Don't use setTimeout - process immediately but don't wait for completion
-  (async () => {
-    try {
-      console.log("[TMDB Import] Starting processing in timeout");
-      // Simulate processing
-      importStatus.logs.push("Import process started");
-      importStatus.lastUpdated = new Date().toISOString();
-      writeStatusToFile(importStatus);
-      console.log("[TMDB Import] Updated import status with start message");
-      console.log("[TMDB Import] Processing items count: " + tmdbIds.length);
+  // Call the background function instead of the regular function
+  try {
+    console.log("[TMDB Import] Starting background import process");
+    importStatus.logs.push("Starting background import process");
+    importStatus.lastUpdated = new Date().toISOString();
+    writeStatusToFile(importStatus);
 
-      // Call the automated-import function with the TMDB IDs
-      try {
-        console.log(
-          `[TMDB Import] Sending TMDB IDs to import function: ${JSON.stringify(tmdbIds)}`,
-        );
-        const response = await axios.post(importUrl, {
-          startId: "tmdb-batch", // Not used for TMDB import
-          count: tmdbIds.length,
-          batchSize: 5, // Process 5 at a time to avoid rate limits
-          tmdbIds: tmdbIds, // Pass the actual TMDB IDs
-          clearExisting: true, // Clear existing data before import
-        });
+    // Call the background function
+    const backgroundUrl = `${siteUrl}/.netlify/functions/tmdb-background-import`;
+    console.log(
+      `[TMDB Import] Calling background function at: ${backgroundUrl}`,
+    );
 
-        console.log(
-          `[TMDB Import] Import function response status: ${response.status}`,
-        );
-        console.log(
-          `[TMDB Import] Import function response: ${JSON.stringify(response.data)}`,
-        );
+    const response = await axios.post(backgroundUrl, {
+      clearExisting: true, // Clear existing data before import
+    });
 
-        // Update the status based on the response
-        if (response.data && response.data.success) {
-          importStatus.logs.push("Import process started successfully");
-          importStatus.logs.push(
-            `Sent ${tmdbIds.length} items to import function`,
-          );
-          writeStatusToFile(importStatus);
-        } else {
-          importStatus.logs.push("Import process failed to start");
-          importStatus.logs.push(
-            `Error: ${response.data?.error || "Unknown error"}`,
-          );
-          importStatus.isRunning = false;
-          writeStatusToFile(importStatus);
-        }
+    console.log(
+      `[TMDB Import] Background function initiated with status: ${response.status}`,
+    );
 
-        importStatus.lastUpdated = new Date().toISOString();
-        writeStatusToFile(importStatus);
-      } catch (error) {
-        console.error(`[TMDB Import] Error calling import function:`, error);
-        importStatus.logs.push(
-          `Error calling import function: ${error.message || "Unknown error"}`,
-        );
-        importStatus.isRunning = false;
-        importStatus.lastUpdated = new Date().toISOString();
-        writeStatusToFile(importStatus);
-      }
-    } catch (error) {
-      console.error("[TMDB Import] Error in timeout function:", error);
-      importStatus.logs.push(
-        `Error starting import process: ${error.message || "Unknown error"}`,
-      );
-      importStatus.lastUpdated = new Date().toISOString();
-      importStatus.isRunning = false;
-      writeStatusToFile(importStatus);
-    }
-  })();
+    importStatus.logs.push("Background import process initiated successfully");
+    importStatus.logs.push(
+      "This process will continue running even if you close your browser",
+    );
+    importStatus.lastUpdated = new Date().toISOString();
+    writeStatusToFile(importStatus);
+  } catch (error) {
+    console.error("[TMDB Import] Error starting background process:", error);
+    importStatus.logs.push(
+      `Error starting background process: ${error.message || "Unknown error"}`,
+    );
+    importStatus.isRunning = false;
+    importStatus.lastUpdated = new Date().toISOString();
+    writeStatusToFile(importStatus);
+  }
 
   console.log("[TMDB Import] Import process initiated successfully");
   return {
