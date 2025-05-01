@@ -35,7 +35,9 @@ function transformTmdbSearchResult(item) {
     id: `tmdb-${mediaType}-${item.id}`,
     title: mediaType === "tv" ? item.name : item.title,
     original_title:
-      mediaType === "tv" ? item.original_name : item.original_title,
+      mediaType === "tv"
+        ? item.original_name || item.name
+        : item.original_title || item.title,
     poster_path: item.poster_path
       ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
       : "",
