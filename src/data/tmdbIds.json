@@ -1,3 +1,23 @@
-{"adult":false,"id":16523,"original_title":"Where the Wild Things Are","popularity":2.7677,"video":false}
-{"adult":false,"id":16524,"original_title":"A Time to Revenge","popularity":1.3397,"video":false}
-{"adult":false,"id":16526,"original_title":"Clowning Around","popularity":0.954,"video":false}
+[
+  {
+    "adult": false,
+    "id": 16523,
+    "original_title": "Where the Wild Things Are",
+    "popularity": 2.7677,
+    "video": false
+  },
+  {
+    "adult": false,
+    "id": 16524,
+    "original_title": "A Time to Revenge",
+    "popularity": 1.3397,
+    "video": false
+  },
+  {
+    "adult": false,
+    "id": 16526,
+    "original_title": "Clowning Around",
+    "popularity": 0.954,
+    "video": false
+  }
+]

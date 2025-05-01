@@ -20,87 +20,34 @@ let importStatus = {
 
 // Function to read the TMDB IDs from the static file
 function readTmdbIds() {
-  console.log("[TMDB Import] Reading TMDB IDs from static data");
+  console.log("[TMDB Import] Reading TMDB IDs from data file");
   try {
-    // In a real implementation, you would read from a file in a persistent location
-    // For now, we'll just return a hardcoded array
-    const ids = [
-      {
-        adult: false,
-        id: 16523,
-        original_title: "Where the Wild Things Are",
-        popularity: 2.7677,
-        video: false,
-      },
-      {
-        adult: false,
-        id: 16524,
-        original_title: "A Time to Revenge",
-        popularity: 1.3397,
-        video: false,
-      },
-      {
-        adult: false,
-        id: 16526,
-        original_title: "Clowning Around",
-        popularity: 0.954,
-        video: false,
-      },
-      {
-        adult: false,
-        id: 16527,
-        original_title: "Mister Jerico",
-        popularity: 0.6,
-        video: false,
-      },
-      {
-        adult: false,
-        id: 16528,
-        original_title: "Mister Moses",
-        popularity: 1.4,
-        video: false,
-      },
-      {
-        adult: false,
-        id: 16529,
-        original_title: "Mister Roberts",
-        popularity: 2.558,
-        video: false,
-      },
-      {
-        adult: false,
-        id: 16530,
-        original_title: "Mister Scoutmaster",
-        popularity: 0.6,
-        video: false,
-      },
-      {
-        adult: false,
-        id: 16531,
-        original_title: "Mistress",
-        popularity: 1.4,
-        video: false,
-      },
-      {
-        adult: false,
-        id: 16532,
-        original_title: "Misty",
-        popularity: 1.4,
-        video: false,
-      },
-      {
-        adult: false,
-        id: 16533,
-        original_title: "Mitchell",
-        popularity: 1.4,
-        video: false,
-      },
-    ];
-    console.log(`[TMDB Import] Successfully read ${ids.length} TMDB IDs`);
+    // Try to read from the src/data/tmdbIds.json file
+    const projectRoot = process.env.LAMBDA_TASK_ROOT || ".";
+    const dataFilePath = path.join(projectRoot, "src", "data", "tmdbIds.json");
+
+    console.log(`[TMDB Import] Looking for data file at: ${dataFilePath}`);
+
+    if (!fs.existsSync(dataFilePath)) {
+      const errorMessage = `[TMDB Import] Error: Data file not found at ${dataFilePath}`;
+      console.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    // Read and parse the JSON file
+    const fileContent = fs.readFileSync(dataFilePath, "utf8");
+    console.log(
+      `[TMDB Import] Successfully read data file with ${fileContent.length} bytes`,
+    );
+
+    const ids = JSON.parse(fileContent);
+    console.log(
+      `[TMDB Import] Successfully parsed ${ids.length} TMDB IDs from file`,
+    );
     return ids;
   } catch (error) {
     console.error("[TMDB Import] Error reading TMDB IDs:", error);
-    return [];
+    throw error;
   }
 }
 
