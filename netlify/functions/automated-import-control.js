@@ -141,16 +141,14 @@ async function startImport() {
       // Call the automated-import function with the TMDB IDs
       try {
         console.log(
-          `[TMDB Import] Sending request to import function with ${tmdbIds.length} items`,
+          `[TMDB Import] Sending TMDB IDs to import function: ${JSON.stringify(tmdbIds)}`;
         );
-
-        // Call the automated-import function with the batch of IDs
         const response = await axios.post(importUrl, {
           startId: "tmdb-batch", // Not used for TMDB import
           count: tmdbIds.length,
-          batchSize: 10, // Process 10 at a time
+          batchSize: 5, // Process 5 at a time to avoid rate limits
           tmdbIds: tmdbIds, // Pass the actual TMDB IDs
-          clearExisting: true, // Clear existing data before import
+          clearExisting: true // Clear existing data before import
         });
 
         console.log(

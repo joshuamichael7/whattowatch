@@ -162,6 +162,45 @@ export function parseTmdbJsonList(jsonString: string): TmdbIdItem[] {
 }
 
 /**
+ * Load TMDB IDs from the static file
+ * @returns Promise<TmdbIdItem[]> Array of TMDB ID items
+ */
+export async function loadTmdbIdsFromFile(): Promise<TmdbIdItem[]> {
+  try {
+    console.log("Loading TMDB IDs from static file");
+    const response = await fetch("/tmdbIds.json");
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch TMDB IDs file: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    const data = await response.json();
+
+    if (!Array.isArray(data)) {
+      throw new Error("TMDB IDs file does not contain an array");
+    }
+
+    console.log(`Successfully loaded ${data.length} TMDB IDs from file`);
+
+    // Ensure each item has the required properties
+    return data.map((item) => {
+      // Ensure media_type is set if available in the JSON
+      if (!item.media_type) {
+        // Default to movie if video is false, otherwise tv
+        // This is a common pattern in TMDB data
+        item.media_type = item.video === false ? "movie" : "tv";
+      }
+      return item;
+    });
+  } catch (error) {
+    console.error("Error loading TMDB IDs from file:", error);
+    return [];
+  }
+}
+
+/**
  * Import TMDB data from a JSON list
  * @param jsonString JSON string with one object per line
  * @param batchSize Size of each batch

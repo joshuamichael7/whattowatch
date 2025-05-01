@@ -333,6 +333,10 @@ async function processTmdbBatch(tmdbIds, batchSize) {
  * @returns {Object} Result object with success status and message
  */
 async function processTmdbItem(tmdbItem, addLog, includeDetails = true) {
+  // Log the entire tmdbItem for debugging
+  console.log(
+    `[Automated Import] Processing TMDB item: ${JSON.stringify(tmdbItem)}`,
+  );
   try {
     if (!tmdbItem || typeof tmdbItem !== "object" || !tmdbItem.id) {
       addLog(`Invalid TMDB item: ${JSON.stringify(tmdbItem)}`);
@@ -371,15 +375,31 @@ async function processTmdbItem(tmdbItem, addLog, includeDetails = true) {
     let attempts = 0;
     const maxAttempts = 3;
 
+    console.log(
+      `[Automated Import] Fetching ${mediaType} content for TMDB ID: ${tmdbItem.id}`,
+    );
+
     while (!content && attempts < maxAttempts) {
       attempts++;
       try {
         if (mediaType === "tv") {
+          console.log(
+            `[Automated Import] Calling getTvShowById for ID: ${tmdbItem.id}`,
+          );
           const { getTvShowById } = require("../../src/lib/tmdbClientProxy");
-          content = await getTvShowById(tmdbItem.id, includeDetails);
+          content = await getTvShowById(tmdbItem.id);
+          console.log(
+            `[Automated Import] getTvShowById result: ${content ? "Success" : "Failed"}`,
+          );
         } else {
+          console.log(
+            `[Automated Import] Calling getMovieById for ID: ${tmdbItem.id}`,
+          );
           const { getMovieById } = require("../../src/lib/tmdbClientProxy");
-          content = await getMovieById(tmdbItem.id, includeDetails);
+          content = await getMovieById(tmdbItem.id);
+          console.log(
+            `[Automated Import] getMovieById result: ${content ? "Success" : "Failed"}`,
+          );
         }
 
         if (!content && attempts < maxAttempts) {
@@ -685,9 +705,31 @@ exports.handler = async (event, context) => {
     let result;
     if (tmdbIds && Array.isArray(tmdbIds)) {
       console.log(`[Automated Import] Processing ${tmdbIds.length} TMDB IDs`);
+      console.log(
+        `[Automated Import] First TMDB ID: ${JSON.stringify(tmdbIds[0])}`,
+      );
       // Process TMDB IDs
       try {
-        result = await processTmdbBatch(tmdbIds, batchSize);
+        // Make sure each item has an id property
+        const validTmdbIds = tmdbIds.filter(
+          (item) => item && typeof item === "object" && item.id,
+        );
+        console.log(
+          `[Automated Import] Found ${validTmdbIds.length} valid TMDB items with IDs`,
+        );
+
+        if (validTmdbIds.length === 0) {
+          return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({
+              error: "No valid TMDB items found in the provided data",
+              details: "Each TMDB item must be an object with an 'id' property",
+            }),
+          };
+        }
+
+        result = await processTmdbBatch(validTmdbIds, batchSize);
       } catch (error) {
         console.error(
           `[Automated Import] Error processing TMDB batch: ${error.message || String(error)}`,
