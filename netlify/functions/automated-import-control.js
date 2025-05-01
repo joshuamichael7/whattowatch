@@ -35,18 +35,33 @@ function readTmdbIds() {
     }
 
     // Read and parse the JSON file
-    const fileContent = fs.readFileSync(dataFilePath, "utf8");
-    console.log(
-      `[TMDB Import] Successfully read data file with ${fileContent.length} bytes`,
-    );
+    let fileContent;
+    try {
+      fileContent = fs.readFileSync(dataFilePath, "utf8");
+      console.log(
+        `[TMDB Import] Successfully read data file with ${fileContent.length} bytes`,
+      );
+    } catch (readError) {
+      console.error(`[TMDB Import] Error reading file: ${readError.message}`);
+      console.error(`[TMDB Import] Error stack: ${readError.stack}`);
+      throw new Error(`Failed to read TMDB IDs file: ${readError.message}`);
+    }
 
-    const ids = JSON.parse(fileContent);
-    console.log(
-      `[TMDB Import] Successfully parsed ${ids.length} TMDB IDs from file`,
-    );
-    return ids;
+    let ids;
+    try {
+      ids = JSON.parse(fileContent);
+      console.log(
+        `[TMDB Import] Successfully parsed ${ids.length} TMDB IDs from file`,
+      );
+      return ids;
+    } catch (parseError) {
+      console.error(`[TMDB Import] Error parsing JSON: ${parseError.message}`);
+      console.error(`[TMDB Import] Error stack: ${parseError.stack}`);
+      throw new Error(`Failed to parse TMDB IDs JSON: ${parseError.message}`);
+    }
   } catch (error) {
     console.error("[TMDB Import] Error reading TMDB IDs:", error);
+    console.error(`[TMDB Import] Error stack: ${error.stack}`);
     throw error;
   }
 }
@@ -62,8 +77,15 @@ async function startImport() {
 
   // Read the TMDB IDs
   console.log("[TMDB Import] Reading TMDB IDs");
-  const tmdbIds = readTmdbIds();
-  console.log(`[TMDB Import] Found ${tmdbIds.length} TMDB IDs to process`);
+  let tmdbIds;
+  try {
+    tmdbIds = readTmdbIds();
+    console.log(`[TMDB Import] Found ${tmdbIds.length} TMDB IDs to process`);
+  } catch (error) {
+    console.error(`[TMDB Import] Failed to read TMDB IDs: ${error.message}`);
+    console.error(`[TMDB Import] Error stack: ${error.stack}`);
+    throw new Error(`Failed to read TMDB IDs: ${error.message}`);
+  }
 
   if (tmdbIds.length === 0) {
     console.log("[TMDB Import] No TMDB IDs found, aborting");
@@ -232,7 +254,21 @@ exports.handler = async (event, context) => {
 
     let result;
     if (action === "start") {
-      result = await startImport();
+      try {
+        result = await startImport();
+      } catch (importError) {
+        console.error("[TMDB Import] Error starting import:", importError);
+        console.error(`[TMDB Import] Error stack: ${importError.stack}`);
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({
+            error: importError.message || "Error starting import",
+            stack: importError.stack,
+            details: "Failed to start TMDB import process",
+          }),
+        };
+      }
     } else if (action === "stop") {
       result = stopImport();
     } else {
@@ -250,10 +286,15 @@ exports.handler = async (event, context) => {
     };
   } catch (error) {
     console.error("[TMDB Import] Error processing request:", error);
+    console.error(`[TMDB Import] Error stack: ${error.stack}`);
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: error.message || "Internal server error" }),
+      body: JSON.stringify({
+        error: error.message || "Internal server error",
+        stack: error.stack,
+        details: "Failed to process TMDB import request",
+      }),
     };
   }
 };
