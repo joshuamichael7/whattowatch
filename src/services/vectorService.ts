@@ -67,6 +67,7 @@ export async function addContentToVectorDb(
     // Create metadata from content fields - ensure all values are strings
     const metadata: Record<string, string> = {
       title: String(content.title || ""),
+      original_title: String(content.original_title || content.title || ""),
       year: String(
         content.release_date
           ? new Date(content.release_date).getFullYear()
@@ -114,6 +115,7 @@ export async function addContentToVectorDb(
     // Create text for embedding - filter out empty fields
     const textLines = [
       `Title: ${content.title || ""}`,
+      `Original Title: ${content.original_title || content.title || ""}`,
       `Type: ${content.media_type || ""}`,
       `Year: ${content.release_date ? new Date(content.release_date).getFullYear() : content.year || ""}`,
       `Plot: ${content.overview || content.synopsis || ""}`,
@@ -245,6 +247,7 @@ export async function batchAddContentToVectorDb(
         // Create metadata
         const metadata = {
           title: content.title || "",
+          original_title: content.original_title || content.title || "",
           year: content.release_date
             ? new Date(content.release_date).getFullYear().toString()
             : content.year || "",
@@ -293,6 +296,7 @@ export async function batchAddContentToVectorDb(
         // Create text for integrated embedding
         const text = [
           `Title: ${content.title || ""}`,
+          `Original Title: ${content.original_title || content.title || ""}`,
           `Type: ${content.media_type || ""}`,
           `Year: ${content.release_date ? new Date(content.release_date).getFullYear() : content.year || ""}`,
           `Plot: ${content.overview || content.synopsis || ""}`,
@@ -422,6 +426,8 @@ export async function searchSimilarContentByText(
       return {
         id: match.id,
         title: metadata.title || "Unknown Title",
+        original_title:
+          metadata.original_title || metadata.title || "Unknown Title",
         imdb_id: metadata.imdbID,
         media_type: metadata.type || "unknown",
         overview: metadata.plot || "",
@@ -459,6 +465,7 @@ export async function searchSimilarContent(
     // Create text representation for the content item
     const text = [
       `Title: ${contentItem.title || ""}`,
+      `Original Title: ${contentItem.original_title || contentItem.title || ""}`,
       `Type: ${contentItem.media_type || ""}`,
       `Year: ${contentItem.release_date ? new Date(contentItem.release_date).getFullYear() : contentItem.year || ""}`,
       `Plot: ${contentItem.overview || contentItem.synopsis || ""}`,
