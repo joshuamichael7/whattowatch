@@ -46,7 +46,7 @@ interface OmdbMovie {
 // Always use Netlify functions in production
 const USE_DIRECT_API = false;
 
-const HomePage = () => {
+export const HomePage = () => {
   const [searchValue, setSearchValue] = useState("");
   const [searchResults, setSearchResults] = useState<OmdbMovie[]>([]);
   const [searchIsLoading, setSearchIsLoading] = useState(false);
