@@ -120,14 +120,14 @@ async function startImport() {
   console.log("[TMDB Import] About to call automated-import function");
   // Log the tmdbIds to verify they're being passed correctly
   console.log(`[TMDB Import] First item: ${JSON.stringify(tmdbIds[0])}`);
-  
+
   // Call the automated-import function
   const axios = require("axios");
   const siteUrl = process.env.URL || "https://whattowatchapp.netlify.app";
   const importUrl = `${siteUrl}/.netlify/functions/automated-import`;
-  
+
   console.log(`[TMDB Import] Calling import function at: ${importUrl}`);
-  
+
   // Make the call asynchronously so we can return immediately
   setTimeout(async () => {
     try {
@@ -140,37 +140,48 @@ async function startImport() {
 
       // Call the automated-import function with the TMDB IDs
       try {
-        console.log(`[TMDB Import] Sending request to import function with ${tmdbIds.length} items`);
-        
+        console.log(
+          `[TMDB Import] Sending request to import function with ${tmdbIds.length} items`,
+        );
+
         // Call the automated-import function with the batch of IDs
         const response = await axios.post(importUrl, {
           startId: "tmdb-batch", // Not used for TMDB import
           count: tmdbIds.length,
           batchSize: 10, // Process 10 at a time
           tmdbIds: tmdbIds, // Pass the actual TMDB IDs
-          clearExisting: true // Clear existing data before import
+          clearExisting: true, // Clear existing data before import
         });
-        
-        console.log(`[TMDB Import] Import function response status: ${response.status}`);
-        console.log(`[TMDB Import] Import function response: ${JSON.stringify(response.data)}`);
-        
+
+        console.log(
+          `[TMDB Import] Import function response status: ${response.status}`,
+        );
+        console.log(
+          `[TMDB Import] Import function response: ${JSON.stringify(response.data)}`,
+        );
+
         // Update the status based on the response
         if (response.data && response.data.success) {
           importStatus.logs.push("Import process started successfully");
-          importStatus.logs.push(`Sent ${tmdbIds.length} items to import function`);
+          importStatus.logs.push(
+            `Sent ${tmdbIds.length} items to import function`,
+          );
         } else {
           importStatus.logs.push("Import process failed to start");
-          importStatus.logs.push(`Error: ${response.data?.error || "Unknown error"}`); 
+          importStatus.logs.push(
+            `Error: ${response.data?.error || "Unknown error"}`,
+          );
           importStatus.isRunning = false;
         }
-        
+
         importStatus.lastUpdated = new Date().toISOString();
       } catch (error) {
         console.error(`[TMDB Import] Error calling import function:`, error);
-        importStatus.logs.push(`Error calling import function: ${error.message || "Unknown error"}`);
+        importStatus.logs.push(
+          `Error calling import function: ${error.message || "Unknown error"}`,
+        );
         importStatus.isRunning = false;
         importStatus.lastUpdated = new Date().toISOString();
-      }
       }
     } catch (error) {
       console.error("[TMDB Import] Error in timeout function:", error);
