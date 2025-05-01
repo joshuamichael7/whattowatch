@@ -47,6 +47,7 @@ export interface TmdbIdItem {
   adult?: boolean;
   popularity?: number;
   video?: boolean;
+  media_type?: "movie" | "tv";
 }
 
 /**
@@ -85,9 +86,9 @@ export async function processTmdbId(
     // Fetch content from TMDB
     let content: ContentItem | null;
     if (mediaType === "movie") {
-      content = await getMovieById(tmdbId, includeDetails);
+      content = await getMovieById(tmdbId);
     } else {
-      content = await getTvShowById(tmdbId, includeDetails);
+      content = await getTvShowById(tmdbId);
     }
 
     if (!content) {
@@ -138,6 +139,12 @@ export function parseTmdbJsonList(jsonString: string): TmdbIdItem[] {
         try {
           const item = JSON.parse(line.trim());
           if (item && typeof item.id === "number") {
+            // Ensure media_type is set if available in the JSON
+            if (!item.media_type) {
+              // Default to movie if video is false, otherwise tv
+              // This is a common pattern in TMDB data
+              item.media_type = item.video === false ? "movie" : "tv";
+            }
             items.push(item);
           }
         } catch (e) {
@@ -170,6 +177,7 @@ export async function importTmdbData(
   ) => void,
   shouldContinue: () => boolean = () => true,
   clearExisting: boolean = false,
+  defaultMediaType: "movie" | "tv" = "movie",
 ): Promise<TmdbImportProgress> {
   // Parse the JSON list
   const tmdbItems = parseTmdbJsonList(jsonString);
@@ -208,7 +216,14 @@ export async function importTmdbData(
   }
 
   // Process the batch
-  return processTmdbBatch(tmdbItems, batchSize, updateProgress, shouldContinue);
+  return processTmdbBatch(
+    tmdbItems,
+    batchSize,
+    updateProgress,
+    shouldContinue,
+    true,
+    defaultMediaType,
+  );
 }
 
 /**
@@ -228,6 +243,7 @@ export async function processTmdbBatch(
   ) => void,
   shouldContinue: () => boolean = () => true,
   includeDetails: boolean = true,
+  defaultMediaType: "movie" | "tv" = "movie",
 ): Promise<TmdbImportProgress> {
   let processed = 0;
   let successful = 0;
@@ -253,7 +269,8 @@ export async function processTmdbBatch(
 
     // Separate movie and TV IDs
     currentBatch.forEach((item) => {
-      const mediaType = item.video === false ? "movie" : "tv";
+      // Use the media_type from the item if available, otherwise use the default
+      const mediaType = item.media_type || defaultMediaType;
       if (mediaType === "movie") {
         movieIds.push(item.id);
       } else {

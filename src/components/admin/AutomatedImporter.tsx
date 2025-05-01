@@ -73,6 +73,7 @@ const AutomatedImporter: React.FC = () => {
   const [importMode, setImportMode] = useState<"range" | "list">("range");
   const [tmdbJsonData, setTmdbJsonData] = useState<string>("");
   const [clearExistingData, setClearExistingData] = useState<boolean>(false);
+  const [tmdbMediaType, setTmdbMediaType] = useState<"movie" | "tv">("movie");
   const [imdbIdList, setImdbIdList] = useState<string>("");
   const [invalidIds, setInvalidIds] = useState<string[]>([]);
   const [errorDetails, setErrorDetails] = useState<{ [key: string]: string[] }>(
@@ -609,7 +610,7 @@ const AutomatedImporter: React.FC = () => {
       isRunning: true,
       totalItems: tmdbItems.length,
       logs: [
-        `Starting import of ${tmdbItems.length} TMDB items with batch size ${batchSize}`,
+        `Starting import of ${tmdbItems.length} TMDB ${tmdbMediaType === "movie" ? "movies" : "TV shows"} with batch size ${batchSize}`,
       ],
       lastUpdated: new Date(),
     }));
@@ -671,6 +672,7 @@ const AutomatedImporter: React.FC = () => {
         },
         () => shouldContinueRef.current,
         clearExistingData,
+        tmdbMediaType, // Pass the selected media type to the import function
       );
     } catch (error) {
       const errorMessage =
@@ -778,48 +780,68 @@ const AutomatedImporter: React.FC = () => {
         ) : (
           /* TMDB Import Options */
           <>
+            {/* Media Type Selection */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">TMDB JSON Data</label>
-              <div className="space-y-1">
-                <textarea
-                  value={tmdbJsonData}
-                  onChange={(e) => setTmdbJsonData(e.target.value)}
-                  disabled={tmdbProgress.isRunning}
-                  placeholder={
-                    'Enter TMDB JSON data, one object per line:\n{"id": 550, "original_title": "Fight Club", "adult": false, "popularity": 0.5, "video": false}\n{"id": 551, "original_title": "Another Movie", "adult": false, "popularity": 0.4, "video": false}'
-                  }
-                  className="w-full h-32 p-2 border rounded-md font-mono text-sm text-black dark:text-white bg-white dark:bg-gray-800"
-                  style={{ color: "inherit" }}
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>
-                    {parseTmdbJsonList(tmdbJsonData).length} valid items
-                  </span>
-                  <button
-                    onClick={() => setTmdbJsonData("")}
-                    className="text-blue-500 hover:underline"
-                    disabled={tmdbProgress.isRunning || !tmdbJsonData}
-                  >
-                    Clear
-                  </button>
+              <label className="text-sm font-medium">Content Type</label>
+              <div className="flex space-x-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="movie-type"
+                    name="media-type"
+                    checked={tmdbMediaType === "movie"}
+                    onChange={() => setTmdbMediaType("movie")}
+                    disabled={tmdbProgress.isRunning}
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="movie-type">Movies</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="tv-type"
+                    name="media-type"
+                    checked={tmdbMediaType === "tv"}
+                    onChange={() => setTmdbMediaType("tv")}
+                    disabled={tmdbProgress.isRunning}
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="tv-type">TV Shows</Label>
                 </div>
               </div>
+              <div className="text-xs text-muted-foreground">
+                Select the type of content you want to import. This will
+                determine how the data is processed.
+              </div>
+            </div>
 
-              {/* Clear Existing Data Option */}
-              <div className="flex items-center space-x-2 mt-4">
-                <Switch
-                  id="clear-existing-data"
-                  checked={clearExistingData}
-                  onCheckedChange={setClearExistingData}
-                  disabled={tmdbProgress.isRunning}
-                />
-                <Label
-                  htmlFor="clear-existing-data"
-                  className="flex items-center gap-2"
+            <label className="text-sm font-medium mt-4">TMDB JSON Data</label>
+            <div className="space-y-1">
+              <textarea
+                value={tmdbJsonData}
+                onChange={(e) => setTmdbJsonData(e.target.value)}
+                disabled={tmdbProgress.isRunning}
+                placeholder={
+                  'Enter TMDB JSON data, one object per line:\n{"id": 550, "original_title": "Fight Club", "adult": false, "popularity": 0.5, "video": false, "media_type": "movie"}\n{"id": 551, "original_title": "Another Movie", "adult": false, "popularity": 0.4, "video": false, "media_type": "movie"}'
+                }
+                className="w-full h-32 p-2 border rounded-md font-mono text-sm text-black dark:text-white bg-white dark:bg-gray-800"
+                style={{ color: "inherit" }}
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>
+                  {parseTmdbJsonList(tmdbJsonData).length} valid items
+                </span>
+                <button
+                  onClick={() => setTmdbJsonData("")}
+                  className="text-blue-500 hover:underline"
+                  disabled={tmdbProgress.isRunning || !tmdbJsonData}
                 >
-                  <Server className="h-4 w-4" />
-                  Clear existing vector database before import
-                </Label>
+                  Clear
+                </button>
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                You can optionally specify a "media_type" field in each JSON
+                object to override the global selection above.
               </div>
             </div>
           </>

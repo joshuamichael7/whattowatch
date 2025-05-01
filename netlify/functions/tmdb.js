@@ -32,7 +32,7 @@ function transformTmdbSearchResult(item) {
   const mediaType = item.media_type || (item.first_air_date ? "tv" : "movie");
 
   return {
-    id: item.id.toString(),
+    id: `tmdb-${mediaType}-${item.id}`,
     title: mediaType === "tv" ? item.name : item.title,
     original_title:
       mediaType === "tv" ? item.original_name : item.original_title,
@@ -117,7 +117,7 @@ function transformTmdbMovieDetails(movie) {
   }
 
   return {
-    id: movie.id.toString(),
+    id: `tmdb-movie-${movie.id}`,
     tmdb_id: movie.id.toString(),
     imdb_id: movie.imdb_id,
     title: movie.title,
@@ -194,11 +194,10 @@ function transformTmdbTvDetails(show) {
   }
 
   return {
-    id: show.id.toString(),
+    id: `tmdb-tv-${show.id}`,
     tmdb_id: show.id.toString(),
     imdb_id: show.external_ids?.imdb_id || "",
     title: show.name,
-    original_title: show.original_name || show.name,
     original_title: show.original_name || show.name,
     poster_path: show.poster_path
       ? `https://image.tmdb.org/t/p/w500${show.poster_path}`
@@ -316,7 +315,8 @@ exports.handler = async (event, context) => {
         }
 
         const tvData = await makeApiCall(`/tv/${tvId}`, {
-          append_to_response: "credits,watch/providers,content_ratings",
+          append_to_response:
+            "credits,watch/providers,content_ratings,external_ids",
           language: "en-US",
         });
 
