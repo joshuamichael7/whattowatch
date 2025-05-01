@@ -19,38 +19,23 @@ let importStatus = {
 };
 
 // Function to read the TMDB IDs from the static file
-function readTmdbIds() {
+async function readTmdbIds() {
   console.log("[TMDB Import] Reading TMDB IDs from data file");
   try {
-    // Read from the src/data/tmdbIds.json file - no fallback
-    const projectRoot = process.env.LAMBDA_TASK_ROOT || ".";
-    const dataFilePath = path.join(projectRoot, "src", "data", "tmdbIds.json");
+    // In Netlify, we should fetch the file from the public URL
+    const siteUrl = process.env.URL || "https://whattowatchapp.netlify.app";
+    const fileUrl = `${siteUrl}/tmdbIds.json`;
 
-    console.log(`[TMDB Import] Looking for data file at: ${dataFilePath}`);
+    console.log(`[TMDB Import] Fetching TMDB IDs from URL: ${fileUrl}`);
 
-    // Check if file exists - throw detailed error if not
-    if (!fs.existsSync(dataFilePath)) {
-      const errorMessage = `[TMDB Import] Error: Data file not found at ${dataFilePath}`;
-      console.error(errorMessage);
-      throw new Error(errorMessage);
-    }
+    // Use axios or node-fetch to get the file from the URL
+    const axios = require("axios");
 
-    // Read and parse the JSON file
-    let fileContent;
     try {
-      fileContent = fs.readFileSync(dataFilePath, "utf8");
-      console.log(
-        `[TMDB Import] Successfully read data file with ${fileContent.length} bytes`,
-      );
-    } catch (readError) {
-      console.error(`[TMDB Import] Error reading file: ${readError.message}`);
-      console.error(`[TMDB Import] Error stack: ${readError.stack}`);
-      throw readError; // Throw the original error to preserve stack trace
-    }
+      const response = await axios.get(fileUrl);
+      const ids = response.data;
 
-    let ids;
-    try {
-      ids = JSON.parse(fileContent);
+      console.log(`[TMDB Import] Successfully fetched data from URL`);
 
       // Validate the parsed data
       if (!Array.isArray(ids)) {
@@ -65,10 +50,22 @@ function readTmdbIds() {
         `[TMDB Import] Successfully parsed ${ids.length} TMDB IDs from file`,
       );
       return ids;
-    } catch (parseError) {
-      console.error(`[TMDB Import] Error parsing JSON: ${parseError.message}`);
-      console.error(`[TMDB Import] Error stack: ${parseError.stack}`);
-      throw parseError; // Throw the original error to preserve stack trace
+    } catch (fetchError) {
+      console.error(`[TMDB Import] Error fetching file from URL: ${fileUrl}`);
+      console.error(`[TMDB Import] Error message: ${fetchError.message}`);
+      console.error(`[TMDB Import] Error stack: ${fetchError.stack}`);
+
+      // Try to provide more detailed error information
+      if (fetchError.response) {
+        console.error(`[TMDB Import] Status: ${fetchError.response.status}`);
+        console.error(
+          `[TMDB Import] Response data: ${JSON.stringify(fetchError.response.data)}`,
+        );
+      }
+
+      throw new Error(
+        `Failed to fetch TMDB IDs from ${fileUrl}: ${fetchError.message}`,
+      );
     }
   } catch (error) {
     console.error("[TMDB Import] Error reading TMDB IDs:", error);
@@ -90,7 +87,7 @@ async function startImport() {
   console.log("[TMDB Import] Reading TMDB IDs");
   let tmdbIds;
   try {
-    tmdbIds = readTmdbIds();
+    tmdbIds = await readTmdbIds();
     console.log(`[TMDB Import] Found ${tmdbIds.length} TMDB IDs to process`);
   } catch (error) {
     console.error(`[TMDB Import] Failed to read TMDB IDs: ${error.message}`);

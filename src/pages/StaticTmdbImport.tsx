@@ -4,7 +4,7 @@ import TmdbImportMonitor from "@/components/TmdbImportMonitor";
 // This is a static page that contains TMDB IDs for server-side processing
 // The actual IDs are stored in a separate data file that the server accesses
 
-const StaticTmdbImportPage: React.FC = () => {
+export const StaticTmdbImport: React.FC = () => {
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-6">TMDB Data Import</h1>
@@ -34,4 +34,4 @@ const StaticTmdbImportPage: React.FC = () => {
   );
 };
 
-export default StaticTmdbImportPage;
+export default StaticTmdbImport;
