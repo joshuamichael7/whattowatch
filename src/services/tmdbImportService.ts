@@ -4,6 +4,7 @@ import {
   searchMoviesByIds,
   searchTvShowsByIds,
 } from "@/lib/tmdbClientProxy";
+import { sleep } from "@/lib/utils";
 import { addContentToVectorDb } from "@/services/vectorService";
 import { ContentItem } from "@/types/omdb";
 import { clearPineconeIndex } from "@/lib/pineconeClient";
@@ -252,11 +253,43 @@ export async function processTmdbBatch(
   let currentIndex = 0;
   const totalItems = tmdbItems.length;
 
+  // TMDB rate limit: 40 requests per 10 seconds
+  // We'll use a more conservative limit to be safe
+  const RATE_LIMIT_REQUESTS = 30; // Requests per window
+  const RATE_LIMIT_WINDOW = 10000; // Window size in ms (10 seconds)
+  const DELAY_BETWEEN_BATCHES = 3000; // 3 seconds between batches
+
+  // For tracking rate limits
+  let requestsInWindow = 0;
+  let windowStartTime = Date.now();
+
   const addLog = (log: string) => {
     updateProgress((prev) => ({
       ...prev,
       logs: [...prev.logs.slice(-99), log], // Keep last 100 logs
     }));
+  };
+
+  // Helper function to check and respect rate limits
+  const checkRateLimit = async () => {
+    requestsInWindow++;
+
+    // If we've reached the limit for this window
+    if (requestsInWindow >= RATE_LIMIT_REQUESTS) {
+      const currentTime = Date.now();
+      const elapsedTime = currentTime - windowStartTime;
+
+      // If we're still within the window, wait until the window ends
+      if (elapsedTime < RATE_LIMIT_WINDOW) {
+        const waitTime = RATE_LIMIT_WINDOW - elapsedTime + 500; // Add 500ms buffer
+        addLog(`Rate limit reached: waiting ${waitTime}ms before continuing`);
+        await sleep(waitTime);
+      }
+
+      // Reset the window
+      requestsInWindow = 0;
+      windowStartTime = Date.now();
+    }
   };
 
   addLog(`Starting batch processing of ${totalItems} TMDB IDs`);
@@ -282,7 +315,30 @@ export async function processTmdbBatch(
     if (movieIds.length > 0) {
       addLog(`Processing ${movieIds.length} movies in bulk`);
       try {
-        const movies = await searchMoviesByIds(movieIds, includeDetails);
+        // Respect TMDB rate limit (40 requests per 10 seconds)
+        // Since searchMoviesByIds makes multiple requests, we need to be cautious
+        const maxBatchSize = Math.min(movieIds.length, 5); // Smaller batch size for safety
+        const movies = [];
+
+        // Process in smaller batches to respect rate limits
+        for (let j = 0; j < movieIds.length; j += maxBatchSize) {
+          await checkRateLimit();
+
+          const idBatch = movieIds.slice(j, j + maxBatchSize);
+          addLog(
+            `Processing movie batch ${j / maxBatchSize + 1} of ${Math.ceil(movieIds.length / maxBatchSize)}`,
+          );
+
+          const batchMovies = await searchMoviesByIds(idBatch, includeDetails);
+          movies.push(...batchMovies);
+
+          // Add delay between batches to respect rate limits
+          if (j + maxBatchSize < movieIds.length) {
+            addLog("Rate limit pause: waiting 3 seconds between batches");
+            await sleep(DELAY_BETWEEN_BATCHES);
+          }
+        }
+
         for (const movie of movies) {
           if (movie) {
             addLog(`Found movie: ${movie.title}`);
@@ -318,6 +374,8 @@ export async function processTmdbBatch(
         );
         // Fall back to individual processing for movies
         for (const movieId of movieIds) {
+          await checkRateLimit();
+
           const result = await processTmdbId(
             movieId,
             "movie",
@@ -344,6 +402,9 @@ export async function processTmdbBatch(
             skipped,
             lastUpdated: new Date(),
           }));
+
+          // Add a small delay between individual requests
+          await sleep(500);
         }
       }
     }
@@ -352,7 +413,33 @@ export async function processTmdbBatch(
     if (tvIds.length > 0) {
       addLog(`Processing ${tvIds.length} TV shows in bulk`);
       try {
-        const tvShows = await searchTvShowsByIds(tvIds, includeDetails);
+        // Respect TMDB rate limit (40 requests per 10 seconds)
+        // Since searchTvShowsByIds makes multiple requests, we need to be cautious
+        const maxBatchSize = Math.min(tvIds.length, 5); // Smaller batch size for safety
+        const tvShows = [];
+
+        // Process in smaller batches to respect rate limits
+        for (let j = 0; j < tvIds.length; j += maxBatchSize) {
+          await checkRateLimit();
+
+          const idBatch = tvIds.slice(j, j + maxBatchSize);
+          addLog(
+            `Processing TV show batch ${j / maxBatchSize + 1} of ${Math.ceil(tvIds.length / maxBatchSize)}`,
+          );
+
+          const batchTvShows = await searchTvShowsByIds(
+            idBatch,
+            includeDetails,
+          );
+          tvShows.push(...batchTvShows);
+
+          // Add delay between batches to respect rate limits
+          if (j + maxBatchSize < tvIds.length) {
+            addLog("Rate limit pause: waiting 3 seconds between batches");
+            await sleep(DELAY_BETWEEN_BATCHES);
+          }
+        }
+
         for (const tvShow of tvShows) {
           if (tvShow) {
             addLog(`Found TV show: ${tvShow.title}`);
@@ -388,6 +475,8 @@ export async function processTmdbBatch(
         );
         // Fall back to individual processing for TV shows
         for (const tvId of tvIds) {
+          await checkRateLimit();
+
           const result = await processTmdbId(
             tvId,
             "tv",
@@ -414,12 +503,15 @@ export async function processTmdbBatch(
             skipped,
             lastUpdated: new Date(),
           }));
+
+          // Add a small delay between individual requests
+          await sleep(500);
         }
       }
     }
 
     // Small delay between batches to prevent overwhelming the API
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await sleep(1000);
   }
 
   addLog(

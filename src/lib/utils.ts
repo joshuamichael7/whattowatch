@@ -124,3 +124,12 @@ export function mapGenreStringsToIds(genreStrings: string[]): number[] {
     })
     .filter((id): id is number => id !== null);
 }
+
+/**
+ * Sleep for a specified number of milliseconds
+ * @param ms Milliseconds to sleep
+ * @returns Promise that resolves after the specified time
+ */
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
