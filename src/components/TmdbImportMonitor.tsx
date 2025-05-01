@@ -41,8 +41,14 @@ const TmdbImportMonitor: React.FC = () => {
   useEffect(() => {
     let interval: NodeJS.Timeout;
 
+    // Initial fetch when component mounts
+    fetchStatus();
+
     if (status.isRunning) {
       interval = setInterval(fetchStatus, 5000); // Poll every 5 seconds
+    } else {
+      // Even if not running, poll occasionally to check for updates
+      interval = setInterval(fetchStatus, 10000); // Poll every 10 seconds
     }
 
     return () => {
@@ -51,6 +57,7 @@ const TmdbImportMonitor: React.FC = () => {
   }, [status.isRunning]);
 
   const fetchStatus = async () => {
+    console.log("Fetching import status...");
     try {
       setLoading(true);
       setError(null);

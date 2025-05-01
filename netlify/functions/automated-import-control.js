@@ -116,6 +116,10 @@ async function startImport() {
   // In a real implementation, you would start a background process to handle the import
   // For now, we'll just simulate it with a timeout
   console.log("[TMDB Import] Setting up timeout for processing");
+  // Add immediate logging to verify execution path
+  console.log("[TMDB Import] About to start processing items");
+  // Log the tmdbIds to verify they're being passed correctly
+  console.log(`[TMDB Import] First item: ${JSON.stringify(tmdbIds[0])}`);
   setTimeout(() => {
     try {
       console.log("[TMDB Import] Starting processing in timeout");
@@ -123,6 +127,7 @@ async function startImport() {
       importStatus.logs.push("Import process started");
       importStatus.lastUpdated = new Date().toISOString();
       console.log("[TMDB Import] Updated import status with start message");
+      console.log("[TMDB Import] Processing items count: " + tmdbIds.length);
 
       // This would be replaced with actual processing logic
       // For now, we'll just simulate it with random success/failure
@@ -133,7 +138,11 @@ async function startImport() {
         console.log(
           `[TMDB Import] Scheduling item ${i + 1}/${tmdbIds.length} for processing`,
         );
+        // Use a shorter timeout for faster processing
         setTimeout(() => {
+          console.log(
+            `[TMDB Import] Processing item ${i + 1} in inner timeout`,
+          );
           try {
             const item = tmdbIds[i];
             console.log(
