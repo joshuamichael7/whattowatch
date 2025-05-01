@@ -90,6 +90,12 @@ async function processTmdbBatch(tmdbIds, batchSize) {
   const addLog = (log) => {
     logs.push(log);
     console.log(`[Automated Import] ${log}`);
+
+    // Update the status file with the new log
+    updateStatusFile({
+      logs: [...logs],
+      lastUpdated: new Date().toISOString(),
+    });
   };
 
   addLog(`Starting TMDB batch processing for ${tmdbIds.length} items`);
@@ -168,6 +174,15 @@ async function processTmdbBatch(tmdbIds, batchSize) {
                 `Error processing movie ID ${currentId}: ${result.reason}`,
               );
             }
+
+            // Update the status file with progress
+            updateStatusFile({
+              processed,
+              successful,
+              failed,
+              skipped,
+              lastUpdated: new Date().toISOString(),
+            });
           });
 
           // Add delay between batches to respect rate limits
@@ -257,6 +272,15 @@ async function processTmdbBatch(tmdbIds, batchSize) {
                 `Error processing TV show ID ${currentId}: ${result.reason}`,
               );
             }
+
+            // Update the status file with progress
+            updateStatusFile({
+              processed,
+              successful,
+              failed,
+              skipped,
+              lastUpdated: new Date().toISOString(),
+            });
           });
 
           // Add delay between batches to respect rate limits
@@ -685,6 +709,18 @@ exports.handler = async (event, context) => {
       };
     }
 
+    // Update the status file with initial information
+    updateStatusFile({
+      isRunning: true,
+      totalItems: tmdbIds && Array.isArray(tmdbIds) ? tmdbIds.length : count,
+      processed: 0,
+      successful: 0,
+      failed: 0,
+      skipped: 0,
+      logs: ["Starting import process"],
+      lastUpdated: new Date().toISOString(),
+    });
+
     // Clear existing data if requested
     if (clearExisting) {
       console.log("[Automated Import] Clearing existing vector database...");
@@ -692,12 +728,62 @@ exports.handler = async (event, context) => {
         const { clearPineconeIndex } = require("../../src/lib/pineconeClient");
         const cleared = await clearVectorDatabase();
         console.log(`[Automated Import] Vector database cleared: ${cleared}`);
+
+        // Update status file
+        updateStatusFile({
+          logs: [
+            "Starting import process",
+            `Vector database cleared: ${cleared}`,
+          ],
+          lastUpdated: new Date().toISOString(),
+        });
       } catch (error) {
         console.error(
           "[Automated Import] Error clearing vector database:",
           error,
         );
+        // Update status file with error
+        updateStatusFile({
+          logs: [
+            "Starting import process",
+            `Error clearing vector database: ${error.message || String(error)}`,
+          ],
+          lastUpdated: new Date().toISOString(),
+        });
         // Continue with import even if clearing fails
+      }
+    }
+
+    // Update the status file with progress
+    const fs = require("fs");
+    const STATUS_FILE_PATH = "/tmp/tmdb_import_status.json";
+
+    function updateStatusFile(update) {
+      try {
+        let currentStatus = {
+          isRunning: true,
+          processed: 0,
+          successful: 0,
+          failed: 0,
+          skipped: 0,
+          totalItems: 0,
+          logs: [],
+          lastUpdated: new Date().toISOString(),
+        };
+
+        if (fs.existsSync(STATUS_FILE_PATH)) {
+          const fileContent = fs.readFileSync(STATUS_FILE_PATH, "utf8");
+          currentStatus = JSON.parse(fileContent);
+        }
+
+        const updatedStatus = { ...currentStatus, ...update };
+        fs.writeFileSync(
+          STATUS_FILE_PATH,
+          JSON.stringify(updatedStatus),
+          "utf8",
+        );
+      } catch (error) {
+        console.error("[Automated Import] Error updating status file:", error);
       }
     }
 

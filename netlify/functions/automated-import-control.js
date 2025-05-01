@@ -5,9 +5,12 @@ const path = require("path");
 // This would normally connect to a database or other persistent storage
 // For now, we'll use a simple in-memory object that's shared with the status endpoint
 
-// Import the shared state from wherever it's maintained
-// This is just a placeholder - in a real implementation, you'd use a database or other persistent storage
-let importStatus = {
+// Define the path for the status file
+// In Netlify Functions, we can use the /tmp directory for temporary storage
+const STATUS_FILE_PATH = "/tmp/tmdb_import_status.json";
+
+// Default status object
+const defaultStatus = {
   isRunning: false,
   processed: 0,
   successful: 0,
@@ -18,17 +21,44 @@ let importStatus = {
   lastUpdated: new Date().toISOString(),
 };
 
+// Function to read the status from file
+function readStatusFromFile() {
+  try {
+    if (fs.existsSync(STATUS_FILE_PATH)) {
+      const fileContent = fs.readFileSync(STATUS_FILE_PATH, "utf8");
+      return JSON.parse(fileContent);
+    }
+  } catch (error) {
+    console.error("Error reading status file:", error);
+  }
+  return defaultStatus;
+}
+
+// Function to write the status to file
+function writeStatusToFile(status) {
+  try {
+    fs.writeFileSync(STATUS_FILE_PATH, JSON.stringify(status), "utf8");
+    return true;
+  } catch (error) {
+    console.error("Error writing status file:", error);
+    return false;
+  }
+}
+
+// Initialize the status from file or default
+let importStatus = readStatusFromFile();
+
 // Function to read the TMDB IDs from the static file
 async function readTmdbIds() {
   console.log("[TMDB Import] Reading TMDB IDs from data file");
   try {
-    // In Netlify, we should fetch the file from the public URL
+    // Fetch from the public URL only
     const siteUrl = process.env.URL || "https://whattowatchapp.netlify.app";
     const fileUrl = `${siteUrl}/tmdbIds.json`;
 
     console.log(`[TMDB Import] Fetching TMDB IDs from URL: ${fileUrl}`);
 
-    // Use axios or node-fetch to get the file from the URL
+    // Use axios to get the file from the URL
     const axios = require("axios");
 
     try {
@@ -129,26 +159,28 @@ async function startImport() {
   console.log(`[TMDB Import] Calling import function at: ${importUrl}`);
 
   // Make the call asynchronously so we can return immediately
-  setTimeout(async () => {
+  // Don't use setTimeout - process immediately but don't wait for completion
+  (async () => {
     try {
       console.log("[TMDB Import] Starting processing in timeout");
       // Simulate processing
       importStatus.logs.push("Import process started");
       importStatus.lastUpdated = new Date().toISOString();
+      writeStatusToFile(importStatus);
       console.log("[TMDB Import] Updated import status with start message");
       console.log("[TMDB Import] Processing items count: " + tmdbIds.length);
 
       // Call the automated-import function with the TMDB IDs
       try {
         console.log(
-          `[TMDB Import] Sending TMDB IDs to import function: ${JSON.stringify(tmdbIds)}`;
+          `[TMDB Import] Sending TMDB IDs to import function: ${JSON.stringify(tmdbIds)}`,
         );
         const response = await axios.post(importUrl, {
           startId: "tmdb-batch", // Not used for TMDB import
           count: tmdbIds.length,
           batchSize: 5, // Process 5 at a time to avoid rate limits
           tmdbIds: tmdbIds, // Pass the actual TMDB IDs
-          clearExisting: true // Clear existing data before import
+          clearExisting: true, // Clear existing data before import
         });
 
         console.log(
@@ -164,15 +196,18 @@ async function startImport() {
           importStatus.logs.push(
             `Sent ${tmdbIds.length} items to import function`,
           );
+          writeStatusToFile(importStatus);
         } else {
           importStatus.logs.push("Import process failed to start");
           importStatus.logs.push(
             `Error: ${response.data?.error || "Unknown error"}`,
           );
           importStatus.isRunning = false;
+          writeStatusToFile(importStatus);
         }
 
         importStatus.lastUpdated = new Date().toISOString();
+        writeStatusToFile(importStatus);
       } catch (error) {
         console.error(`[TMDB Import] Error calling import function:`, error);
         importStatus.logs.push(
@@ -180,6 +215,7 @@ async function startImport() {
         );
         importStatus.isRunning = false;
         importStatus.lastUpdated = new Date().toISOString();
+        writeStatusToFile(importStatus);
       }
     } catch (error) {
       console.error("[TMDB Import] Error in timeout function:", error);
@@ -188,8 +224,9 @@ async function startImport() {
       );
       importStatus.lastUpdated = new Date().toISOString();
       importStatus.isRunning = false;
+      writeStatusToFile(importStatus);
     }
-  }, 1000);
+  })();
 
   console.log("[TMDB Import] Import process initiated successfully");
   return {
@@ -210,6 +247,7 @@ function stopImport() {
   importStatus.isRunning = false;
   importStatus.logs.push("Import process stopped manually");
   importStatus.lastUpdated = new Date().toISOString();
+  writeStatusToFile(importStatus);
   console.log("[TMDB Import] Import process stopped manually");
 
   return {
