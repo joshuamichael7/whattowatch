@@ -50,27 +50,39 @@ export async function matchRecommendationWithOmdbResults(
         synopsis: originalRecommendation.synopsis,
       },
       omdbResults: omdbResults.map((result) => ({
-        title: result.Title,
-        year: result.Year,
-        type: result.Type,
-        imdbID: result.imdbID,
-        plot: result.Plot,
-        actors: result.Actors,
-        director: result.Director,
-        genre: result.Genre,
+        title: result.Title || result.title,
+        year: result.Year || result.year,
+        type: result.Type || result.media_type,
+        imdbID: result.imdbID || result.imdb_id,
+        plot: result.Plot || result.overview || result.plot,
+        actors: result.Actors || result.actors,
+        director: result.Director || result.director,
+        genre:
+          result.Genre ||
+          (result.genre_strings ? result.genre_strings.join(", ") : ""),
       })),
     };
 
     // Call the AI matching function
+    console.log(
+      "[aiMatchingService] Sending request to AI content matcher with prompt:",
+      JSON.stringify(prompt, null, 2),
+    );
     const response = await axios.post(
       "/.netlify/functions/ai-content-matcher",
       prompt,
     );
+    console.log(
+      "[aiMatchingService] Received response from AI content matcher:",
+      response.data,
+    );
 
     if (response.data && response.data.matchedResult) {
       const matchedImdbId = response.data.matchedResult.imdbID;
+      const confidence = response.data.matchedResult.confidence;
+      const reason = response.data.matchedResult.reasonForMatch;
       console.log(
-        `[aiMatchingService] AI matched with IMDB ID: ${matchedImdbId}`,
+        `[aiMatchingService] AI matched with IMDB ID: ${matchedImdbId}, confidence: ${confidence}, reason: ${reason}`,
       );
 
       // Find the full OMDB result that matches the AI's choice
@@ -80,15 +92,26 @@ export async function matchRecommendationWithOmdbResults(
 
       if (matchedOmdbResult) {
         console.log(
-          `[aiMatchingService] Found matching OMDB result: ${matchedOmdbResult.Title} (${matchedOmdbResult.Year})`,
+          `[aiMatchingService] Found matching OMDB result: ${matchedOmdbResult.Title || matchedOmdbResult.title} (${matchedOmdbResult.Year || matchedOmdbResult.year})`,
         );
-        return convertOmdbToContentItem(
+        const contentItem = convertOmdbToContentItem(
           matchedOmdbResult,
           originalRecommendation,
         );
+        console.log("[aiMatchingService] Converted content item:", contentItem);
+        return contentItem;
       } else {
         console.error(
           "[aiMatchingService] AI returned an IMDB ID that doesn't match any of the provided results",
+        );
+        console.log("[aiMatchingService] AI returned IMDB ID:", matchedImdbId);
+        console.log(
+          "[aiMatchingService] Available OMDB results:",
+          omdbResults.map((r) => ({
+            imdbID: r.imdbID || r.imdb_id,
+            title: r.Title || r.title,
+            year: r.Year || r.year,
+          })),
         );
       }
     }

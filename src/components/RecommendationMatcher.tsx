@@ -249,6 +249,22 @@ const RecommendationMatcher: React.FC<RecommendationMatcherProps> = ({
           if (matchResults.length > 1) {
             console.log("[RecommendationMatcher] Using AI to find best match");
             try {
+              console.log("[RecommendationMatcher] Sending to AI matcher:", {
+                title: recommendation.title,
+                year: recommendation.year,
+                reason: recommendation.reason?.substring(0, 50) + "...",
+                synopsis: recommendation.synopsis?.substring(0, 50) + "...",
+              });
+              console.log(
+                "[RecommendationMatcher] Match results for AI:",
+                matchResults.map((r) => ({
+                  id: r.id,
+                  imdb_id: r.imdb_id,
+                  title: r.title,
+                  year: r.year,
+                })),
+              );
+
               const aiMatchedContent = await matchRecommendationWithOmdbResults(
                 {
                   title: recommendation.title,

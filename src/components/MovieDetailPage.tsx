@@ -142,6 +142,99 @@ const MovieDetailPage = () => {
     }
   };
 
+  // Helper function to process AI matching results
+  const processAiMatchingResults = async (
+    aiTitle: string,
+    aiYear: string | undefined,
+    aiReason: string | undefined,
+    aiSynopsis: string,
+    detailedResults: any[],
+  ) => {
+    setVerificationStatus("Using AI to find the best match...");
+    try {
+      console.log(
+        "[MovieDetailPage] Detailed results for AI matching:",
+        detailedResults.map((r) => ({
+          id: r.id,
+          imdb_id: r.imdb_id,
+          title: r.title,
+          year: r.year,
+          media_type: r.media_type,
+        })),
+      );
+
+      const aiMatchedContent = await matchRecommendationWithOmdbResults(
+        {
+          title: aiTitle,
+          year: aiYear,
+          reason: aiReason,
+          synopsis: aiSynopsis,
+        },
+        detailedResults,
+      );
+
+      if (aiMatchedContent) {
+        // Make sure we have a valid ID for the movie
+        if (!aiMatchedContent.id && aiMatchedContent.imdb_id) {
+          aiMatchedContent.id = aiMatchedContent.imdb_id;
+        }
+        console.log("[MovieDetailPage] AI matched content:", {
+          id: aiMatchedContent.id,
+          imdb_id: aiMatchedContent.imdb_id,
+          title: aiMatchedContent.title,
+          year: aiMatchedContent.year,
+          media_type: aiMatchedContent.media_type,
+          overview: aiMatchedContent.overview?.substring(0, 50) + "...",
+        });
+        setMovie(aiMatchedContent);
+        setVerificationStatus(
+          "AI found the best match for this recommendation",
+        );
+        return true;
+      } else {
+        // If AI matching fails, show all options for user selection
+        console.log("[MovieDetailPage] AI matching failed to return a match");
+        console.log(
+          "[MovieDetailPage] Setting potential matches for user selection",
+        );
+        setPotentialMatches(detailedResults);
+        setNeedsUserSelection(true);
+        setVerificationStatus("Please select the correct match manually");
+        return false;
+      }
+    } catch (error) {
+      console.error("[MovieDetailPage] Error during AI matching:", error);
+      console.log(
+        "[MovieDetailPage] Setting potential matches for user selection after error",
+      );
+      setPotentialMatches(detailedResults);
+      setNeedsUserSelection(true);
+      setVerificationStatus(
+        "AI matching failed. Please select the correct match manually",
+      );
+      return false;
+    }
+  };
+
+  // Helper function to get detailed results from search results
+  const getDetailedResults = async (searchResults: any[]) => {
+    const detailedResults = [];
+    const originalResults = searchResults.slice(0, 5);
+
+    for (const result of originalResults) {
+      try {
+        const details = await getContentById(result.id);
+        if (details) detailedResults.push(details);
+      } catch (error) {
+        console.error(`Error getting details for ${result.id}:`, error);
+        // If we can't get details, use the search result directly
+        detailedResults.push(result);
+      }
+    }
+
+    return detailedResults;
+  };
+
   useEffect(() => {
     const fetchMovieDetails = async () => {
       if (!id) return;
@@ -219,104 +312,52 @@ const MovieDetailPage = () => {
             setVerificationStatus(
               "Found potential matches, getting details...",
             );
-            const detailedResults = [];
-            for (const result of relaxedResults.slice(0, 5)) {
-              // Limit to 5 results
-              const details = await getContentById(result.id);
-              if (details) detailedResults.push(details);
-            }
+            const detailedResults = await getDetailedResults(relaxedResults);
 
-            // Step 2: Use AI to match the original recommendation with OMDB results
-            setVerificationStatus("Using AI to find the best match...");
-            const aiMatchedContent = await matchRecommendationWithOmdbResults(
-              {
-                title: aiTitle,
-                year: aiYear,
-                reason: aiReason,
-                synopsis: aiSynopsis,
-              },
-              detailedResults,
-            );
-
-            if (aiMatchedContent) {
-              // Make sure we have a valid ID for the movie
-              if (!aiMatchedContent.id && aiMatchedContent.imdb_id) {
-                aiMatchedContent.id = aiMatchedContent.imdb_id;
-              }
-              console.log("AI matched content:", aiMatchedContent);
-              setMovie(aiMatchedContent);
-              setVerificationStatus(
-                "AI found the best match for this recommendation",
+            // If we have at least one detailed result, proceed with AI matching
+            if (detailedResults.length > 0) {
+              // Step 2: Use AI to match the original recommendation with OMDB results
+              const matchSuccess = await processAiMatchingResults(
+                aiTitle,
+                aiYear,
+                aiReason,
+                aiSynopsis,
+                detailedResults,
               );
-            } else {
-              // If AI matching fails, use the first result
-              if (detailedResults.length > 0) {
-                const firstMatch = detailedResults[0];
-                setMovie({
-                  ...firstMatch,
-                  recommendationReason: aiReason,
-                  synopsis:
-                    aiSynopsis || firstMatch.overview || firstMatch.plot,
-                  aiRecommended: true,
-                });
-                setVerificationStatus(
-                  "Using best available match (low confidence)",
-                );
-              } else {
-                throw new Error("No content found matching the recommendation");
+
+              if (!matchSuccess) {
+                // If AI matching fails and we're showing user selection, return early
+                return;
               }
+            } else {
+              // No detailed results available
+              throw new Error(`No content found matching "${aiTitle}"`);
             }
           } else {
             // Get detailed info for each search result
             setVerificationStatus(
               "Found potential matches, getting details...",
             );
-            const detailedResults = [];
-            for (const result of searchResults.slice(0, 5)) {
-              // Limit to 5 results
-              const details = await getContentById(result.id);
-              if (details) detailedResults.push(details);
-            }
+            const detailedResults = await getDetailedResults(searchResults);
 
-            // Step 2: Use AI to match the original recommendation with OMDB results
-            setVerificationStatus("Using AI to find the best match...");
-            const aiMatchedContent = await matchRecommendationWithOmdbResults(
-              {
-                title: aiTitle,
-                year: aiYear,
-                reason: aiReason,
-                synopsis: aiSynopsis,
-              },
-              detailedResults,
-            );
-
-            if (aiMatchedContent) {
-              // Make sure we have a valid ID for the movie
-              if (!aiMatchedContent.id && aiMatchedContent.imdb_id) {
-                aiMatchedContent.id = aiMatchedContent.imdb_id;
-              }
-              console.log("AI matched content:", aiMatchedContent);
-              setMovie(aiMatchedContent);
-              setVerificationStatus(
-                "AI found the best match for this recommendation",
+            // If we have at least one detailed result, proceed with AI matching
+            if (detailedResults.length > 0) {
+              // Step 2: Use AI to match the original recommendation with OMDB results
+              const matchSuccess = await processAiMatchingResults(
+                aiTitle,
+                aiYear,
+                aiReason,
+                aiSynopsis,
+                detailedResults,
               );
-            } else {
-              // If AI matching fails, use the first result
-              if (detailedResults.length > 0) {
-                const firstMatch = detailedResults[0];
-                setMovie({
-                  ...firstMatch,
-                  recommendationReason: aiReason,
-                  synopsis:
-                    aiSynopsis || firstMatch.overview || firstMatch.plot,
-                  aiRecommended: true,
-                });
-                setVerificationStatus(
-                  "Using best available match (low confidence)",
-                );
-              } else {
-                throw new Error("No content found matching the recommendation");
+
+              if (!matchSuccess) {
+                // If AI matching fails and we're showing user selection, return early
+                return;
               }
+            } else {
+              // No detailed results available
+              throw new Error(`No content found matching "${aiTitle}"`);
             }
           }
         }
@@ -360,36 +401,23 @@ const MovieDetailPage = () => {
               setVerificationStatus(
                 "Found potential matches, getting details...",
               );
-              const detailedResults = [];
-              for (const result of searchResults.slice(0, 5)) {
-                // Limit to 5 results
-                const details = await getContentById(result.id);
-                if (details) detailedResults.push(details);
-              }
+              const detailedResults = await getDetailedResults(searchResults);
 
-              // Use AI to match
-              setVerificationStatus("Using AI to find the best match...");
-              const aiMatchedContent = await matchRecommendationWithOmdbResults(
-                {
-                  title: decodedTitle,
-                  synopsis: "",
-                },
-                detailedResults,
-              );
-
-              if (aiMatchedContent) {
-                // Make sure we have a valid ID for the movie
-                if (!aiMatchedContent.id && aiMatchedContent.imdb_id) {
-                  aiMatchedContent.id = aiMatchedContent.imdb_id;
-                }
-                setMovie(aiMatchedContent);
-                setVerificationStatus("AI found the best match for this title");
-              } else if (detailedResults.length > 0) {
-                // If AI matching fails, use the first result
-                setMovie(detailedResults[0]);
-                setVerificationStatus(
-                  "Using best available match (low confidence)",
+              // If we have at least one detailed result, proceed with AI matching
+              if (detailedResults.length > 0) {
+                // Use AI to match
+                const matchSuccess = await processAiMatchingResults(
+                  decodedTitle,
+                  undefined,
+                  undefined,
+                  "",
+                  detailedResults,
                 );
+
+                if (!matchSuccess) {
+                  // If AI matching fails and we're showing user selection, return early
+                  return;
+                }
               } else {
                 throw new Error(`No content found matching "${decodedTitle}"`);
               }
