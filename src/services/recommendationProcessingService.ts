@@ -262,8 +262,10 @@ export const processRecommendation = async (
   rec: any,
   retryCount: number = 0,
 ): Promise<ContentItem | null> => {
+  // CRITICAL: Add more visible logging
   console.log(
-    `[RecommendationProcessingService] 🔄 processRecommendation CALLED for ${rec.title} at ${new Date().toISOString()}`,
+    `%c[RecommendationProcessingService] 🔄 processRecommendation CALLED for ${rec.title} at ${new Date().toISOString()}`,
+    "background: #ff9800; color: #000; padding: 2px 4px; border-radius: 2px; font-weight: bold;",
   );
   const MAX_RETRIES = 2;
 
@@ -309,7 +311,8 @@ export const processRecommendation = async (
   // CRITICAL: Log that processing has started with timestamp
   const startTime = new Date();
   console.log(
-    `[RecommendationProcessingService] ⚡ STARTED PROCESSING: ${rec.title} (ID: ${rec.id}) at ${startTime.toISOString()}`,
+    `%c[RecommendationProcessingService] ⚡ STARTED PROCESSING: ${rec.title} (ID: ${rec.id}) at ${startTime.toISOString()}`,
+    "background: #f44336; color: #fff; padding: 2px 4px; border-radius: 2px; font-weight: bold;",
   );
 
   try {
@@ -558,7 +561,8 @@ import {
  */
 export const startBackgroundProcessing = async () => {
   console.log(
-    `[RecommendationProcessingService] 🔄 STARTING BACKGROUND PROCESSING at ${new Date().toISOString()}`,
+    `%c[RecommendationProcessingService] 🔄 STARTING BACKGROUND PROCESSING at ${new Date().toISOString()}`,
+    "background: #4caf50; color: #fff; padding: 2px 4px; border-radius: 2px; font-weight: bold;",
   );
 
   // Log to console for tracking background processing
@@ -583,6 +587,23 @@ export const startBackgroundProcessing = async () => {
           `%c[BackgroundProcessing ${timestamp}] ${message}`,
           "color: blue",
         );
+      }
+
+      // CRITICAL: Also store logs in localStorage for debugging
+      try {
+        const logsStr =
+          localStorage.getItem("backgroundProcessingLogs") || "[]";
+        const logs = JSON.parse(logsStr);
+        logs.unshift({
+          timestamp,
+          message,
+          type,
+        });
+        // Keep only the last 100 logs
+        if (logs.length > 100) logs.length = 100;
+        localStorage.setItem("backgroundProcessingLogs", JSON.stringify(logs));
+      } catch (storageErr) {
+        console.error("Error storing log in localStorage:", storageErr);
       }
     } catch (err) {
       console.error("Error logging to console:", err);

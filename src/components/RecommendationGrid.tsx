@@ -97,6 +97,28 @@ const RecommendationGrid = ({
       `[RecommendationGrid] 📥 RECEIVED ${recommendations.length} RECOMMENDATIONS:`,
       recommendations.map((rec) => ({ id: rec.id, title: rec.title })),
     );
+
+    // CRITICAL: Store recommendations for processing immediately when they're received
+    if (recommendations && recommendations.length > 0) {
+      console.log(
+        `[RecommendationGrid] 🚨 IMMEDIATELY storing ${recommendations.length} recommendations for processing`,
+      );
+      // Store in localStorage for background processing
+      try {
+        localStorage.setItem(
+          "pendingRecommendationsToProcess",
+          JSON.stringify(recommendations),
+        );
+        console.log(
+          `[RecommendationGrid] ✅ Successfully stored ${recommendations.length} recommendations in localStorage`,
+        );
+      } catch (err) {
+        console.error(
+          "[RecommendationGrid] ❌ Error storing in localStorage:",
+          err,
+        );
+      }
+    }
   }, [recommendations]);
   const [sortBy, setSortBy] = useState("relevance");
   const [filterVisible, setFilterVisible] = useState(false);
@@ -162,6 +184,9 @@ const RecommendationGrid = ({
 
     // Define an async function inside the effect
     const processRecommendationsNow = async () => {
+      console.log(
+        `[RecommendationGrid] 🔄 processRecommendationsNow FUNCTION CALLED at ${new Date().toISOString()}`,
+      );
       try {
         console.log(
           `[RecommendationGrid] ⏱️ START IMPORT of recommendationProcessingService at ${new Date().toISOString()}`,
@@ -244,7 +269,15 @@ const RecommendationGrid = ({
     };
 
     // Execute the async function
-    processRecommendationsNow();
+    console.log(
+      `[RecommendationGrid] 🚀 CALLING processRecommendationsNow() NOW at ${new Date().toISOString()}`,
+    );
+    processRecommendationsNow().catch((error) => {
+      console.error(
+        `[RecommendationGrid] ❌ CRITICAL ERROR in processRecommendationsNow:`,
+        error,
+      );
+    });
   }, [recommendations]);
 
   useEffect(() => {
