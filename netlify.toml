@@ -5,13 +5,13 @@
 
 [functions]
   directory = "netlify/functions"
-
-# Define the background function with a longer timeout
-[[functions]]
-  pattern = "tmdb-background-import"
-  included_files = ["src/**", "netlify/functions/**"]
   node_bundler = "esbuild"
+
+# Define background function with longer timeout
+[[functions]]
+  included_files = ["src/**", "netlify/functions/**"]
   external_node_modules = ["axios", "@supabase/supabase-js"]
+  pattern = "tmdb-background-import"
   background = true
   timeout = 900 # 15 minutes in seconds
 
