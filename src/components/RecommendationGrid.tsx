@@ -144,136 +144,87 @@ const RecommendationGrid = ({
   useEffect(() => {
     if (!recommendations || recommendations.length === 0) return;
 
-    // Immediately start processing recommendations when they're loaded
-    const processRecommendations = async () => {
-      try {
-        console.log(
-          `[RecommendationGrid] Starting immediate processing of ${recommendations.length} recommendations`,
-        );
+    // DIRECT PROCESSING - No async/await to ensure it runs immediately
+    console.log(
+      `[RecommendationGrid] DIRECT PROCESSING of ${recommendations.length} recommendations`,
+    );
 
-        // Import the recommendation processing service
-        const service = await import(
-          "@/services/recommendationProcessingService"
-        );
-
-        // First check if we have cached recommendations
-        const cacheParams = {
-          type: typeFilter,
-          rating: ratingFilter,
-          year: yearFilter,
-          userId: userId || "anonymous",
-          count: recommendations.length,
-        };
-
-        try {
-          const cachedRecommendations =
-            await service.checkCachedRecommendations(cacheParams);
-
-          if (cachedRecommendations && cachedRecommendations.length > 0) {
-            console.log(
-              `[RecommendationGrid] Using ${cachedRecommendations.length} cached recommendations`,
-            );
-            setProcessedRecommendations(
-              cachedRecommendations.reduce((acc, item) => {
-                if (item.id) acc[item.id] = item;
-                return acc;
-              }, {}),
-            );
-          } else {
-            // No cached recommendations, process new ones
-            console.log(
-              `[RecommendationGrid] No cached recommendations found, processing ${recommendations.length} new recommendations`,
-            );
-
-            // Store recommendations for background processing
-            const storedCount =
-              await service.storeRecommendationsForProcessing(recommendations);
-            console.log(
-              `[RecommendationGrid] Stored ${storedCount} recommendations for processing`,
-            );
-
-            // Force immediate processing of at least the first 3 recommendations
-            const initialProcessingPromises = recommendations
-              .slice(0, 3)
-              .map((rec) => {
-                console.log(
-                  `[RecommendationGrid] Starting immediate processing for: ${rec.title}`,
-                );
-                return service.processRecommendation(rec);
-              });
-
-            // Process first 3 recommendations immediately
-            const initialResults = await Promise.allSettled(
-              initialProcessingPromises,
-            );
-            console.log(
-              `[RecommendationGrid] Initial processing complete for ${initialResults.filter((r) => r.status === "fulfilled").length} recommendations`,
-            );
-
-            // Start background processing for the rest
-            await service.startBackgroundProcessing();
-            console.log(
-              `[RecommendationGrid] Background processing started for remaining recommendations`,
-            );
-
-            // Set up a polling mechanism to check for processed recommendations
-            const pollInterval = setInterval(() => {
-              const processedRecs = service.getProcessedRecommendations();
-              const processedCount = Object.keys(processedRecs).length;
-              console.log(
-                `[RecommendationGrid] Polling: ${processedCount} recommendations processed`,
-              );
-
-              if (processedCount > 0) {
-                setProcessedRecommendations(processedRecs);
-              }
-
-              // Check if all recommendations are processed
-              const pendingRecsString = localStorage.getItem(
-                "pendingRecommendationsToProcess",
-              );
-              const pendingRecs = pendingRecsString
-                ? JSON.parse(pendingRecsString)
-                : [];
-
-              if (pendingRecs.length === 0) {
-                console.log(
-                  `[RecommendationGrid] All recommendations processed, stopping polling`,
-                );
-                clearInterval(pollInterval);
-              }
-            }, 2000); // Poll every 2 seconds
-
-            // Load any previously processed recommendations
-            const processedRecs = service.getProcessedRecommendations();
-            setProcessedRecommendations(processedRecs);
-
-            // Clean up the interval when component unmounts
-            return () => clearInterval(pollInterval);
-          }
-        } catch (cacheError) {
-          console.error(
-            "[RecommendationGrid] Error checking cache:",
-            cacheError,
+    // Import synchronously to avoid any delays
+    const processRecommendationsDirectly = () => {
+      // Process recommendations directly without waiting
+      import("@/services/recommendationProcessingService")
+        .then((service) => {
+          console.log(
+            `[RecommendationGrid] Service imported, processing recommendations NOW`,
           );
 
-          // Fallback to standard processing
-          await service.storeRecommendationsForProcessing(recommendations);
-          await service.startBackgroundProcessing();
-          const processedRecs = service.getProcessedRecommendations();
-          setProcessedRecommendations(processedRecs);
-        }
-      } catch (error) {
-        console.error(
-          "[RecommendationGrid] Error processing recommendations:",
-          error,
-        );
-      }
+          // Process all recommendations by title - NEVER prioritize by IMDB ID as they're unreliable from AI
+          console.log(
+            `[RecommendationGrid] Processing all ${recommendations.length} recommendations by title`,
+          );
+
+          recommendations.forEach((rec, index) => {
+            console.log(
+              `[RecommendationGrid] Processing recommendation ${index + 1}/${recommendations.length}: ${rec.title}`,
+            );
+            service.processRecommendation(rec).then((result) => {
+              console.log(
+                `[RecommendationGrid] Processed ${rec.title}: ${result ? "SUCCESS" : "FAILED"}`,
+              );
+            });
+          });
+
+          // Start background processing in parallel
+          service.startBackgroundProcessing();
+
+          // Set up aggressive polling to update UI
+          const pollInterval = setInterval(() => {
+            const processedRecs = service.getProcessedRecommendations();
+            const processedCount = Object.keys(processedRecs).length;
+            console.log(
+              `[RecommendationGrid] POLL: ${processedCount}/${recommendations.length} processed`,
+            );
+
+            if (processedCount > 0) {
+              setProcessedRecommendations(processedRecs);
+            }
+
+            // Check if all recommendations are processed
+            if (processedCount >= recommendations.length) {
+              console.log(
+                `[RecommendationGrid] All recommendations processed, stopping polling`,
+              );
+              clearInterval(pollInterval);
+            }
+          }, 1000); // Poll every second for faster updates
+
+          // Clean up interval on unmount
+          return () => clearInterval(pollInterval);
+        })
+        .catch((error) => {
+          console.error(
+            `[RecommendationGrid] CRITICAL ERROR in processing:`,
+            error,
+          );
+        });
     };
 
-    // Start processing immediately
-    processRecommendations();
-  }, [recommendations, typeFilter, ratingFilter, yearFilter, userId]);
+    // Execute immediately
+    processRecommendationsDirectly();
+
+    // Also store recommendations in localStorage directly as backup
+    try {
+      localStorage.setItem(
+        "pendingRecommendationsToProcess",
+        JSON.stringify(recommendations),
+      );
+      console.log(
+        `[RecommendationGrid] Stored ${recommendations.length} recommendations in localStorage directly`,
+      );
+    } catch (err) {
+      console.error("[RecommendationGrid] Error storing in localStorage:", err);
+    }
+  }, [recommendations]);
 
   useEffect(() => {
     if (userId && userPreferences) {
@@ -453,6 +404,9 @@ const RecommendationGrid = ({
                     synopsis: rec.synopsis,
                     overview: rec.overview || rec.synopsis, // Ensure overview is also set
                     reason: rec.reason || rec.recommendationReason,
+                    // CRITICAL: Ensure all fields are properly passed
+                    recommendationReason:
+                      rec.recommendationReason || rec.reason,
                   },
                   processedContent: processedRecommendations[rec.id],
                   fromRecommendations: true,
@@ -890,7 +844,7 @@ const defaultRecommendations: RecommendationItem[] = [
     type: "tv",
     year: "2020",
     poster:
-      "https://images.unsplash.com/photo-1580541631950-7282082b03fe?w=800&q=80",
+      "https://images.unsplash.com/photo-1581905764498-f1b60bae941a?w=800&q=80",
     rating: 8.6,
     genres: ["Drama"],
     synopsis:

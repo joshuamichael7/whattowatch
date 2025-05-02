@@ -150,6 +150,9 @@ const MovieDetailPage = () => {
     aiSynopsis: string,
     detailedResults: any[],
   ) => {
+    console.log(
+      `[MovieDetailPage] Processing AI matching with synopsis: ${aiSynopsis?.substring(0, 100)}...`,
+    );
     setVerificationStatus("Using AI to find the best match...");
     try {
       console.log(
@@ -163,14 +166,21 @@ const MovieDetailPage = () => {
         })),
       );
 
+      // CRITICAL: Ensure synopsis is properly passed to the matching service
+      const matchRequest = {
+        title: aiTitle,
+        year: aiYear,
+        reason: aiReason,
+        synopsis: aiSynopsis,
+        overview: aiSynopsis, // Include synopsis as overview as well for redundancy
+      };
+
+      console.log(
+        `[MovieDetailPage] Sending match request with synopsis: ${matchRequest.synopsis?.substring(0, 100)}...`,
+      );
+
       const aiMatchedContent = await matchRecommendationWithOmdbResults(
-        {
-          title: aiTitle,
-          year: aiYear,
-          reason: aiReason,
-          synopsis: aiSynopsis,
-          overview: aiSynopsis, // Include synopsis as overview as well for redundancy
-        },
+        matchRequest,
         detailedResults,
       );
 
@@ -271,6 +281,12 @@ const MovieDetailPage = () => {
           locationRecommendation?.synopsis ||
           locationRecommendation?.overview ||
           "";
+
+        // CRITICAL: Log the full recommendation object from location state
+        console.log(
+          `[MovieDetailPage] FULL RECOMMENDATION FROM LOCATION STATE:`,
+          JSON.stringify(locationRecommendation),
+        );
 
         console.log("AI recommendation data:", {
           title: aiTitle,

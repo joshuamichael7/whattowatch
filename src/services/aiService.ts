@@ -582,6 +582,9 @@ function calculateTextSimilarity(text1: string, text2: string): number {
 export async function verifyRecommendationWithOmdb(
   item: ContentItem,
 ): Promise<ContentItem | null> {
+  console.log(
+    `[verifyRecommendationWithOmdb] 🔍 VERIFYING: ${item.title} (ID: ${item.id})`,
+  );
   try {
     console.log(`[verifyRecommendationWithOmdb] Verifying "${item.title}"`);
 

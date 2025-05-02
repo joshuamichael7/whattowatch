@@ -18,6 +18,12 @@ export async function matchRecommendationWithOmdbResults(
   omdbResults: any[],
 ): Promise<ContentItem | null> {
   try {
+    // CRITICAL: Log the full recommendation object to debug synopsis issues
+    console.log(
+      `[aiMatchingService] FULL RECOMMENDATION OBJECT:`,
+      JSON.stringify(originalRecommendation),
+    );
+
     console.log(
       "[aiMatchingService] Matching recommendation with OMDB results",
     );
@@ -45,16 +51,20 @@ export async function matchRecommendationWithOmdbResults(
       return null;
     }
 
+    // CRITICAL: Ensure synopsis is properly included in the prompt
+    const synopsis =
+      originalRecommendation.synopsis || originalRecommendation.overview || "";
+    console.log(
+      `[aiMatchingService] Using synopsis for prompt: ${synopsis.substring(0, 100)}...`,
+    );
+
     // Prepare the prompt for the AI
     const prompt = {
       originalRecommendation: {
         title: originalRecommendation.title,
         year: originalRecommendation.year || "",
         reason: originalRecommendation.reason || "",
-        synopsis:
-          originalRecommendation.synopsis ||
-          originalRecommendation.overview ||
-          "",
+        synopsis: synopsis,
       },
       omdbResults: omdbResults.map((result) => ({
         title: result.Title || result.title,
@@ -73,7 +83,21 @@ export async function matchRecommendationWithOmdbResults(
     // Call the AI matching function
     console.log(
       "[aiMatchingService] Sending request to AI content matcher with prompt:",
-      JSON.stringify(prompt, null, 2),
+      {
+        originalRecommendation: {
+          title: prompt.originalRecommendation.title,
+          year: prompt.originalRecommendation.year,
+          synopsis: prompt.originalRecommendation.synopsis,
+          reason: prompt.originalRecommendation.reason,
+        },
+        omdbResults: prompt.omdbResults.map((r) => ({
+          title: r.title,
+          year: r.year,
+          type: r.type,
+          imdbID: r.imdbID,
+          plot: r.plot?.substring(0, 100) + "...",
+        })),
+      },
     );
     const response = await axios.post(
       "/.netlify/functions/ai-content-matcher",
@@ -361,4 +385,95 @@ function levenshteinDistance(str1: string, str2: string): number {
   }
 
   return dp[m][n];
+}
+
+export async function verifyRecommendationWithOmdb(
+  item: ContentItem,
+): Promise<ContentItem | null> {
+  console.log(`[verifyRecommendationWithOmdb] 🔍 VERIFYING: ${item.title}`);
+  try {
+    // ALWAYS try direct IMDB ID lookup first if available
+    if (aiImdbId || extractedImdbId) {
+      const imdbIds = [aiImdbId, extractedImdbId].filter(Boolean) as string[];
+      const uniqueImdbIds = [...new Set(imdbIds)];
+
+      console.log(
+        `[verifyRecommendationWithOmdb] Attempting lookup with ${uniqueImdbIds.length} unique IMDB IDs: ${uniqueImdbIds.join(", ")}`,
+      );
+
+      for (const imdbId of uniqueImdbIds) {
+        console.log(
+          `[verifyRecommendationWithOmdb] Trying direct IMDB ID lookup: ${imdbId}`,
+        );
+        const response = await fetch(
+          `/.netlify/functions/omdb?i=${imdbId}&plot=full`,
+        );
+
+        if (!response.ok) {
+          console.error(
+            `[verifyRecommendationWithOmdb] OMDB API error for IMDB ID ${imdbId}: ${response.status} ${response.statusText}`,
+          );
+          continue; // Try next IMDB ID if available
+        }
+
+        const data = await response.json();
+        if (data && data.Response === "True") {
+          // For IMDB ID lookups, we trust the result more but still verify the title
+          const similarity = calculateTitleSimilarity(aiTitle, data.Title);
+          console.log(
+            `[verifyRecommendationWithOmdb] Title similarity for "${data.Title}" (${imdbId}): ${similarity.toFixed(2)}`,
+          );
+
+          // Create the content item regardless of similarity score
+          const contentItem = convertOmdbToContentItem(data);
+          contentItem.recommendationReason = aiReason || "Recommended for you";
+          contentItem.reason = aiReason || "Recommended for you";
+          contentItem.synopsis = aiSynopsis || data.Plot;
+          contentItem.verified = true;
+          contentItem.similarityScore = similarity;
+          contentItem.imdb_url = aiImdbUrl; // Preserve the original IMDB URL
+
+          // If similarity is high, it's a confident match
+          if (similarity >= 0.8) {
+            console.log(
+              `[verifyRecommendationWithOmdb] Found good match by IMDB ID: "${data.Title}" (${similarity.toFixed(2)})`,
+            );
+          } else {
+            // Even with low similarity, we trust the IMDB ID but mark it as low confidence
+            console.log(
+              `[verifyRecommendationWithOmdb] Using IMDB match despite lower similarity score: "${data.Title}" (${similarity.toFixed(2)})`,
+            );
+            contentItem.lowConfidenceMatch = true;
+          }
+
+          // Return the content item from IMDB ID lookup regardless of similarity
+          // This prioritizes IMDB ID over title matching
+          return contentItem;
+        } else {
+          console.log(
+            `[verifyRecommendationWithOmdb] IMDB ID ${imdbId} returned no valid data: ${JSON.stringify(data)}`,
+          );
+        }
+      }
+    }
+
+    // NEVER try direct IMDB ID lookup first - AI-provided IMDB IDs are unreliable
+    // Instead, always search by title which is more reliable
+    console.log(
+      `[verifyRecommendationWithOmdb] Skipping IMDB ID lookup - AI-provided IDs are unreliable`,
+    );
+
+    // Log any provided IMDB IDs for debugging purposes only
+    if (aiImdbId || extractedImdbId) {
+      console.log(
+        `[verifyRecommendationWithOmdb] Note: AI provided IMDB ID(s) ${aiImdbId || ""} ${extractedImdbId || ""} but we're ignoring them and searching by title instead`,
+      );
+    }
+  } catch (error) {
+    console.error(
+      "[verifyRecommendationWithOmdb] Error verifying recommendation with OMDB:",
+      error,
+    );
+    return null;
+  }
 }

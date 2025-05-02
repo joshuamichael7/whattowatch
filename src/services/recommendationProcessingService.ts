@@ -264,6 +264,15 @@ export const processRecommendation = async (
 ): Promise<ContentItem | null> => {
   const MAX_RETRIES = 2;
 
+  // ALWAYS use the title as the tracking ID - NEVER use IMDB IDs from AI recommendations as they're unreliable
+  // We only get reliable IMDB IDs after matching with OMDB
+  if (!rec.id) {
+    rec.id = rec.title;
+    console.log(
+      `[RecommendationProcessingService] Using title as identifier for recommendation: ${rec.title}`,
+    );
+  }
+
   // Skip if we've already processed this recommendation
   const processedRecommendations = getProcessedRecommendations();
   if (processedRecommendations[rec.id]) {
@@ -281,9 +290,18 @@ export const processRecommendation = async (
     return null;
   }
 
+  console.log(
+    `[RecommendationProcessingService] Processing recommendation: ${rec.title} (ID: ${rec.id})`,
+  );
+
   // Mark this recommendation as being processed
   processingRecommendations[rec.id] = true;
   updateProcessingRecommendationsStorage();
+
+  // CRITICAL: Log that processing has started
+  console.log(
+    `[RecommendationProcessingService] ⚡ STARTED PROCESSING: ${rec.title} (ID: ${rec.id})`,
+  );
 
   try {
     // Log the full recommendation object to help with debugging
@@ -372,7 +390,7 @@ export const processRecommendation = async (
 
     if (verifiedItem) {
       console.log(
-        `[RecommendationProcessingService] Successfully processed recommendation: ${rec.title}`,
+        `[RecommendationProcessingService] ✅ SUCCESSFULLY PROCESSED: ${rec.title}`,
       );
       // Preserve the original recommendation reason if it exists
       if (rec.recommendationReason || rec.reason) {
@@ -492,7 +510,7 @@ import {
  */
 export const startBackgroundProcessing = async () => {
   console.log(
-    `[RecommendationProcessingService] Starting background processing`,
+    `[RecommendationProcessingService] 🔄 STARTING BACKGROUND PROCESSING`,
   );
 
   // Log to console for tracking background processing
@@ -526,7 +544,7 @@ export const startBackgroundProcessing = async () => {
   console.group("Background Processing Started");
   logBackgroundProcessing("Starting background processing", "info");
 
-  // Immediately start processing the first 3 recommendations to avoid delay
+  // CRITICAL: Process ALL pending recommendations immediately
   try {
     const pendingRecsString = localStorage.getItem(
       "pendingRecommendationsToProcess",
@@ -534,49 +552,66 @@ export const startBackgroundProcessing = async () => {
     if (pendingRecsString) {
       const pendingRecs = JSON.parse(pendingRecsString);
       if (pendingRecs.length > 0) {
-        const initialBatchSize = Math.min(3, pendingRecs.length);
         logBackgroundProcessing(
-          `Immediately processing first ${initialBatchSize} recommendations`,
+          `🚀 FORCE PROCESSING ALL ${pendingRecs.length} RECOMMENDATIONS IMMEDIATELY`,
           "info",
         );
 
-        // Process first batch in parallel
-        const processingPromises = [];
+        // Process ALL recommendations in parallel
+        pendingRecs.forEach((rec: any) => {
+          if (!rec.id) {
+            rec.id = rec.title; // ALWAYS use title, NEVER use IMDB ID from AI recommendations
+          }
 
-        for (let i = 0; i < initialBatchSize; i++) {
-          const rec = pendingRecs[i];
           logBackgroundProcessing(
-            `Starting immediate processing for: ${rec.title}`,
+            `⚡ Starting immediate processing for: ${rec.title} (ID: ${rec.id})`,
             "info",
           );
 
-          const promise = processRecommendation(rec).then((result) => {
-            if (result) {
+          // Process without awaiting to maximize parallelism
+          processRecommendation(rec)
+            .then((result) => {
+              if (result) {
+                logBackgroundProcessing(
+                  `✅ Processing COMPLETE for: ${rec.title}`,
+                  "success",
+                );
+
+                // Remove from pending list immediately
+                try {
+                  const currentPendingStr = localStorage.getItem(
+                    "pendingRecommendationsToProcess",
+                  );
+                  if (currentPendingStr) {
+                    const currentPending = JSON.parse(currentPendingStr);
+                    const updatedPending = currentPending.filter(
+                      (item: any) => item.id !== rec.id,
+                    );
+                    localStorage.setItem(
+                      "pendingRecommendationsToProcess",
+                      JSON.stringify(updatedPending),
+                    );
+                    logBackgroundProcessing(
+                      `Removed ${rec.title} from pending list. ${updatedPending.length} remaining.`,
+                      "info",
+                    );
+                  }
+                } catch (err) {
+                  console.error("Error updating pending list:", err);
+                }
+              } else {
+                logBackgroundProcessing(
+                  `❌ Processing FAILED for: ${rec.title}`,
+                  "error",
+                );
+              }
+            })
+            .catch((err) => {
               logBackgroundProcessing(
-                `Immediate processing complete for: ${rec.title}`,
-                "success",
-              );
-            } else {
-              logBackgroundProcessing(
-                `Immediate processing failed for: ${rec.title}`,
+                `❌ ERROR processing ${rec.title}: ${err.message}`,
                 "error",
               );
-            }
-            return result;
-          });
-
-          processingPromises.push(promise);
-        }
-
-        // Wait for all initial processing to complete
-        Promise.allSettled(processingPromises).then((results) => {
-          const successCount = results.filter(
-            (r) => r.status === "fulfilled" && r.value,
-          ).length;
-          logBackgroundProcessing(
-            `Initial batch processing complete. Success: ${successCount}/${initialBatchSize}`,
-            successCount > 0 ? "success" : "info",
-          );
+            });
         });
       }
     }
