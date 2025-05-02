@@ -245,13 +245,68 @@ const RecommendationMatcher: React.FC<RecommendationMatcherProps> = ({
             `[RecommendationMatcher] Found ${matchResults.length} potential matches`,
           );
 
+          // Instead of showing all matches, use AI to find the best match
+          if (matchResults.length > 1) {
+            console.log("[RecommendationMatcher] Using AI to find best match");
+            try {
+              const aiMatchedContent = await matchRecommendationWithOmdbResults(
+                {
+                  title: recommendation.title,
+                  year: recommendation.year,
+                  reason: recommendation.reason,
+                  synopsis: recommendation.synopsis,
+                },
+                matchResults,
+              );
+
+              if (aiMatchedContent) {
+                console.log(
+                  "[RecommendationMatcher] AI found best match, using it directly",
+                );
+                if (onSelectMatch) {
+                  onSelectMatch(aiMatchedContent);
+                  return;
+                } else {
+                  navigate(`/movie/${aiMatchedContent.imdb_id}`, {
+                    state: { recommendation: aiMatchedContent },
+                  });
+                  return;
+                }
+              }
+            } catch (error) {
+              console.error(
+                "[RecommendationMatcher] Error using AI matching:",
+                error,
+              );
+              // Continue with regular sorting if AI matching fails
+            }
+          }
+
+          // Fallback to sorting if AI matching fails or if there's only one match
           const sortedMatches = matchResults.sort((a, b) => {
             const scoreA = a.similarityScore || (a.lowSimilarity ? 0 : 0.5);
             const scoreB = b.similarityScore || (b.lowSimilarity ? 0 : 0.5);
             return scoreB - scoreA;
           });
 
-          setMatches(sortedMatches);
+          // Use the best match directly instead of showing options
+          if (sortedMatches.length > 0) {
+            const bestMatch = sortedMatches[0];
+            console.log(
+              `[RecommendationMatcher] Using best match: ${bestMatch.title}`,
+            );
+            if (onSelectMatch) {
+              onSelectMatch(bestMatch);
+              return;
+            } else {
+              navigate(`/movie/${bestMatch.imdb_id}`, {
+                state: { recommendation: bestMatch },
+              });
+              return;
+            }
+          } else {
+            setMatches(sortedMatches); // Fallback to showing matches if something went wrong
+          }
         } else {
           setError("We couldn't find any matches for this recommendation.");
         }

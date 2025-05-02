@@ -340,15 +340,45 @@ const MovieDetailPage = () => {
               setMovie(movieData);
               setVerificationStatus("Using single match from title search");
             }
-            // Multiple results, show selection screen
+            // Multiple results, use AI to find the best match
             else {
               console.log(
-                `Multiple results found for "${decodedTitle}", showing selection screen`,
+                `Multiple results found for "${decodedTitle}", using AI to find best match`,
               );
-              setPotentialMatches(searchResults);
-              setNeedsUserSelection(true);
-              setIsLoading(false);
-              return;
+
+              // Get detailed info for each search result
+              setVerificationStatus(
+                "Found potential matches, getting details...",
+              );
+              const detailedResults = [];
+              for (const result of searchResults.slice(0, 5)) {
+                // Limit to 5 results
+                const details = await getContentById(result.id);
+                if (details) detailedResults.push(details);
+              }
+
+              // Use AI to match
+              setVerificationStatus("Using AI to find the best match...");
+              const aiMatchedContent = await matchRecommendationWithOmdbResults(
+                {
+                  title: decodedTitle,
+                  synopsis: "",
+                },
+                detailedResults,
+              );
+
+              if (aiMatchedContent) {
+                setMovie(aiMatchedContent);
+                setVerificationStatus("AI found the best match for this title");
+              } else if (detailedResults.length > 0) {
+                // If AI matching fails, use the first result
+                setMovie(detailedResults[0]);
+                setVerificationStatus(
+                  "Using best available match (low confidence)",
+                );
+              } else {
+                throw new Error(`No content found matching "${decodedTitle}"`);
+              }
             }
           } else {
             throw new Error(`No content found matching "${decodedTitle}"`);
