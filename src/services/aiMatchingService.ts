@@ -144,7 +144,7 @@ function convertOmdbToContentItem(
     vote_average:
       omdbData.imdbRating !== "N/A" ? parseFloat(omdbData.imdbRating) : 0,
     vote_count:
-      omdbData.imdbVotes !== "N/A"
+      omdbData.imdbVotes && omdbData.imdbVotes !== "N/A"
         ? parseInt(omdbData.imdbVotes.replace(/,/g, ""))
         : 0,
     genre_ids: [],
