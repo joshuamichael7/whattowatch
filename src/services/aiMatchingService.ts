@@ -100,16 +100,25 @@ export async function matchRecommendationWithOmdbResults(
     const sortedResults = [...omdbResults].sort((a, b) => {
       const aSimilarity = calculateTitleSimilarity(
         originalRecommendation.title,
-        a.Title,
+        a.Title || a.title || "",
       );
       const bSimilarity = calculateTitleSimilarity(
         originalRecommendation.title,
-        b.Title,
+        b.Title || b.title || "",
       );
       return bSimilarity - aSimilarity;
     });
 
-    return convertOmdbToContentItem(sortedResults[0], originalRecommendation);
+    // Make sure we have a valid result before converting
+    if (sortedResults.length > 0) {
+      const bestMatch = sortedResults[0];
+      console.log(
+        `[aiMatchingService] Best match by title similarity: ${bestMatch.Title || bestMatch.title}`,
+      );
+      return convertOmdbToContentItem(bestMatch, originalRecommendation);
+    }
+
+    return null;
   } catch (error) {
     console.error(
       "[aiMatchingService] Error matching recommendation with OMDB results:",
@@ -135,12 +144,23 @@ function convertOmdbToContentItem(
   omdbData: any,
   originalRecommendation: any,
 ): ContentItem {
+  // Handle different property casing (OMDB returns Title, but our app might use title)
+  const title = omdbData.Title || omdbData.title || "Unknown Title";
+  const imdbId = omdbData.imdbID || omdbData.imdb_id;
+  const poster = omdbData.Poster || omdbData.poster_path || omdbData.poster;
+  const plot = omdbData.Plot || omdbData.overview || omdbData.plot || "";
+  const type = omdbData.Type || omdbData.media_type || "movie";
+
+  console.log(
+    `[aiMatchingService] Converting OMDB data to ContentItem: ${title} (${imdbId})`,
+  );
+
   return {
-    id: omdbData.imdbID,
-    imdb_id: omdbData.imdbID,
-    title: omdbData.Title,
-    poster_path: omdbData.Poster !== "N/A" ? omdbData.Poster : "",
-    media_type: omdbData.Type === "movie" ? "movie" : "tv",
+    id: imdbId,
+    imdb_id: imdbId,
+    title: title,
+    poster_path: poster !== "N/A" ? poster : "",
+    media_type: type === "movie" ? "movie" : "tv",
     vote_average:
       omdbData.imdbRating !== "N/A" ? parseFloat(omdbData.imdbRating) : 0,
     vote_count:
@@ -149,7 +169,7 @@ function convertOmdbToContentItem(
         : 0,
     genre_ids: [],
     genre_strings: omdbData.Genre ? omdbData.Genre.split(", ") : [],
-    overview: omdbData.Plot !== "N/A" ? omdbData.Plot : "",
+    overview: plot !== "N/A" ? plot : "",
     content_rating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
     year: omdbData.Year,
     release_date:

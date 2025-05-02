@@ -80,7 +80,7 @@ const MovieDetailPage = () => {
 
   useEffect(() => {
     const checkWatchlist = async () => {
-      if (!isAuthenticated || !user || !movie) return;
+      if (!isAuthenticated || !user || !movie || !movie.id) return;
 
       try {
         const { data } = await supabase
@@ -239,6 +239,11 @@ const MovieDetailPage = () => {
             );
 
             if (aiMatchedContent) {
+              // Make sure we have a valid ID for the movie
+              if (!aiMatchedContent.id && aiMatchedContent.imdb_id) {
+                aiMatchedContent.id = aiMatchedContent.imdb_id;
+              }
+              console.log("AI matched content:", aiMatchedContent);
               setMovie(aiMatchedContent);
               setVerificationStatus(
                 "AI found the best match for this recommendation",
@@ -286,6 +291,11 @@ const MovieDetailPage = () => {
             );
 
             if (aiMatchedContent) {
+              // Make sure we have a valid ID for the movie
+              if (!aiMatchedContent.id && aiMatchedContent.imdb_id) {
+                aiMatchedContent.id = aiMatchedContent.imdb_id;
+              }
+              console.log("AI matched content:", aiMatchedContent);
               setMovie(aiMatchedContent);
               setVerificationStatus(
                 "AI found the best match for this recommendation",
@@ -368,6 +378,10 @@ const MovieDetailPage = () => {
               );
 
               if (aiMatchedContent) {
+                // Make sure we have a valid ID for the movie
+                if (!aiMatchedContent.id && aiMatchedContent.imdb_id) {
+                  aiMatchedContent.id = aiMatchedContent.imdb_id;
+                }
                 setMovie(aiMatchedContent);
                 setVerificationStatus("AI found the best match for this title");
               } else if (detailedResults.length > 0) {
