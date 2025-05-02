@@ -96,7 +96,16 @@ const RecommendationGrid = ({
   const [typeFilter, setTypeFilter] = useState("all");
   const [processedRecommendations, setProcessedRecommendations] = useState<
     Record<string, ContentItem>
-  >({});
+  >(() => {
+    // Load any previously processed recommendations from localStorage
+    try {
+      const stored = localStorage.getItem("processedRecommendations");
+      return stored ? JSON.parse(stored) : {};
+    } catch (error) {
+      console.error("Error loading processed recommendations:", error);
+      return {};
+    }
+  });
 
   useEffect(() => {
     const fetchAdditionalDetails = async (itemId: string) => {
@@ -121,14 +130,39 @@ const RecommendationGrid = ({
   useEffect(() => {
     if (!recommendations || recommendations.length === 0) return;
 
+    // Store recommendations in localStorage to persist them
+    const storeRecommendationsForProcessing = () => {
+      try {
+        // Store only recommendations that haven't been processed yet
+        const unprocessedRecs = recommendations.filter(
+          (rec) => !processedRecommendations[rec.id],
+        );
+
+        if (unprocessedRecs.length > 0) {
+          localStorage.setItem(
+            "pendingRecommendationsToProcess",
+            JSON.stringify(unprocessedRecs),
+          );
+          console.log(
+            `[RecommendationGrid] Stored ${unprocessedRecs.length} recommendations for background processing`,
+          );
+        }
+      } catch (error) {
+        console.error("Error storing recommendations for processing:", error);
+      }
+    };
+
     // Process recommendations in the background
     const processRecommendationsInBackground = async () => {
       console.log(
         `[RecommendationGrid] Starting background processing for ${recommendations.length} recommendations`,
       );
 
-      // Prioritize processing recommendations that are visible in the current view
+      // Create a copy to avoid modifying the original array
       const visibleRecommendations = [...recommendations];
+
+      // Track processed recommendations to update localStorage
+      const newlyProcessed = {};
 
       // Process each recommendation one by one to avoid overwhelming the API
       for (const rec of visibleRecommendations) {
@@ -170,10 +204,44 @@ const RecommendationGrid = ({
                 rec.recommendationReason || rec.reason;
             }
 
-            setProcessedRecommendations((prev) => ({
-              ...prev,
-              [rec.id]: verifiedItem,
-            }));
+            // Update state if component is still mounted
+            setProcessedRecommendations((prev) => {
+              const updated = {
+                ...prev,
+                [rec.id]: verifiedItem,
+              };
+
+              // Store processed recommendations in localStorage
+              try {
+                localStorage.setItem(
+                  "processedRecommendations",
+                  JSON.stringify(updated),
+                );
+              } catch (err) {
+                console.error("Error storing processed recommendations:", err);
+              }
+
+              return updated;
+            });
+
+            // Track this recommendation as processed
+            newlyProcessed[rec.id] = true;
+
+            // Update pending recommendations in localStorage
+            try {
+              const pendingRecs = JSON.parse(
+                localStorage.getItem("pendingRecommendationsToProcess") || "[]",
+              );
+              const updatedPendingRecs = pendingRecs.filter(
+                (pendingRec) => pendingRec.id !== rec.id,
+              );
+              localStorage.setItem(
+                "pendingRecommendationsToProcess",
+                JSON.stringify(updatedPendingRecs),
+              );
+            } catch (err) {
+              console.error("Error updating pending recommendations:", err);
+            }
           }
         } catch (error) {
           console.error(
@@ -191,7 +259,14 @@ const RecommendationGrid = ({
       );
     };
 
-    processRecommendationsInBackground();
+    // Store recommendations first
+    storeRecommendationsForProcessing();
+
+    // Use a non-cancelable promise to ensure processing continues
+    const processingPromise = processRecommendationsInBackground();
+
+    // We don't need to clean up the promise as we want it to continue
+    // even if the component unmounts
   }, [recommendations]);
 
   useEffect(() => {

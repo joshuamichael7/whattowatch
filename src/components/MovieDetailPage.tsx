@@ -289,6 +289,46 @@ const MovieDetailPage = () => {
           return;
         }
 
+        // Check if we have this content in localStorage processed recommendations
+        try {
+          const storedProcessed = localStorage.getItem(
+            "processedRecommendations",
+          );
+          if (storedProcessed) {
+            const processedItems = JSON.parse(storedProcessed);
+            // Try to find by ID or by title
+            const matchedItem =
+              processedItems[id] ||
+              Object.values(processedItems).find(
+                (item: any) => item.title === decodeURIComponent(id),
+              );
+
+            if (matchedItem) {
+              console.log("Using stored processed content data:", matchedItem);
+              setMovie(matchedItem);
+
+              // Set verification status based on stored data
+              if (matchedItem.aiRecommended) {
+                setVerificationStatus(
+                  matchedItem.verified
+                    ? `Content verified with ${(matchedItem.similarityScore || 0) * 100}% confidence`
+                    : "AI recommended content",
+                );
+              } else {
+                setVerificationStatus("Using stored processed data");
+              }
+
+              setIsLoading(false);
+              return;
+            }
+          }
+        } catch (error) {
+          console.error(
+            "Error checking localStorage for processed content:",
+            error,
+          );
+        }
+
         // If this is a recommendation that's still being processed in the background,
         // show a more specific message
         if (isProcessingRecommendation) {
