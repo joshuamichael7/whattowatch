@@ -234,6 +234,9 @@ export const processRecommendation = async (
       imdb_id: rec.imdb_id,
       imdb_url: rec.imdb_url,
       aiRecommended: true,
+      // Preserve content rating if available
+      content_rating: rec.contentRating || rec.content_rating || "",
+      contentRating: rec.contentRating || rec.content_rating || "",
     };
 
     console.log(
@@ -291,6 +294,24 @@ export const processRecommendation = async (
       if (rec.recommendationReason || rec.reason) {
         verifiedItem.recommendationReason =
           rec.recommendationReason || rec.reason;
+      }
+
+      // Preserve content rating from original recommendation if OMDB didn't provide one
+      if (
+        (rec.contentRating || rec.content_rating) &&
+        (!verifiedItem.content_rating || verifiedItem.content_rating === "")
+      ) {
+        verifiedItem.content_rating = rec.contentRating || rec.content_rating;
+        verifiedItem.contentRating = rec.contentRating || rec.content_rating;
+      }
+
+      // If OMDB provided a rating (Rated field), make sure it's copied to our standard fields
+      if (
+        verifiedItem.Rated &&
+        (!verifiedItem.content_rating || verifiedItem.content_rating === "")
+      ) {
+        verifiedItem.content_rating = verifiedItem.Rated;
+        verifiedItem.contentRating = verifiedItem.Rated;
       }
 
       // Update processed recommendations in localStorage with 48-hour expiry
@@ -356,6 +377,8 @@ export const processRecommendation = async (
         failureReason: error.message || "Unknown error",
         recommendationReason: rec.recommendationReason || rec.reason || "",
         year: rec.year,
+        content_rating: rec.contentRating || rec.content_rating || "",
+        contentRating: rec.contentRating || rec.content_rating || "",
         aiRecommended: true,
       };
 
@@ -388,6 +411,37 @@ export const startBackgroundProcessing = async () => {
     `[RecommendationProcessingService] Starting background processing`,
   );
 
+  // Log to console for tracking background processing
+  const logBackgroundProcessing = (
+    message: string,
+    type: "info" | "error" | "success" = "info",
+  ) => {
+    try {
+      const now = new Date();
+      const timestamp = now.toISOString();
+
+      // Log to console with appropriate styling based on type
+      if (type === "error") {
+        console.error(`[BackgroundProcessing ${timestamp}] ${message}`);
+      } else if (type === "success") {
+        console.log(
+          `%c[BackgroundProcessing ${timestamp}] ${message}`,
+          "color: green; font-weight: bold",
+        );
+      } else {
+        console.log(
+          `%c[BackgroundProcessing ${timestamp}] ${message}`,
+          "color: blue",
+        );
+      }
+    } catch (err) {
+      console.error("Error logging to console:", err);
+    }
+  };
+
+  console.group("Background Processing Started");
+  logBackgroundProcessing("Starting background processing", "info");
+
   // Create a worker-like function that will continue running even if component unmounts
   const backgroundWorker = async () => {
     try {
@@ -396,15 +450,17 @@ export const startBackgroundProcessing = async () => {
         "pendingRecommendationsToProcess",
       );
       if (!pendingRecsString) {
-        console.log(
-          "[RecommendationProcessingService] No pending recommendations to process",
+        logBackgroundProcessing(
+          "No pending recommendations to process",
+          "info",
         );
         return;
       }
 
       const pendingRecs = JSON.parse(pendingRecsString);
-      console.log(
-        `[RecommendationProcessingService] Found ${pendingRecs.length} pending recommendations to process`,
+      logBackgroundProcessing(
+        `Found ${pendingRecs.length} pending recommendations to process`,
+        "info",
       );
 
       // Track successfully processed recommendations for Supabase caching
@@ -413,19 +469,33 @@ export const startBackgroundProcessing = async () => {
       // Process each recommendation one by one to avoid overwhelming the API
       for (const rec of pendingRecs) {
         try {
+          logBackgroundProcessing(
+            `Processing recommendation: ${rec.title}`,
+            "info",
+          );
+
           // Process with retry logic
           const processedItem = await processRecommendation(rec);
 
           if (processedItem) {
             processedItems.push(processedItem);
+            logBackgroundProcessing(
+              `Successfully processed recommendation: ${rec.title}`,
+              "success",
+            );
+          } else {
+            logBackgroundProcessing(
+              `Failed to process recommendation: ${rec.title}`,
+              "error",
+            );
           }
 
           // Add a small delay between API calls to avoid rate limiting
           await new Promise((resolve) => setTimeout(resolve, 500));
         } catch (itemError) {
-          console.error(
-            `[RecommendationProcessingService] Error processing item ${rec.title}:`,
-            itemError,
+          logBackgroundProcessing(
+            `Error processing item ${rec.title}: ${itemError.message}`,
+            "error",
           );
           // Continue with next item instead of failing the entire batch
           continue;
@@ -435,6 +505,11 @@ export const startBackgroundProcessing = async () => {
       // Cache successfully processed recommendations in Supabase if we have any
       if (processedItems.length > 0) {
         try {
+          logBackgroundProcessing(
+            `Caching ${processedItems.length} processed recommendations in Supabase`,
+            "info",
+          );
+
           // Generate a cache key based on the first item's properties
           const firstItem = pendingRecs[0];
           const cacheKey = generateCacheKey({
@@ -445,32 +520,40 @@ export const startBackgroundProcessing = async () => {
 
           // Cache in Supabase with 48-hour expiry
           await cacheRecommendationsInSupabase(cacheKey, processedItems, 48);
+
+          logBackgroundProcessing(
+            `Successfully cached recommendations in Supabase with key: ${cacheKey}`,
+            "success",
+          );
         } catch (cacheError) {
-          console.error(
-            "[RecommendationProcessingService] Error caching in Supabase:",
-            cacheError,
+          logBackgroundProcessing(
+            `Error caching in Supabase: ${cacheError.message}`,
+            "error",
           );
           // Non-critical error, continue execution
         }
       }
 
-      console.log(
-        `[RecommendationProcessingService] Completed background processing for recommendations. Successfully processed: ${processedItems.length}/${pendingRecs.length}`,
+      logBackgroundProcessing(
+        `Completed background processing. Successfully processed: ${processedItems.length}/${pendingRecs.length}`,
+        "success",
       );
+      console.groupEnd();
     } catch (error) {
-      console.error(
-        "[RecommendationProcessingService] Background worker error:",
-        error,
+      logBackgroundProcessing(
+        `Background worker error: ${error.message}`,
+        "error",
       );
     }
   };
 
   // Start the background worker and don't wait for it to complete
   backgroundWorker().catch((error) => {
-    console.error(
-      "[RecommendationProcessingService] Background worker error:",
-      error,
+    logBackgroundProcessing(
+      `Background worker error: ${error.message}`,
+      "error",
     );
+    console.groupEnd();
   });
 };
 

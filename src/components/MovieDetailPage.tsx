@@ -859,8 +859,10 @@ const MovieDetailPage = () => {
                 <Film className="mr-1 h-3 w-3" />
                 {movie.media_type === "movie" ? "Movie" : "TV Show"}
               </Badge>
-              {movie.content_rating && (
-                <Badge variant="secondary">{movie.content_rating}</Badge>
+              {(movie.content_rating || movie.contentRating || movie.Rated) && (
+                <Badge variant="secondary" className="mr-2">
+                  {movie.content_rating || movie.contentRating || movie.Rated}
+                </Badge>
               )}
               {movie.aiRecommended && (
                 <Badge variant="secondary" className="ml-2 bg-primary/20">

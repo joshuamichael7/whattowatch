@@ -431,6 +431,11 @@ const RecommendationGrid = ({
                   </CardTitle>
                   <CardDescription className="flex items-center gap-2">
                     <span>{rec.year}</span>
+                    {rec.contentRating || rec.content_rating ? (
+                      <Badge variant="outline" className="text-xs">
+                        {rec.contentRating || rec.content_rating}
+                      </Badge>
+                    ) : null}
                     {rec.rating > 0 && (
                       <span className="flex items-center">
                         <Star
@@ -538,10 +543,12 @@ const RecommendationGrid = ({
                           <DialogDescription className="flex items-center gap-3">
                             <span>{selectedItem.year}</span>
                             {(selectedItem.contentRating ||
-                              selectedItem.content_rating) && (
+                              selectedItem.content_rating ||
+                              selectedItem.Rated) && (
                               <Badge variant="outline">
                                 {selectedItem.contentRating ||
-                                  selectedItem.content_rating}
+                                  selectedItem.content_rating ||
+                                  selectedItem.Rated}
                               </Badge>
                             )}
                             {selectedItem.runtime && (
