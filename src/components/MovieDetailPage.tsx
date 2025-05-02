@@ -243,9 +243,16 @@ const MovieDetailPage = () => {
       setError(null);
       setVerificationStatus("Starting verification process...");
 
+      // Check if we're coming from a recommendation that's still being processed
+      const isProcessingRecommendation =
+        location.state?.recommendation &&
+        !location.state?.processedContent &&
+        location.state?.recommendation.aiRecommended;
+
       try {
         // Get recommendation data from location state
         const locationRecommendation = location.state?.recommendation;
+        const processedContent = location.state?.processedContent;
         const aiTitle = locationRecommendation?.title || decodeURIComponent(id);
         const aiYear = locationRecommendation?.year;
         const aiReason =
@@ -262,7 +269,33 @@ const MovieDetailPage = () => {
           synopsis: aiSynopsis?.substring(0, 50) + "...",
         });
 
-        // First check if we have this movie in the RecommendationContext
+        // First check if we have pre-processed content from RecommendationGrid
+        if (processedContent) {
+          console.log("Using pre-processed content data:", processedContent);
+          setMovie(processedContent);
+
+          // Set verification status based on pre-processed data
+          if (processedContent.aiRecommended) {
+            setVerificationStatus(
+              processedContent.verified
+                ? `Content verified with ${(processedContent.similarityScore || 0) * 100}% confidence`
+                : "AI recommended content",
+            );
+          } else {
+            setVerificationStatus("Using pre-processed data");
+          }
+
+          setIsLoading(false);
+          return;
+        }
+
+        // If this is a recommendation that's still being processed in the background,
+        // show a more specific message
+        if (isProcessingRecommendation) {
+          setVerificationStatus("Preparing recommendation details...");
+        }
+
+        // Next check if we have this movie in the RecommendationContext
         if (
           selectedRecommendation &&
           (selectedRecommendation.id === id ||
@@ -502,6 +535,11 @@ const MovieDetailPage = () => {
               ? verificationStatus
               : "Loading content details..."}
           </p>
+          {locationState?.recommendation && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Preparing details for "{locationState.recommendation.title}"
+            </p>
+          )}
         </div>
       </div>
     );

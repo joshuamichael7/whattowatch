@@ -475,11 +475,12 @@ export async function getPersonalizedRecommendations(
         year: item.year,
         synopsis: item.synopsis,
         reason: item.reason,
+        recommendationReason: item.recommendationReason,
         imdb_id: imdbId,
       });
 
       recommendations.push({
-        id: imdbId, // Only use IMDB ID if available, otherwise null
+        id: imdbId || item.title, // Use IMDB ID if available, otherwise use title
         title: item.title,
         poster_path: item.poster || "",
         media_type: item.type === "movie" ? "movie" : "tv",
@@ -488,7 +489,14 @@ export async function getPersonalizedRecommendations(
         genre_ids: [],
         overview: item.synopsis || "",
         synopsis: item.synopsis || "",
-        recommendationReason: item.reason || "Matches your preferences",
+        recommendationReason:
+          item.recommendationReason ||
+          item.reason ||
+          "Matches your preferences",
+        reason:
+          item.reason ||
+          item.recommendationReason ||
+          "Matches your preferences",
         year: item.year,
         aiRecommended: true,
         needsVerification: true, // Flag that this needs verification
@@ -635,6 +643,7 @@ export async function verifyRecommendationWithOmdb(
           // Create the content item regardless of similarity score
           const contentItem = convertOmdbToContentItem(data);
           contentItem.recommendationReason = aiReason || "Recommended for you";
+          contentItem.reason = aiReason || "Recommended for you";
           contentItem.synopsis = aiSynopsis || data.Plot;
           contentItem.verified = true;
           contentItem.similarityScore = similarity;
@@ -760,6 +769,7 @@ export async function verifyRecommendationWithOmdb(
               const contentItem = convertOmdbToContentItem(detailData);
               contentItem.recommendationReason =
                 aiReason || "Recommended for you";
+              contentItem.reason = aiReason || "Recommended for you";
               contentItem.synopsis = aiSynopsis || detailData.Plot;
               contentItem.verified = true;
               contentItem.similarityScore = 0.5; // Medium confidence
@@ -870,6 +880,7 @@ export async function verifyRecommendationWithOmdb(
         if (detailData && detailData.Response === "True") {
           const contentItem = convertOmdbToContentItem(detailData);
           contentItem.recommendationReason = aiReason || "Recommended for you";
+          contentItem.reason = aiReason || "Recommended for you";
           contentItem.synopsis = aiSynopsis || detailData.Plot;
           contentItem.verified = true;
           contentItem.similarityScore = bestMatch.similarity;
@@ -1057,10 +1068,10 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
   // We can now proceed without synopsis
   if (!aiSynopsis) {
     console.log(
-      `[findBestMatch] No synopsis available for \\\"${aiTitle}\\\", can't compare`,
+      `[findBestMatch] No synopsis available for \"${aiTitle}\", can't compare`,
     );
     console.error(
-      `[findBestMatch] CRITICAL ERROR: Missing synopsis for \\\"${aiTitle}\\\"`,
+      `[findBestMatch] CRITICAL ERROR: Missing synopsis for \"${aiTitle}\"`,
     );
     // Return null to indicate verification failed - no fallbacks!
     return null;
@@ -1123,6 +1134,7 @@ async function findBestMatch(aiItem: any, omdbResults: any[]): Promise<any> {
           similarityScore: similarity,
           recommendationReason:
             aiItem.recommendationReason || aiItem.reason || null,
+          reason: aiItem.reason || aiItem.recommendationReason || null,
         });
       }
     } catch (error) {

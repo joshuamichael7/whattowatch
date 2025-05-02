@@ -43,6 +43,7 @@ import { getContentById } from "@/lib/omdbClient";
 import { ContentItem, genreMap } from "@/types/omdb";
 import UserFeedbackButton from "./UserFeedbackButton";
 import WatchlistButton from "./WatchlistButton";
+import { verifyRecommendationWithOmdb } from "@/services/aiService";
 
 interface RecommendationItem {
   id: string;
@@ -93,6 +94,9 @@ const RecommendationGrid = ({
   const [ratingFilter, setRatingFilter] = useState([0, 10]);
   const [yearFilter, setYearFilter] = useState([1950, 2023]);
   const [typeFilter, setTypeFilter] = useState("all");
+  const [processedRecommendations, setProcessedRecommendations] = useState<
+    Record<string, ContentItem>
+  >({});
 
   useEffect(() => {
     const fetchAdditionalDetails = async (itemId: string) => {
@@ -112,6 +116,83 @@ const RecommendationGrid = ({
       fetchAdditionalDetails(selectedItem.id);
     }
   }, [selectedItem, useDirectApi]);
+
+  // Background processing for recommendations
+  useEffect(() => {
+    if (!recommendations || recommendations.length === 0) return;
+
+    // Process recommendations in the background
+    const processRecommendationsInBackground = async () => {
+      console.log(
+        `[RecommendationGrid] Starting background processing for ${recommendations.length} recommendations`,
+      );
+
+      // Prioritize processing recommendations that are visible in the current view
+      const visibleRecommendations = [...recommendations];
+
+      // Process each recommendation one by one to avoid overwhelming the API
+      for (const rec of visibleRecommendations) {
+        // Skip if we've already processed this recommendation
+        if (processedRecommendations[rec.id]) continue;
+
+        try {
+          // Convert recommendation to ContentItem format for verification
+          const contentItem: ContentItem = {
+            id: rec.id,
+            title: rec.title,
+            poster_path: rec.poster || rec.poster_path || "",
+            media_type: rec.type === "movie" ? "movie" : "tv",
+            vote_average: rec.rating || 0,
+            vote_count: 0,
+            genre_ids: [],
+            overview: rec.synopsis || "",
+            synopsis: rec.synopsis || "",
+            recommendationReason: rec.recommendationReason || rec.reason || "",
+            reason: rec.reason || rec.recommendationReason || "",
+            year: rec.year,
+            imdb_id: rec.imdb_id,
+            imdb_url: rec.imdb_url,
+            aiRecommended: true,
+          };
+
+          console.log(
+            `[RecommendationGrid] Processing recommendation in background: ${rec.title}`,
+          );
+          const verifiedItem = await verifyRecommendationWithOmdb(contentItem);
+
+          if (verifiedItem) {
+            console.log(
+              `[RecommendationGrid] Successfully processed recommendation: ${rec.title}`,
+            );
+            // Preserve the original recommendation reason if it exists
+            if (rec.recommendationReason || rec.reason) {
+              verifiedItem.recommendationReason =
+                rec.recommendationReason || rec.reason;
+            }
+
+            setProcessedRecommendations((prev) => ({
+              ...prev,
+              [rec.id]: verifiedItem,
+            }));
+          }
+        } catch (error) {
+          console.error(
+            `[RecommendationGrid] Error processing recommendation ${rec.title}:`,
+            error,
+          );
+        }
+
+        // Add a small delay between API calls to avoid rate limiting
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+
+      console.log(
+        `[RecommendationGrid] Completed background processing for recommendations`,
+      );
+    };
+
+    processRecommendationsInBackground();
+  }, [recommendations]);
 
   useEffect(() => {
     if (userId && userPreferences) {
@@ -292,6 +373,7 @@ const RecommendationGrid = ({
                     overview: rec.overview,
                     reason: rec.reason || rec.recommendationReason,
                   },
+                  processedContent: processedRecommendations[rec.id],
                   fromRecommendations: true,
                 }}
               >
@@ -369,11 +451,11 @@ const RecommendationGrid = ({
                   <p className="text-xs text-muted-foreground line-clamp-2">
                     {rec.synopsis || rec.overview || "No synopsis available"}
                   </p>
-                  {(rec.recommendationReason || rec.reason) && (
-                    <p className="text-xs text-primary-foreground mt-1 bg-primary/10 p-1 rounded line-clamp-2 font-medium">
-                      {rec.recommendationReason || rec.reason}
-                    </p>
-                  )}
+                  <p className="text-xs text-primary-foreground mt-1 bg-primary/10 p-1 rounded line-clamp-2 font-medium">
+                    {rec.recommendationReason ||
+                      rec.reason ||
+                      "Matches your preferences"}
+                  </p>
                   {rec.imdb_id && (
                     <p className="text-xs text-muted-foreground mt-1">
                       IMDB: {rec.imdb_id}
@@ -545,6 +627,8 @@ const RecommendationGrid = ({
                                       ...selectedItem,
                                       imdb_url: selectedItem.imdb_url, // Ensure imdb_url is passed in state
                                     },
+                                    processedContent:
+                                      processedRecommendations[selectedItem.id],
                                     fromRecommendations: true,
                                   }}
                                 >
