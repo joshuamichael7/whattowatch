@@ -159,7 +159,9 @@ export const updateProcessedRecommendations = (
 /**
  * Store recommendations for background processing
  */
-export const storeRecommendationsForProcessing = (recommendations: any[]) => {
+export const storeRecommendationsForProcessing = async (
+  recommendations: any[],
+) => {
   try {
     // Get processed recommendations
     const processedRecommendations = getProcessedRecommendations();
@@ -171,13 +173,38 @@ export const storeRecommendationsForProcessing = (recommendations: any[]) => {
     );
 
     if (unprocessedRecs.length > 0) {
+      // Ensure each recommendation has a unique ID
+      const recsWithIds = unprocessedRecs.map((rec) => {
+        if (!rec.id) {
+          rec.id = `rec_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        }
+        return rec;
+      });
+
+      // Store in localStorage
       localStorage.setItem(
         "pendingRecommendationsToProcess",
-        JSON.stringify(unprocessedRecs),
+        JSON.stringify(recsWithIds),
       );
       console.log(
-        `[RecommendationProcessingService] Stored ${unprocessedRecs.length} recommendations for background processing`,
+        `[RecommendationProcessingService] Stored ${recsWithIds.length} recommendations for background processing`,
       );
+
+      // Pre-process the first recommendation to make it faster
+      if (recsWithIds.length > 0) {
+        console.log(
+          `[RecommendationProcessingService] Pre-processing first recommendation: ${recsWithIds[0].title}`,
+        );
+        try {
+          // Start processing the first recommendation but don't await it
+          processRecommendation(recsWithIds[0]);
+        } catch (preProcessError) {
+          console.error(
+            "Error pre-processing first recommendation:",
+            preProcessError,
+          );
+        }
+      }
     }
     return unprocessedRecs.length;
   } catch (error) {
@@ -441,6 +468,40 @@ export const startBackgroundProcessing = async () => {
 
   console.group("Background Processing Started");
   logBackgroundProcessing("Starting background processing", "info");
+
+  // Immediately start processing the first recommendation to avoid delay
+  try {
+    const pendingRecsString = localStorage.getItem(
+      "pendingRecommendationsToProcess",
+    );
+    if (pendingRecsString) {
+      const pendingRecs = JSON.parse(pendingRecsString);
+      if (pendingRecs.length > 0) {
+        logBackgroundProcessing(
+          `Immediately processing first recommendation: ${pendingRecs[0].title}`,
+          "info",
+        );
+        processRecommendation(pendingRecs[0]).then((result) => {
+          if (result) {
+            logBackgroundProcessing(
+              `Immediate processing complete for: ${pendingRecs[0].title}`,
+              "success",
+            );
+          } else {
+            logBackgroundProcessing(
+              `Immediate processing failed for: ${pendingRecs[0].title}`,
+              "error",
+            );
+          }
+        });
+      }
+    }
+  } catch (error) {
+    logBackgroundProcessing(
+      `Error in immediate processing: ${error.message}`,
+      "error",
+    );
+  }
 
   // Create a worker-like function that will continue running even if component unmounts
   const backgroundWorker = async () => {

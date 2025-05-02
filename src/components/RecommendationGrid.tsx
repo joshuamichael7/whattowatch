@@ -177,14 +177,50 @@ const RecommendationGrid = ({
             );
 
             // Store recommendations for background processing
-            service.storeRecommendationsForProcessing(recommendations);
+            const storedCount =
+              await service.storeRecommendationsForProcessing(recommendations);
+            console.log(
+              `[RecommendationGrid] Stored ${storedCount} recommendations for processing`,
+            );
 
-            // Start the background processing
-            service.startBackgroundProcessing();
+            // Start the background processing immediately
+            await service.startBackgroundProcessing();
+            console.log(`[RecommendationGrid] Background processing started`);
+
+            // Set up a polling mechanism to check for processed recommendations
+            const pollInterval = setInterval(() => {
+              const processedRecs = service.getProcessedRecommendations();
+              const processedCount = Object.keys(processedRecs).length;
+              console.log(
+                `[RecommendationGrid] Polling: ${processedCount} recommendations processed`,
+              );
+
+              if (processedCount > 0) {
+                setProcessedRecommendations(processedRecs);
+              }
+
+              // Check if all recommendations are processed
+              const pendingRecsString = localStorage.getItem(
+                "pendingRecommendationsToProcess",
+              );
+              const pendingRecs = pendingRecsString
+                ? JSON.parse(pendingRecsString)
+                : [];
+
+              if (pendingRecs.length === 0) {
+                console.log(
+                  `[RecommendationGrid] All recommendations processed, stopping polling`,
+                );
+                clearInterval(pollInterval);
+              }
+            }, 2000); // Poll every 2 seconds
 
             // Load any previously processed recommendations
             const processedRecs = service.getProcessedRecommendations();
             setProcessedRecommendations(processedRecs);
+
+            // Clean up the interval when component unmounts
+            return () => clearInterval(pollInterval);
           }
         } catch (cacheError) {
           console.error(
@@ -205,9 +241,6 @@ const RecommendationGrid = ({
           error,
         );
       });
-
-    // No cleanup function needed as we want processing to continue
-    // even if the component unmounts
   }, [recommendations, typeFilter, ratingFilter, yearFilter, userId]);
 
   useEffect(() => {
@@ -432,7 +465,7 @@ const RecommendationGrid = ({
                   <CardDescription className="flex items-center gap-2">
                     <span>{rec.year}</span>
                     {rec.contentRating || rec.content_rating ? (
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="secondary" className="text-xs font-bold">
                         {rec.contentRating || rec.content_rating}
                       </Badge>
                     ) : null}
@@ -545,7 +578,7 @@ const RecommendationGrid = ({
                             {(selectedItem.contentRating ||
                               selectedItem.content_rating ||
                               selectedItem.Rated) && (
-                              <Badge variant="outline">
+                              <Badge variant="secondary" className="font-bold">
                                 {selectedItem.contentRating ||
                                   selectedItem.content_rating ||
                                   selectedItem.Rated}
