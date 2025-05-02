@@ -15,7 +15,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { getContentById, searchContent } from "@/lib/omdbClient";
+import {
+  getMovieById,
+  getTvShowById,
+  searchContent,
+  getContentById,
+} from "@/lib/tmdbClientProxy";
 import { supabase } from "@/lib/supabaseClient";
 import { ContentItem } from "@/types/omdb";
 import MovieDetailPageHeader from "@/components/MovieDetailPageHeader";
@@ -77,33 +82,16 @@ const MovieDetailPage = () => {
     setFromRecommendations(hasRecommendations || fromLocationState);
   }, [location]);
 
-  useEffect(() => {
-    const checkWatchlist = async () => {
-      if (!isAuthenticated || !user || !movie) return;
-
-      try {
-        const { data } = await supabase
-          .from("watchlist")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("content_id", movie.id)
-          .single();
-
-        setIsInWatchlist(!!data);
-      } catch (error) {
-        console.error("Error checking watchlist:", error);
-      }
-    };
-
-    checkWatchlist();
-  }, [movie, user, isAuthenticated]);
-
   const handleSelectMatch = async (selectedMatch: any) => {
     setIsLoading(true);
     try {
-      const contentDetails = await getContentById(
-        selectedMatch.imdbID || selectedMatch.id,
-      );
+      let contentDetails;
+      const contentType = selectedMatch.media_type;
+      if (contentType === "movie") {
+        contentDetails = await getMovieById(selectedMatch.id);
+      } else if (contentType === "tv") {
+        contentDetails = await getTvShowById(selectedMatch.id);
+      }
       if (contentDetails) {
         // Add recommendation reason from original recommendation if available
         if (
@@ -142,6 +130,27 @@ const MovieDetailPage = () => {
   };
 
   useEffect(() => {
+    const checkWatchlist = async () => {
+      if (!isAuthenticated || !user || !movie) return;
+
+      try {
+        const { data } = await supabase
+          .from("watchlist")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("content_id", movie.id)
+          .single();
+
+        setIsInWatchlist(!!data);
+      } catch (error) {
+        console.error("Error checking watchlist:", error);
+      }
+    };
+
+    checkWatchlist();
+  }, [movie, user, isAuthenticated]);
+
+  useEffect(() => {
     const fetchMovieDetails = async () => {
       if (!id) return;
 
@@ -154,6 +163,7 @@ const MovieDetailPage = () => {
         const locationRecommendation = location.state?.recommendation;
         const aiImdbId = locationRecommendation?.imdb_id;
         const aiTitle = locationRecommendation?.title || decodeURIComponent(id);
+        const aiYear = locationRecommendation?.year || null;
         const aiSynopsis =
           locationRecommendation?.synopsis ||
           locationRecommendation?.overview ||
@@ -161,6 +171,7 @@ const MovieDetailPage = () => {
 
         console.log("AI recommendation data:", {
           title: aiTitle,
+          year: aiYear,
           imdb_id: aiImdbId,
           synopsis: aiSynopsis?.substring(0, 50) + "...",
         });
@@ -201,8 +212,13 @@ const MovieDetailPage = () => {
             `Using AI-provided IMDB ID: ${aiImdbId} for title: ${aiTitle}`,
           );
 
-          // Get content by IMDB ID
-          const imdbContent = await getContentById(aiImdbId);
+          // For IMDB IDs, we need to use a different approach since TMDB doesn't support direct IMDB ID lookup
+          // We'll search by title and year instead
+          const searchResults = await searchContent(aiTitle, "multi", {
+            year: aiYear,
+          });
+          const imdbContent =
+            searchResults && searchResults.length > 0 ? searchResults[0] : null;
 
           if (imdbContent) {
             // Check if the title from IMDB matches the AI-provided title
@@ -228,7 +244,9 @@ const MovieDetailPage = () => {
               );
 
               // Search by title to see if we have multiple options
-              const searchResults = await searchContent(aiTitle);
+              const searchResults = await searchContent(aiTitle, "multi", {
+                year: aiYear,
+              });
 
               if (searchResults && searchResults.length > 1) {
                 // Only show selection screen if we have multiple results for the title search
@@ -244,7 +262,12 @@ const MovieDetailPage = () => {
                 console.log(
                   `Single result found for title "${aiTitle}": ${searchResults[0].title}. Using this instead of IMDB ID result.`,
                 );
-                movieData = await getContentById(searchResults[0].id);
+                const contentType = searchResults[0].media_type;
+                if (contentType === "movie") {
+                  movieData = await getMovieById(searchResults[0].id);
+                } else if (contentType === "tv") {
+                  movieData = await getTvShowById(searchResults[0].id);
+                }
                 setVerificationStatus(
                   "Using title match instead of incorrect IMDB ID",
                 );
@@ -271,7 +294,17 @@ const MovieDetailPage = () => {
         if (!movieData && id.startsWith("tt")) {
           // If it's already an IMDB ID, just get the content directly from OMDB
           console.log(`Looking up content by IMDB ID from URL: ${id}`);
-          movieData = await getContentById(id);
+          // Since we're using TMDB now, we can't directly query by IMDB ID
+          // We'll need to search by title instead
+          const searchResults = await searchContent(decodeURIComponent(id));
+          if (searchResults && searchResults.length > 0) {
+            const contentType = searchResults[0].media_type;
+            if (contentType === "movie") {
+              movieData = await getMovieById(searchResults[0].id);
+            } else if (contentType === "tv") {
+              movieData = await getTvShowById(searchResults[0].id);
+            }
+          }
 
           if (!movieData) {
             throw new Error("Content not found");
@@ -279,26 +312,97 @@ const MovieDetailPage = () => {
 
           setVerificationStatus("Using IMDB data directly");
         }
-        // PRIORITY 3: If we still don't have movie data, search by title
+        // PRIORITY 3: If we still don't have movie data, search by title and year if available
         else if (!movieData) {
           // If not an IMDB ID, it's likely a title that needs verification
           const decodedTitle = aiTitle || decodeURIComponent(id);
-          console.log(`Looking up content by title: ${decodedTitle}`);
-          console.log(`Searching OMDB for: ${decodedTitle}`);
+          console.log(
+            `Looking up content by title: ${decodedTitle}${aiYear ? ` (${aiYear})` : ""}`,
+          );
 
-          // Get search results directly from OMDB
-          const searchResults = await searchContent(decodedTitle);
+          // Search by title and year if available
+          let searchResults;
+          let exactMatch = null;
+
+          if (aiYear) {
+            console.log(
+              `Searching TMDB for: ${decodedTitle} with year ${aiYear}`,
+            );
+            searchResults = await searchContent(decodedTitle, "multi", {
+              year: aiYear,
+            });
+
+            // Check for exact title match with year
+            exactMatch = searchResults?.find((item) => {
+              const itemTitle = item.title || item.name || "";
+              const itemYear = item.release_date
+                ? new Date(item.release_date).getFullYear().toString()
+                : item.first_air_date
+                  ? new Date(item.first_air_date).getFullYear().toString()
+                  : "";
+
+              return (
+                itemTitle.toLowerCase() === decodedTitle.toLowerCase() &&
+                itemYear === aiYear
+              );
+            });
+
+            // If no results with year, try without year
+            if (!searchResults || searchResults.length === 0) {
+              console.log(
+                `No results found with year ${aiYear}, trying without year restriction`,
+              );
+              searchResults = await searchContent(decodedTitle);
+            }
+          } else {
+            console.log(`Searching TMDB for: ${decodedTitle} without year`);
+            searchResults = await searchContent(decodedTitle);
+
+            // Check for exact title match
+            exactMatch = searchResults?.find((item) => {
+              const itemTitle = item.title || item.name || "";
+              return itemTitle.toLowerCase() === decodedTitle.toLowerCase();
+            });
+          }
 
           if (searchResults && searchResults.length > 0) {
             console.log(
-              `Found ${searchResults.length} results in OMDB for title search`,
+              `Found ${searchResults.length} results in TMDB for title search`,
             );
 
-            // If we have multiple results, show selection screen
-            if (searchResults.length > 1) {
+            // If we have an exact match, use it directly
+            if (exactMatch) {
               console.log(
-                `Multiple results found for \"${decodedTitle}\", showing selection screen`,
+                `Found exact match for "${decodedTitle}": ${exactMatch.title || exactMatch.name}`,
               );
+              const contentType = exactMatch.media_type;
+              if (contentType === "movie") {
+                movieData = await getMovieById(exactMatch.id);
+              } else if (contentType === "tv") {
+                movieData = await getTvShowById(exactMatch.id);
+              }
+              setVerificationStatus("Using exact title match");
+            }
+            // If we have multiple results and no exact match, show selection screen
+            else if (searchResults.length > 1) {
+              console.log(
+                `Multiple results found for "${decodedTitle}", showing selection screen`,
+              );
+
+              // Sort results by relevance - exact title matches first, then by popularity
+              searchResults.sort((a, b) => {
+                const aTitle = (a.title || a.name || "").toLowerCase();
+                const bTitle = (b.title || b.name || "").toLowerCase();
+                const titleLower = decodedTitle.toLowerCase();
+
+                // Exact title matches come first
+                if (aTitle === titleLower && bTitle !== titleLower) return -1;
+                if (bTitle === titleLower && aTitle !== titleLower) return 1;
+
+                // Then sort by popularity
+                return (b.popularity || 0) - (a.popularity || 0);
+              });
+
               setPotentialMatches(searchResults);
               setNeedsUserSelection(true);
               setIsLoading(false);
@@ -306,13 +410,44 @@ const MovieDetailPage = () => {
             } else {
               // Only one result, use it
               console.log(
-                `Single result found for \"${decodedTitle}\", using it: ${searchResults[0].title}`,
+                `Single result found for "${decodedTitle}", using it: ${searchResults[0].title || searchResults[0].name}`,
               );
-              movieData = await getContentById(searchResults[0].id);
+              const contentType = searchResults[0].media_type;
+              if (contentType === "movie") {
+                movieData = await getMovieById(searchResults[0].id);
+              } else if (contentType === "tv") {
+                movieData = await getTvShowById(searchResults[0].id);
+              }
               setVerificationStatus("Using single match from title search");
             }
           } else {
-            throw new Error("Content not found");
+            // Try a fuzzy search as a last resort
+            console.log(
+              `No exact matches found for "${decodedTitle}", trying fuzzy search`,
+            );
+
+            // Remove any year info from title and try again
+            const titleWithoutYear = decodedTitle.replace(
+              /\s*\([0-9]{4}\)$/,
+              "",
+            );
+            if (titleWithoutYear !== decodedTitle) {
+              searchResults = await searchContent(titleWithoutYear);
+
+              if (searchResults && searchResults.length > 0) {
+                console.log(
+                  `Found ${searchResults.length} results with fuzzy search`,
+                );
+                setPotentialMatches(searchResults);
+                setNeedsUserSelection(true);
+                setIsLoading(false);
+                return;
+              }
+            }
+
+            throw new Error(
+              `Content not found for "${decodedTitle}". Please try a different search.`,
+            );
           }
         }
 
@@ -410,6 +545,7 @@ const MovieDetailPage = () => {
               ? verificationStatus
               : "Loading content details..."}
           </p>
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </div>
     );
@@ -443,10 +579,18 @@ const MovieDetailPage = () => {
               synopsis:
                 locationState?.recommendation?.synopsis ||
                 locationState?.recommendation?.overview,
+              type: locationState?.recommendation?.media_type,
             }}
             potentialMatches={potentialMatches}
             onSelectMatch={handleSelectMatch}
-            onCancel={() => navigate(-1)}
+            onCancel={() => {
+              if (fromRecommendations) {
+                navigate("/", { state: { fromContentSelection: true } });
+              } else {
+                navigate(-1);
+              }
+            }}
+            isLoading={isLoading}
           />
         </div>
       </div>
@@ -456,13 +600,50 @@ const MovieDetailPage = () => {
   if (error || !movie) {
     return (
       <div className="container py-12 text-center min-h-[50vh] font-body">
-        <h2 className="text-2xl font-bold mb-4 font-heading">Error</h2>
-        <p className="text-muted-foreground mb-6">
-          {error || "Movie not found"}
-        </p>
-        <Button asChild>
-          <Link to="/">Back to Home</Link>
-        </Button>
+        <MovieDetailPageHeader title="Error" />
+        <div className="flex flex-col items-center justify-center gap-6 mt-12">
+          <h2 className="text-2xl font-bold mb-4 font-heading">
+            Content Not Found
+          </h2>
+          <p className="text-muted-foreground mb-6 max-w-md">
+            {error ||
+              "We couldn't find the content you're looking for. It may have been removed or is temporarily unavailable."}
+          </p>
+          <div className="flex gap-4">
+            <Button asChild>
+              <Link to="/">Back to Home</Link>
+            </Button>
+            {fromRecommendations && (
+              <Button variant="outline" asChild>
+                <Link to="/" state={{ fromContentError: true }}>
+                  Back to Recommendations
+                </Link>
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              onClick={() => {
+                // Try to search for the content again with a different approach
+                setIsLoading(true);
+                setError(null);
+                const decodedTitle = decodeURIComponent(id);
+                searchContent(decodedTitle, "multi").then((results) => {
+                  if (results && results.length > 0) {
+                    setPotentialMatches(results);
+                    setNeedsUserSelection(true);
+                  } else {
+                    setError(
+                      `No results found for "${decodedTitle}". Please try a different search.`,
+                    );
+                  }
+                  setIsLoading(false);
+                });
+              }}
+            >
+              Try Again
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }

@@ -115,15 +115,24 @@ async function makeApiCall<T>(
 export async function searchContent(
   query: string,
   type: "movie" | "tv" | "multi" = "multi",
+  options: { year?: string | number } = {},
 ): Promise<ContentItem[]> {
   try {
     const endpoint = `/search/${type}`;
-    const data = await makeApiCall<TmdbSearchResponse>(endpoint, {
+    // Add year to query params if provided
+    const params: Record<string, any> = {
       query,
       include_adult: false,
       language: "en-US",
       page: 1,
-    });
+    };
+
+    // Add year parameter if provided
+    if (options.year) {
+      params.year = options.year;
+    }
+
+    const data = await makeApiCall<TmdbSearchResponse>(endpoint, params);
 
     return data.results.map((item) => transformTmdbSearchResult(item));
   } catch (error) {

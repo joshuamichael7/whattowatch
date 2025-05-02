@@ -5,20 +5,27 @@ import { ContentItem } from "@/types/omdb";
  * Search for movies or TV shows
  * @param query Search query
  * @param type Content type (movie, tv, or multi)
+ * @param options Additional options like year
  * @returns Search results
  */
 export async function searchContent(
   query: string,
   type: "movie" | "tv" | "multi" = "multi",
+  options: { year?: string | number } = {},
 ): Promise<ContentItem[]> {
   try {
-    const response = await axios.get("/.netlify/functions/tmdb", {
-      params: {
-        operation: "search",
-        query,
-        type,
-      },
-    });
+    const params: Record<string, any> = {
+      operation: "search",
+      query,
+      type,
+    };
+
+    // Add year parameter if provided
+    if (options.year) {
+      params.year = options.year;
+    }
+
+    const response = await axios.get("/.netlify/functions/tmdb", { params });
 
     return response.data.results || [];
   } catch (error) {
@@ -212,5 +219,22 @@ export async function searchTvShowsByIds(
   } catch (error) {
     console.error(`Error searching for TV shows by IDs:`, error);
     return [];
+  }
+}
+
+/**
+ * Helper function to get content by ID based on media type
+ * @param id Content ID
+ * @param mediaType Media type (movie or tv)
+ * @returns Content details
+ */
+export async function getContentById(
+  id: string | number,
+  mediaType: "movie" | "tv" = "movie",
+): Promise<ContentItem | null> {
+  if (mediaType === "movie") {
+    return getMovieById(id);
+  } else {
+    return getTvShowById(id);
   }
 }
