@@ -52,8 +52,7 @@ export async function matchRecommendationWithOmdbResults(
     }
 
     // CRITICAL: Ensure synopsis is properly included in the prompt
-    const synopsis =
-      originalRecommendation.synopsis || originalRecommendation.overview || "";
+    const synopsis = recommendation.synopsis || recommendation.overview || "";
     console.log(
       `[aiMatchingService] Using synopsis for prompt: ${synopsis.substring(0, 100)}...`,
     );

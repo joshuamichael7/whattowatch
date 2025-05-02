@@ -273,25 +273,27 @@ export const processRecommendation = async (
     );
   }
 
-  // Skip if we've already processed this recommendation
+  // CRITICAL: Check if we've already processed this recommendation
   const processedRecommendations = getProcessedRecommendations();
   if (processedRecommendations[rec.id]) {
     console.log(
-      `[RecommendationProcessingService] Skipping already processed recommendation: ${rec.title}`,
+      `[RecommendationProcessingService] ⚠️ Found already processed recommendation: ${rec.title}`,
     );
+    // CRITICAL: Return the processed recommendation instead of skipping
     return processedRecommendations[rec.id];
   }
 
-  // Skip if this recommendation is currently being processed
+  // CRITICAL: Force processing even if it's already being processed
+  // This ensures we don't get stuck recommendations
   if (processingRecommendations[rec.id]) {
     console.log(
-      `[RecommendationProcessingService] Skipping recommendation that's already being processed: ${rec.title}`,
+      `[RecommendationProcessingService] ⚠️ Recommendation ${rec.title} is already being processed, but FORCING processing anyway`,
     );
-    return null;
+    // Continue processing instead of returning null
   }
 
   console.log(
-    `[RecommendationProcessingService] Processing recommendation: ${rec.title} (ID: ${rec.id})`,
+    `[RecommendationProcessingService] 🔄 FORCE PROCESSING recommendation: ${rec.title} (ID: ${rec.id})`,
   );
 
   // Mark this recommendation as being processed
@@ -443,16 +445,41 @@ export const processRecommendation = async (
 
     // If verification failed but wasn't a network error (already handled in catch)
     if (retryCount === 0) {
-      // Store a minimal version to prevent repeated processing attempts
+      // CRITICAL: Create a usable fallback item with all available data
       const fallbackItem: ContentItem = {
         ...contentItem,
+        id: rec.id,
+        title: rec.title,
+        poster_path: rec.poster || rec.poster_path || "",
+        media_type: rec.type === "movie" ? "movie" : "tv",
+        vote_average: rec.rating || 0,
+        vote_count: 0,
+        genre_ids: [],
+        overview: rec.synopsis || rec.overview || "",
+        synopsis: rec.synopsis || rec.overview || "",
+        recommendationReason: rec.recommendationReason || rec.reason || "",
+        reason: rec.reason || rec.recommendationReason || "",
+        year: rec.year,
         verified: false,
         processingFailed: true,
         failureReason: "Verification returned null",
+        // Ensure we have all the fields from the original recommendation
+        imdb_id: rec.imdb_id,
+        imdb_url: rec.imdb_url,
+        content_rating: rec.contentRating || rec.content_rating || "",
+        contentRating: rec.contentRating || rec.content_rating || "",
+        aiRecommended: true,
       };
+
+      console.log(
+        `[RecommendationProcessingService] ⚠️ Using fallback item for ${rec.title} with all available data`,
+      );
 
       // Store with shorter expiry (12 hours) so we can retry sooner
       updateProcessedRecommendations(rec.id, fallbackItem, 12);
+
+      // CRITICAL: Return the fallback item instead of null
+      return fallbackItem;
     }
 
     return null;

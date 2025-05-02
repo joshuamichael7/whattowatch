@@ -144,73 +144,90 @@ const RecommendationGrid = ({
   useEffect(() => {
     if (!recommendations || recommendations.length === 0) return;
 
-    // DIRECT PROCESSING - No async/await to ensure it runs immediately
+    // CRITICAL: FORCE IMMEDIATE PROCESSING - Load the service synchronously
     console.log(
-      `[RecommendationGrid] DIRECT PROCESSING of ${recommendations.length} recommendations`,
+      `[RecommendationGrid] 🔥 FORCE IMMEDIATE PROCESSING of ${recommendations.length} recommendations`,
     );
 
-    // Import synchronously to avoid any delays
-    const processRecommendationsDirectly = () => {
-      // Process recommendations directly without waiting
-      import("@/services/recommendationProcessingService")
-        .then((service) => {
+    // Import the service immediately
+    import("@/services/recommendationProcessingService")
+      .then((service) => {
+        console.log(
+          `[RecommendationGrid] ⚡ Service imported, FORCE PROCESSING recommendations NOW`,
+        );
+
+        // CRITICAL: Process each recommendation IMMEDIATELY and SEQUENTIALLY to ensure they all get processed
+        const processSequentially = async () => {
           console.log(
-            `[RecommendationGrid] Service imported, processing recommendations NOW`,
+            `[RecommendationGrid] Starting sequential processing of ${recommendations.length} recommendations`,
           );
 
-          // Process all recommendations by title - NEVER prioritize by IMDB ID as they're unreliable from AI
-          console.log(
-            `[RecommendationGrid] Processing all ${recommendations.length} recommendations by title`,
-          );
-
-          recommendations.forEach((rec, index) => {
+          for (let i = 0; i < recommendations.length; i++) {
+            const rec = recommendations[i];
             console.log(
-              `[RecommendationGrid] Processing recommendation ${index + 1}/${recommendations.length}: ${rec.title}`,
-            );
-            service.processRecommendation(rec).then((result) => {
-              console.log(
-                `[RecommendationGrid] Processed ${rec.title}: ${result ? "SUCCESS" : "FAILED"}`,
-              );
-            });
-          });
-
-          // Start background processing in parallel
-          service.startBackgroundProcessing();
-
-          // Set up aggressive polling to update UI
-          const pollInterval = setInterval(() => {
-            const processedRecs = service.getProcessedRecommendations();
-            const processedCount = Object.keys(processedRecs).length;
-            console.log(
-              `[RecommendationGrid] POLL: ${processedCount}/${recommendations.length} processed`,
+              `[RecommendationGrid] FORCE PROCESSING recommendation ${i + 1}/${recommendations.length}: ${rec.title}`,
             );
 
-            if (processedCount > 0) {
-              setProcessedRecommendations(processedRecs);
-            }
+            try {
+              // CRITICAL: Use await to ensure each recommendation is fully processed before moving to the next
+              const result = await service.processRecommendation(rec);
 
-            // Check if all recommendations are processed
-            if (processedCount >= recommendations.length) {
               console.log(
-                `[RecommendationGrid] All recommendations processed, stopping polling`,
+                `[RecommendationGrid] ✅ PROCESSED ${rec.title}: ${result ? "SUCCESS" : "FAILED"}`,
               );
-              clearInterval(pollInterval);
+
+              // CRITICAL: Update UI immediately after each recommendation is processed
+              const processedRecs = service.getProcessedRecommendations();
+              setProcessedRecommendations({ ...processedRecs });
+            } catch (error) {
+              console.error(
+                `[RecommendationGrid] ❌ ERROR processing ${rec.title}:`,
+                error,
+              );
             }
-          }, 1000); // Poll every second for faster updates
+          }
 
-          // Clean up interval on unmount
-          return () => clearInterval(pollInterval);
-        })
-        .catch((error) => {
-          console.error(
-            `[RecommendationGrid] CRITICAL ERROR in processing:`,
-            error,
+          console.log(
+            `[RecommendationGrid] ✅ COMPLETED sequential processing of all recommendations`,
           );
-        });
-    };
+        };
 
-    // Execute immediately
-    processRecommendationsDirectly();
+        // Start processing immediately
+        processSequentially();
+
+        // ALSO start background processing in parallel as a backup
+        service.startBackgroundProcessing();
+
+        // Set up aggressive polling to update UI
+        const pollInterval = setInterval(() => {
+          const processedRecs = service.getProcessedRecommendations();
+          const processedCount = Object.keys(processedRecs).length;
+          console.log(
+            `[RecommendationGrid] POLL: ${processedCount}/${recommendations.length} processed`,
+          );
+
+          if (processedCount > 0) {
+            setProcessedRecommendations({ ...processedRecs });
+          }
+
+          // Check if all recommendations are processed
+          if (processedCount >= recommendations.length) {
+            console.log(
+              `[RecommendationGrid] All recommendations processed, stopping polling`,
+            );
+            clearInterval(pollInterval);
+          }
+        }, 500); // Poll every half second for faster updates
+
+        // Clean up interval on unmount
+        return () => clearInterval(pollInterval);
+      })
+      .catch((error) => {
+        console.error(
+          `[RecommendationGrid] CRITICAL ERROR in processing:`,
+          error,
+        );
+      });
 
     // Also store recommendations in localStorage directly as backup
     try {

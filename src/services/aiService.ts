@@ -582,9 +582,18 @@ function calculateTextSimilarity(text1: string, text2: string): number {
 export async function verifyRecommendationWithOmdb(
   item: ContentItem,
 ): Promise<ContentItem | null> {
-  console.log(
-    `[verifyRecommendationWithOmdb] 🔍 VERIFYING: ${item.title} (ID: ${item.id})`,
-  );
+  console.log(`[verifyRecommendationWithOmdb] 🔍 VERIFYING: ${item.title}`);
+
+  // CRITICAL: If the item has no synopsis/overview, create a minimal one based on the title
+  // This helps the AI matching process which requires some text to work with
+  if (!item.synopsis && !item.overview) {
+    item.synopsis = `Content about ${item.title}`;
+    item.overview = `Content about ${item.title}`;
+    console.log(
+      `[verifyRecommendationWithOmdb] Added minimal synopsis for ${item.title}`,
+    );
+  }
+
   try {
     console.log(`[verifyRecommendationWithOmdb] Verifying "${item.title}"`);
 
