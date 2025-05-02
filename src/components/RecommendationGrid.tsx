@@ -144,9 +144,18 @@ const RecommendationGrid = ({
   useEffect(() => {
     if (!recommendations || recommendations.length === 0) return;
 
-    // Import the recommendation processing service
-    import("@/services/recommendationProcessingService")
-      .then(async (service) => {
+    // Immediately start processing recommendations when they're loaded
+    const processRecommendations = async () => {
+      try {
+        console.log(
+          `[RecommendationGrid] Starting immediate processing of ${recommendations.length} recommendations`,
+        );
+
+        // Import the recommendation processing service
+        const service = await import(
+          "@/services/recommendationProcessingService"
+        );
+
         // First check if we have cached recommendations
         const cacheParams = {
           type: typeFilter,
@@ -183,9 +192,29 @@ const RecommendationGrid = ({
               `[RecommendationGrid] Stored ${storedCount} recommendations for processing`,
             );
 
-            // Start the background processing immediately
+            // Force immediate processing of at least the first 3 recommendations
+            const initialProcessingPromises = recommendations
+              .slice(0, 3)
+              .map((rec) => {
+                console.log(
+                  `[RecommendationGrid] Starting immediate processing for: ${rec.title}`,
+                );
+                return service.processRecommendation(rec);
+              });
+
+            // Process first 3 recommendations immediately
+            const initialResults = await Promise.allSettled(
+              initialProcessingPromises,
+            );
+            console.log(
+              `[RecommendationGrid] Initial processing complete for ${initialResults.filter((r) => r.status === "fulfilled").length} recommendations`,
+            );
+
+            // Start background processing for the rest
             await service.startBackgroundProcessing();
-            console.log(`[RecommendationGrid] Background processing started`);
+            console.log(
+              `[RecommendationGrid] Background processing started for remaining recommendations`,
+            );
 
             // Set up a polling mechanism to check for processed recommendations
             const pollInterval = setInterval(() => {
@@ -229,18 +258,21 @@ const RecommendationGrid = ({
           );
 
           // Fallback to standard processing
-          service.storeRecommendationsForProcessing(recommendations);
-          service.startBackgroundProcessing();
+          await service.storeRecommendationsForProcessing(recommendations);
+          await service.startBackgroundProcessing();
           const processedRecs = service.getProcessedRecommendations();
           setProcessedRecommendations(processedRecs);
         }
-      })
-      .catch((error) => {
+      } catch (error) {
         console.error(
-          "[RecommendationGrid] Error importing recommendation processing service:",
+          "[RecommendationGrid] Error processing recommendations:",
           error,
         );
-      });
+      }
+    };
+
+    // Start processing immediately
+    processRecommendations();
   }, [recommendations, typeFilter, ratingFilter, yearFilter, userId]);
 
   useEffect(() => {
@@ -419,7 +451,7 @@ const RecommendationGrid = ({
                     ...rec,
                     imdb_url: rec.imdb_url,
                     synopsis: rec.synopsis,
-                    overview: rec.overview,
+                    overview: rec.overview || rec.synopsis, // Ensure overview is also set
                     reason: rec.reason || rec.recommendationReason,
                   },
                   processedContent: processedRecommendations[rec.id],
@@ -621,7 +653,8 @@ const RecommendationGrid = ({
                                 Synopsis
                               </h4>
                               <p className="text-sm text-muted-foreground">
-                                {selectedItem.overview ||
+                                {selectedItem.synopsis ||
+                                  selectedItem.overview ||
                                   "No description available"}
                               </p>
                             </div>
@@ -682,6 +715,10 @@ const RecommendationGrid = ({
                                     recommendation: {
                                       ...selectedItem,
                                       imdb_url: selectedItem.imdb_url, // Ensure imdb_url is passed in state
+                                      synopsis: selectedItem.synopsis,
+                                      overview:
+                                        selectedItem.overview ||
+                                        selectedItem.synopsis,
                                     },
                                     processedContent:
                                       processedRecommendations[selectedItem.id],

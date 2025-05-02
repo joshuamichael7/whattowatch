@@ -13,6 +13,7 @@ export async function matchRecommendationWithOmdbResults(
     year?: string;
     reason?: string;
     synopsis?: string;
+    overview?: string;
   },
   omdbResults: any[],
 ): Promise<ContentItem | null> {
@@ -22,6 +23,9 @@ export async function matchRecommendationWithOmdbResults(
     );
     console.log(
       `[aiMatchingService] Original recommendation: ${originalRecommendation.title} (${originalRecommendation.year || "unknown year"})`,
+    );
+    console.log(
+      `[aiMatchingService] Original synopsis: ${(originalRecommendation.synopsis || originalRecommendation.overview || "").substring(0, 100)}...`,
     );
     console.log(
       `[aiMatchingService] Found ${omdbResults.length} potential OMDB matches`,
@@ -45,9 +49,12 @@ export async function matchRecommendationWithOmdbResults(
     const prompt = {
       originalRecommendation: {
         title: originalRecommendation.title,
-        year: originalRecommendation.year,
-        reason: originalRecommendation.reason,
-        synopsis: originalRecommendation.synopsis,
+        year: originalRecommendation.year || "",
+        reason: originalRecommendation.reason || "",
+        synopsis:
+          originalRecommendation.synopsis ||
+          originalRecommendation.overview ||
+          "",
       },
       omdbResults: omdbResults.map((result) => ({
         title: result.Title || result.title,
@@ -219,6 +226,10 @@ function convertOmdbToContentItem(
   console.log(`[aiMatchingService] Genres: ${genreStrings.join(", ")}`);
   console.log(`[aiMatchingService] Rating: ${rating}`);
 
+  // Get synopsis from original recommendation or use plot as fallback
+  const synopsis =
+    originalRecommendation.synopsis || originalRecommendation.overview || plot;
+
   return {
     id: imdbId,
     imdb_id: imdbId,
@@ -276,8 +287,10 @@ function convertOmdbToContentItem(
     contentRating:
       omdbData.Rated !== "N/A" ? omdbData.Rated : omdbData.contentRating || "",
     // Add recommendation data from original recommendation
-    recommendationReason: originalRecommendation.reason,
-    synopsis: originalRecommendation.synopsis || plot,
+    recommendationReason:
+      originalRecommendation.reason ||
+      originalRecommendation.recommendationReason,
+    synopsis: synopsis,
     aiRecommended: true,
     aiVerified: true,
     similarityScore: 0.9, // Add a default high similarity score

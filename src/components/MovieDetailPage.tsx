@@ -169,6 +169,7 @@ const MovieDetailPage = () => {
           year: aiYear,
           reason: aiReason,
           synopsis: aiSynopsis,
+          overview: aiSynopsis, // Include synopsis as overview as well for redundancy
         },
         detailedResults,
       );

@@ -178,6 +178,21 @@ export const storeRecommendationsForProcessing = async (
         if (!rec.id) {
           rec.id = `rec_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         }
+
+        // Ensure synopsis is preserved in both fields for redundancy
+        if (rec.synopsis && !rec.overview) {
+          rec.overview = rec.synopsis;
+        } else if (rec.overview && !rec.synopsis) {
+          rec.synopsis = rec.overview;
+        }
+
+        // Ensure reason is preserved in both fields for redundancy
+        if (rec.reason && !rec.recommendationReason) {
+          rec.recommendationReason = rec.reason;
+        } else if (rec.recommendationReason && !rec.reason) {
+          rec.reason = rec.recommendationReason;
+        }
+
         return rec;
       });
 
@@ -190,20 +205,47 @@ export const storeRecommendationsForProcessing = async (
         `[RecommendationProcessingService] Stored ${recsWithIds.length} recommendations for background processing`,
       );
 
-      // Pre-process the first recommendation to make it faster
+      // Process the first 3 recommendations immediately to make them available faster
       if (recsWithIds.length > 0) {
+        const initialBatchSize = Math.min(3, recsWithIds.length);
         console.log(
-          `[RecommendationProcessingService] Pre-processing first recommendation: ${recsWithIds[0].title}`,
+          `[RecommendationProcessingService] Immediately processing first ${initialBatchSize} recommendations`,
         );
-        try {
-          // Start processing the first recommendation but don't await it
-          processRecommendation(recsWithIds[0]);
-        } catch (preProcessError) {
-          console.error(
-            "Error pre-processing first recommendation:",
-            preProcessError,
+
+        // Process first batch in parallel
+        const processingPromises = [];
+
+        for (let i = 0; i < initialBatchSize; i++) {
+          const rec = recsWithIds[i];
+          console.log(
+            `[RecommendationProcessingService] Starting immediate processing for: ${rec.title}`,
           );
+
+          const promise = processRecommendation(rec).then((result) => {
+            if (result) {
+              console.log(
+                `[RecommendationProcessingService] Immediate processing complete for: ${rec.title}`,
+              );
+            } else {
+              console.log(
+                `[RecommendationProcessingService] Immediate processing failed for: ${rec.title}`,
+              );
+            }
+            return result;
+          });
+
+          processingPromises.push(promise);
         }
+
+        // Wait for all initial processing to complete
+        Promise.allSettled(processingPromises).then((results) => {
+          const successCount = results.filter(
+            (r) => r.status === "fulfilled" && r.value,
+          ).length;
+          console.log(
+            `[RecommendationProcessingService] Initial batch processing complete. Success: ${successCount}/${initialBatchSize}`,
+          );
+        });
       }
     }
     return unprocessedRecs.length;
@@ -244,6 +286,21 @@ export const processRecommendation = async (
   updateProcessingRecommendationsStorage();
 
   try {
+    // Log the full recommendation object to help with debugging
+    console.log(
+      `[RecommendationProcessingService] Processing recommendation:`,
+      {
+        id: rec.id,
+        title: rec.title,
+        year: rec.year,
+        imdb_id: rec.imdb_id,
+        imdb_url: rec.imdb_url,
+        synopsis: rec.synopsis ? rec.synopsis.substring(0, 50) + "..." : "none",
+        overview: rec.overview ? rec.overview.substring(0, 50) + "..." : "none",
+        reason: rec.reason || rec.recommendationReason || "none",
+      },
+    );
+
     // Convert recommendation to ContentItem format for verification
     const contentItem: ContentItem = {
       id: rec.id,
@@ -253,8 +310,8 @@ export const processRecommendation = async (
       vote_average: rec.rating || 0,
       vote_count: 0,
       genre_ids: [],
-      overview: rec.synopsis || "",
-      synopsis: rec.synopsis || "",
+      overview: rec.overview || rec.synopsis || "",
+      synopsis: rec.synopsis || rec.overview || "",
       recommendationReason: rec.recommendationReason || rec.reason || "",
       reason: rec.reason || rec.recommendationReason || "",
       year: rec.year,
@@ -469,7 +526,7 @@ export const startBackgroundProcessing = async () => {
   console.group("Background Processing Started");
   logBackgroundProcessing("Starting background processing", "info");
 
-  // Immediately start processing the first recommendation to avoid delay
+  // Immediately start processing the first 3 recommendations to avoid delay
   try {
     const pendingRecsString = localStorage.getItem(
       "pendingRecommendationsToProcess",
@@ -477,22 +534,49 @@ export const startBackgroundProcessing = async () => {
     if (pendingRecsString) {
       const pendingRecs = JSON.parse(pendingRecsString);
       if (pendingRecs.length > 0) {
+        const initialBatchSize = Math.min(3, pendingRecs.length);
         logBackgroundProcessing(
-          `Immediately processing first recommendation: ${pendingRecs[0].title}`,
+          `Immediately processing first ${initialBatchSize} recommendations`,
           "info",
         );
-        processRecommendation(pendingRecs[0]).then((result) => {
-          if (result) {
-            logBackgroundProcessing(
-              `Immediate processing complete for: ${pendingRecs[0].title}`,
-              "success",
-            );
-          } else {
-            logBackgroundProcessing(
-              `Immediate processing failed for: ${pendingRecs[0].title}`,
-              "error",
-            );
-          }
+
+        // Process first batch in parallel
+        const processingPromises = [];
+
+        for (let i = 0; i < initialBatchSize; i++) {
+          const rec = pendingRecs[i];
+          logBackgroundProcessing(
+            `Starting immediate processing for: ${rec.title}`,
+            "info",
+          );
+
+          const promise = processRecommendation(rec).then((result) => {
+            if (result) {
+              logBackgroundProcessing(
+                `Immediate processing complete for: ${rec.title}`,
+                "success",
+              );
+            } else {
+              logBackgroundProcessing(
+                `Immediate processing failed for: ${rec.title}`,
+                "error",
+              );
+            }
+            return result;
+          });
+
+          processingPromises.push(promise);
+        }
+
+        // Wait for all initial processing to complete
+        Promise.allSettled(processingPromises).then((results) => {
+          const successCount = results.filter(
+            (r) => r.status === "fulfilled" && r.value,
+          ).length;
+          logBackgroundProcessing(
+            `Initial batch processing complete. Success: ${successCount}/${initialBatchSize}`,
+            successCount > 0 ? "success" : "info",
+          );
         });
       }
     }
@@ -642,7 +726,7 @@ export const checkCachedRecommendations = async (
 
     if (supabaseCache && supabaseCache.length > 0) {
       console.log(
-        `[RecommendationProcessingService] Found ${supabaseCache.length} items in Supabase cache`,
+        `[RecommendationProcessingService] Found ${supababCache.length} items in Supabase cache`,
       );
 
       // Store in localStorage for faster access next time
