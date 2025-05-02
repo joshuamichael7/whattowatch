@@ -43,7 +43,8 @@ import { getContentById } from "@/lib/omdbClient";
 import { ContentItem, genreMap } from "@/types/omdb";
 import UserFeedbackButton from "./UserFeedbackButton";
 import WatchlistButton from "./WatchlistButton";
-import { verifyRecommendationWithOmdb } from "@/services/aiService";
+// Recommendation processing is now handled by the dedicated service
+// import { verifyRecommendationWithOmdb } from "@/services/aiService";
 
 interface RecommendationItem {
   id: string;
@@ -107,6 +108,19 @@ const RecommendationGrid = ({
     }
   });
 
+  // Track which recommendations are currently being processed
+  const [processingRecommendations, setProcessingRecommendations] = useState<
+    Record<string, boolean>
+  >(() => {
+    try {
+      const stored = localStorage.getItem("processingRecommendations");
+      return stored ? JSON.parse(stored) : {};
+    } catch (error) {
+      console.error("Error loading processing recommendations:", error);
+      return {};
+    }
+  });
+
   useEffect(() => {
     const fetchAdditionalDetails = async (itemId: string) => {
       try {
@@ -126,148 +140,75 @@ const RecommendationGrid = ({
     }
   }, [selectedItem, useDirectApi]);
 
-  // Background processing for recommendations
+  // Background processing for recommendations using the dedicated service
   useEffect(() => {
     if (!recommendations || recommendations.length === 0) return;
 
-    // Store recommendations in localStorage to persist them
-    const storeRecommendationsForProcessing = () => {
-      try {
-        // Store only recommendations that haven't been processed yet
-        const unprocessedRecs = recommendations.filter(
-          (rec) => !processedRecommendations[rec.id],
-        );
-
-        if (unprocessedRecs.length > 0) {
-          localStorage.setItem(
-            "pendingRecommendationsToProcess",
-            JSON.stringify(unprocessedRecs),
-          );
-          console.log(
-            `[RecommendationGrid] Stored ${unprocessedRecs.length} recommendations for background processing`,
-          );
-        }
-      } catch (error) {
-        console.error("Error storing recommendations for processing:", error);
-      }
-    };
-
-    // Process recommendations in the background
-    const processRecommendationsInBackground = async () => {
-      console.log(
-        `[RecommendationGrid] Starting background processing for ${recommendations.length} recommendations`,
-      );
-
-      // Create a copy to avoid modifying the original array
-      const visibleRecommendations = [...recommendations];
-
-      // Track processed recommendations to update localStorage
-      const newlyProcessed = {};
-
-      // Process each recommendation one by one to avoid overwhelming the API
-      for (const rec of visibleRecommendations) {
-        // Skip if we've already processed this recommendation
-        if (processedRecommendations[rec.id]) continue;
+    // Import the recommendation processing service
+    import("@/services/recommendationProcessingService")
+      .then(async (service) => {
+        // First check if we have cached recommendations
+        const cacheParams = {
+          type: typeFilter,
+          rating: ratingFilter,
+          year: yearFilter,
+          userId: userId || "anonymous",
+          count: recommendations.length,
+        };
 
         try {
-          // Convert recommendation to ContentItem format for verification
-          const contentItem: ContentItem = {
-            id: rec.id,
-            title: rec.title,
-            poster_path: rec.poster || rec.poster_path || "",
-            media_type: rec.type === "movie" ? "movie" : "tv",
-            vote_average: rec.rating || 0,
-            vote_count: 0,
-            genre_ids: [],
-            overview: rec.synopsis || "",
-            synopsis: rec.synopsis || "",
-            recommendationReason: rec.recommendationReason || rec.reason || "",
-            reason: rec.reason || rec.recommendationReason || "",
-            year: rec.year,
-            imdb_id: rec.imdb_id,
-            imdb_url: rec.imdb_url,
-            aiRecommended: true,
-          };
+          const cachedRecommendations =
+            await service.checkCachedRecommendations(cacheParams);
 
-          console.log(
-            `[RecommendationGrid] Processing recommendation in background: ${rec.title}`,
-          );
-          const verifiedItem = await verifyRecommendationWithOmdb(contentItem);
-
-          if (verifiedItem) {
+          if (cachedRecommendations && cachedRecommendations.length > 0) {
             console.log(
-              `[RecommendationGrid] Successfully processed recommendation: ${rec.title}`,
+              `[RecommendationGrid] Using ${cachedRecommendations.length} cached recommendations`,
             );
-            // Preserve the original recommendation reason if it exists
-            if (rec.recommendationReason || rec.reason) {
-              verifiedItem.recommendationReason =
-                rec.recommendationReason || rec.reason;
-            }
+            setProcessedRecommendations(
+              cachedRecommendations.reduce((acc, item) => {
+                if (item.id) acc[item.id] = item;
+                return acc;
+              }, {}),
+            );
+          } else {
+            // No cached recommendations, process new ones
+            console.log(
+              `[RecommendationGrid] No cached recommendations found, processing ${recommendations.length} new recommendations`,
+            );
 
-            // Update state if component is still mounted
-            setProcessedRecommendations((prev) => {
-              const updated = {
-                ...prev,
-                [rec.id]: verifiedItem,
-              };
+            // Store recommendations for background processing
+            service.storeRecommendationsForProcessing(recommendations);
 
-              // Store processed recommendations in localStorage
-              try {
-                localStorage.setItem(
-                  "processedRecommendations",
-                  JSON.stringify(updated),
-                );
-              } catch (err) {
-                console.error("Error storing processed recommendations:", err);
-              }
+            // Start the background processing
+            service.startBackgroundProcessing();
 
-              return updated;
-            });
-
-            // Track this recommendation as processed
-            newlyProcessed[rec.id] = true;
-
-            // Update pending recommendations in localStorage
-            try {
-              const pendingRecs = JSON.parse(
-                localStorage.getItem("pendingRecommendationsToProcess") || "[]",
-              );
-              const updatedPendingRecs = pendingRecs.filter(
-                (pendingRec) => pendingRec.id !== rec.id,
-              );
-              localStorage.setItem(
-                "pendingRecommendationsToProcess",
-                JSON.stringify(updatedPendingRecs),
-              );
-            } catch (err) {
-              console.error("Error updating pending recommendations:", err);
-            }
+            // Load any previously processed recommendations
+            const processedRecs = service.getProcessedRecommendations();
+            setProcessedRecommendations(processedRecs);
           }
-        } catch (error) {
+        } catch (cacheError) {
           console.error(
-            `[RecommendationGrid] Error processing recommendation ${rec.title}:`,
-            error,
+            "[RecommendationGrid] Error checking cache:",
+            cacheError,
           );
+
+          // Fallback to standard processing
+          service.storeRecommendationsForProcessing(recommendations);
+          service.startBackgroundProcessing();
+          const processedRecs = service.getProcessedRecommendations();
+          setProcessedRecommendations(processedRecs);
         }
+      })
+      .catch((error) => {
+        console.error(
+          "[RecommendationGrid] Error importing recommendation processing service:",
+          error,
+        );
+      });
 
-        // Add a small delay between API calls to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-
-      console.log(
-        `[RecommendationGrid] Completed background processing for recommendations`,
-      );
-    };
-
-    // Store recommendations first
-    storeRecommendationsForProcessing();
-
-    // Use a non-cancelable promise to ensure processing continues
-    const processingPromise = processRecommendationsInBackground();
-
-    // We don't need to clean up the promise as we want it to continue
+    // No cleanup function needed as we want processing to continue
     // even if the component unmounts
-  }, [recommendations]);
+  }, [recommendations, typeFilter, ratingFilter, yearFilter, userId]);
 
   useEffect(() => {
     if (userId && userPreferences) {

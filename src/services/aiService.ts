@@ -374,9 +374,17 @@ export async function getSimilarContentTitles(
  * @param limit Maximum number of recommendations to return
  * @returns Array of content items as recommendations
  */
+/**
+ * Get personalized recommendations based on user preferences
+ * @param preferences User preferences object
+ * @param limit Maximum number of recommendations to return
+ * @param forceAi Whether to force using AI recommendations (default: true)
+ * @returns Array of content items as recommendations
+ */
 export async function getPersonalizedRecommendations(
   preferences: any,
   limit: number = 10,
+  forceAi: boolean = true,
 ): Promise<ContentItem[]> {
   try {
     console.log(
@@ -406,6 +414,7 @@ export async function getPersonalizedRecommendations(
     }
 
     // Call the Netlify function to get personalized recommendations
+    // Always use AI for personalized recommendations
     const response = await fetch("/.netlify/functions/ai-recommendations", {
       method: "POST",
       headers: {
@@ -414,6 +423,7 @@ export async function getPersonalizedRecommendations(
       body: JSON.stringify({
         preferences,
         limit: limit * 2, // Request more items than needed to account for filtering
+        forceAi: true, // Always force AI for personalized recommendations
       }),
     });
 

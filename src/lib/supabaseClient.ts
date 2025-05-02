@@ -24,6 +24,12 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   global: {
     fetch: (...args) => {
       console.log("[SUPABASE] Fetch request:", args[0]);
+      // Add proper headers to fix 406 error
+      if (args[1] && !args[1].headers) {
+        args[1] = { ...args[1], headers: { Accept: "application/json" } };
+      } else if (args[1] && args[1].headers && !args[1].headers["Accept"]) {
+        args[1].headers = { ...args[1].headers, Accept: "application/json" };
+      }
       return fetch(...args);
     },
   },

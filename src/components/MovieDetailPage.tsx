@@ -241,6 +241,14 @@ const MovieDetailPage = () => {
 
       setIsLoading(true);
       setError(null);
+
+      // Log the state to help with debugging
+      console.log("[MovieDetailPage] Location state:", {
+        hasProcessedContent: !!location.state?.processedContent,
+        hasRecommendation: !!location.state?.recommendation,
+        fromRecommendations: !!location.state?.fromRecommendations,
+      });
+
       setVerificationStatus("Starting verification process...");
 
       // Check if we're coming from a recommendation that's still being processed
@@ -283,6 +291,26 @@ const MovieDetailPage = () => {
             );
           } else {
             setVerificationStatus("Using pre-processed data");
+          }
+
+          // Store this processed content in localStorage to avoid redundant processing
+          try {
+            const storedProcessed =
+              localStorage.getItem("processedRecommendations") || "{}";
+            const processedItems = JSON.parse(storedProcessed);
+            processedItems[id] = processedContent;
+            localStorage.setItem(
+              "processedRecommendations",
+              JSON.stringify(processedItems),
+            );
+            console.log(
+              "[MovieDetailPage] Updated processedRecommendations in localStorage",
+            );
+          } catch (err) {
+            console.error(
+              "[MovieDetailPage] Error updating localStorage:",
+              err,
+            );
           }
 
           setIsLoading(false);
@@ -366,9 +394,22 @@ const MovieDetailPage = () => {
         if (locationRecommendation) {
           // Check if we have a recommendation but it's not being processed
           // This is to prevent duplicate processing when navigating from RecommendationGrid
+          // Also check if background processing is happening for this recommendation
+          const pendingProcessing = localStorage.getItem(
+            "pendingRecommendationsToProcess",
+          );
+          const isPendingProcessing = pendingProcessing
+            ? JSON.parse(pendingProcessing).some(
+                (rec: any) =>
+                  rec.id === locationRecommendation.id ||
+                  rec.title === locationRecommendation.title,
+              )
+            : false;
+
           if (
-            location.state?.fromRecommendations &&
-            !isProcessingRecommendation
+            (location.state?.fromRecommendations &&
+              !isProcessingRecommendation) ||
+            isPendingProcessing
           ) {
             console.log(
               "Using recommendation data from location state without processing",
@@ -411,7 +452,11 @@ const MovieDetailPage = () => {
             };
 
             setMovie(movieFromRec);
-            setVerificationStatus("Using recommendation data");
+            setVerificationStatus(
+              isPendingProcessing
+                ? "Using recommendation data (background processing in progress)"
+                : "Using recommendation data",
+            );
             setIsLoading(false);
             return;
           }
@@ -574,12 +619,18 @@ const MovieDetailPage = () => {
     }
 
     try {
+      // Add proper headers to prevent 406 error
+      const headers = {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      };
       if (isInWatchlist) {
         const { error } = await supabase
           .from("watchlist")
           .delete()
           .eq("user_id", user.id)
-          .eq("content_id", movie.id);
+          .eq("content_id", movie.id)
+          .select();
 
         if (error) throw error;
 
@@ -589,14 +640,17 @@ const MovieDetailPage = () => {
           description: `${movie.title} has been removed from your watchlist`,
         });
       } else {
-        const { error } = await supabase.from("watchlist").insert({
-          user_id: user.id,
-          content_id: movie.id,
-          title: movie.title,
-          poster_path: movie.poster_path,
-          media_type: movie.media_type,
-          added_at: new Date().toISOString(),
-        });
+        const { error } = await supabase
+          .from("watchlist")
+          .insert({
+            user_id: user.id,
+            content_id: movie.id,
+            title: movie.title,
+            poster_path: movie.poster_path,
+            media_type: movie.media_type,
+            added_at: new Date().toISOString(),
+          })
+          .select();
 
         if (error) throw error;
 

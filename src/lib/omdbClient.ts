@@ -866,6 +866,7 @@ export async function getSimilarContent(
   limit = 8,
   useAi = false,
   useVectorDb = false,
+  isPersonalizedRecommendation = false,
 ): Promise<ContentItem[]> {
   // Force useDirectApi to true to always use OMDB API directly
   useDirectApi = true;
@@ -913,6 +914,25 @@ export async function getSimilarContent(
       `[getSimilarContent] Getting similar content for ID: ${id}, useDirectApi: ${useDirectApi}, limit: ${limit}, useAi: ${useAi}, useVectorDb: ${useVectorDb}`,
     );
 
+    // Create a cache key for this request
+    const cacheKey = `similar-content-${id}-${limit}-${useAi ? 1 : 0}-${useVectorDb ? 1 : 0}`;
+
+    // Try to get cached results from Supabase first
+    try {
+      const { getCachedRecommendations } = await import("./supabaseClient");
+      const cachedResults = await getCachedRecommendations(cacheKey);
+
+      if (cachedResults && cachedResults.length > 0) {
+        console.log(
+          `[getSimilarContent] Using cached results for ${id} from Supabase`,
+        );
+        return cachedResults;
+      }
+    } catch (cacheError) {
+      console.error(`[getSimilarContent] Error checking cache:`, cacheError);
+      // Continue with normal flow if cache check fails
+    }
+
     // Get the content details first - this will now try to fetch genres from OMDB if missing
     console.log("[DEBUG] Before calling getContentById");
     const contentDetails = await getContentById(id);
@@ -943,9 +963,14 @@ export async function getSimilarContent(
         : "none",
     });
 
-    // If useAi is true, call the similar-content function with title and overview
-    // This is ONLY used for the Similar Content feature, not What to Watch
-    if (useAi && contentDetails.title && contentDetails.overview) {
+    // If useAi is true and this is not a personalized recommendation, call the similar-content function with title and overview
+    // This is ONLY used for the Similar Content feature, not What to Watch or personalized recommendations
+    if (
+      useAi &&
+      !isPersonalizedRecommendation &&
+      contentDetails.title &&
+      contentDetails.overview
+    ) {
       try {
         console.log(
           `[getSimilarContent] Using AI to get recommendations for "${contentDetails.title}"`,
@@ -999,6 +1024,22 @@ export async function getSimilarContent(
             "[DEBUG] After calling processAiRecommendations, results:",
             aiResults.length,
           );
+
+          // Cache the AI results in Supabase for future use
+          try {
+            const { cacheRecommendations } = await import("./supabaseClient");
+            await cacheRecommendations(cacheKey, aiResults, 24); // Cache for 24 hours
+            console.log(
+              `[getSimilarContent] Cached AI results for ${id} in Supabase`,
+            );
+          } catch (cacheError) {
+            console.error(
+              `[getSimilarContent] Error caching results:`,
+              cacheError,
+            );
+            // Continue even if caching fails
+          }
+
           return aiResults;
         } else {
           console.log(
@@ -1088,6 +1129,18 @@ export async function getSimilarContent(
     console.log(
       `[getSimilarContent] Found ${data.results.length} similar items for ${contentDetails.title}`,
     );
+
+    // Cache the results in Supabase for future use
+    if (data.results.length > 0) {
+      try {
+        const { cacheRecommendations } = await import("./supabaseClient");
+        await cacheRecommendations(cacheKey, data.results, 24); // Cache for 24 hours
+        console.log(`[getSimilarContent] Cached results for ${id} in Supabase`);
+      } catch (cacheError) {
+        console.error(`[getSimilarContent] Error caching results:`, cacheError);
+        // Continue even if caching fails
+      }
+    }
 
     return data.results;
   } catch (error) {
