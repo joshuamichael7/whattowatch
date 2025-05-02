@@ -15,7 +15,7 @@ type AuthContextType = {
   refreshProfile: () => Promise<void>;
 };
 
-export const AuthContext = createContext<AuthContextType>({
+const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
   profile: null,

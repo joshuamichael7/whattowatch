@@ -11,7 +11,7 @@ type RecommendationContextType = {
   clearRecommendations: () => void;
 };
 
-export const RecommendationContext = createContext<RecommendationContextType>({
+const RecommendationContext = createContext<RecommendationContextType>({
   recommendations: [],
   allRecommendations: [],
   selectedRecommendation: null,

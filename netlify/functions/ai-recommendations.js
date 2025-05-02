@@ -185,19 +185,18 @@ exports.handler = async (event, context) => {
     3. The IMDB ID (in the format tt1234567)\n
     4. The IMDB URL (in the format https://www.imdb.com/title/tt1234567/)\n
     5. A brief reason why it matches their preferences (1-2 sentences)\n
-    6. A brief synopsis of the plot (1-2 sentences)\n
-    7. The type of content (movie or tv)\n\n
-    Format your response as a JSON array with title, year, imdb_id, imdb_url, reason, synopsis, and type properties for each recommendation. Example:\n
+    6. A brief synopsis of the plot (1-2 sentences)\n\n
+    Format your response as a JSON array with title, year, imdb_id, imdb_url, reason, and synopsis properties for each recommendation. Example:\n
     [\n
-      {\"title\": \"The Shawshank Redemption\", \"year\": \"1994\", \"imdb_id\": \"tt0111161\", \"imdb_url\": \"https://www.imdb.com/title/tt0111161/\", \"reason\": \"A powerful drama about hope and redemption that matches your preference for thoughtful storytelling.\", \"synopsis\": \"Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.\", \"type\": \"movie\"},\n
-      {\"title\": \"Inception\", \"year\": \"2010\", \"imdb_id\": \"tt1375666\", \"imdb_url\": \"https://www.imdb.com/title/tt1375666/\", \"reason\": \"A mind-bending sci-fi thriller that aligns with your interest in complex narratives.\", \"synopsis\": \"A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.\", \"type\": \"movie\"}\n
+      {\"title\": \"The Shawshank Redemption\", \"year\": \"1994\", \"imdb_id\": \"tt0111161\", \"imdb_url\": \"https://www.imdb.com/title/tt0111161/\", \"reason\": \"A powerful drama about hope and redemption that matches your preference for thoughtful storytelling.\", \"synopsis\": \"Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.\"},\n
+      {\"title\": \"Inception\", \"year\": \"2010\", \"imdb_id\": \"tt1375666\", \"imdb_url\": \"https://www.imdb.com/title/tt1375666/\", \"reason\": \"A mind-bending sci-fi thriller that aligns with your interest in complex narratives.\", \"synopsis\": \"A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.\"}\n
     ]\n
     \n
     ULTRA IMPORTANT: For each recommendation, you MUST search the web to find the correct IMDB page for that exact title and year. Then extract the precise IMDB ID and URL from that page. Do not guess or make up IMDB IDs.
     
     CRITICAL: Verify that each IMDB ID actually corresponds to the title you're recommending. Double-check that the title on the IMDB page matches your recommendation exactly.
     
-    IMPORTANT: Make sure the titles are accurate and match real movies or TV shows. The IMDB ID and URL must be correct and match the actual IMDB entry for the title. Always include the year and type (movie or tv) for each recommendation.\n
+    IMPORTANT: Make sure the titles are accurate and match real movies or TV shows. The IMDB ID and URL must be correct and match the actual IMDB entry for the title.\n
     Only return the JSON array, no other text.`;
 
     // Construct the API endpoint URL
