@@ -7,14 +7,6 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
-# Define background function with longer timeout
-[[functions]]
-  included_files = ["src/**", "netlify/functions/**"]
-  external_node_modules = ["axios", "@supabase/supabase-js"]
-  pattern = "tmdb-background-import"
-  background = true
-  timeout = 900 # 15 minutes in seconds
-
 # Redirect for the API
 [[redirects]]
   from = "/api/*"
@@ -26,3 +18,10 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Define the background function with a longer timeout
+[functions.tmdb-background-import]
+  included_files = ["src/**", "netlify/functions/**"]
+  external_node_modules = ["axios", "@supabase/supabase-js"]
+  background = true
+  timeout = 900 # 15 minutes in seconds
