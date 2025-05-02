@@ -360,14 +360,16 @@ export const processRecommendation = async (
     });
 
     // Get the AI data
-    const aiTitle = item.title;
-    const aiSynopsis = item.synopsis || item.overview || "";
+    const aiTitle = contentItem.title;
+    const aiSynopsis = contentItem.synopsis || contentItem.overview || "";
     const aiYear =
-      item.year ||
-      (item.release_date ? item.release_date.substring(0, 4) : null);
-    const aiReason = item.recommendationReason || item.reason;
-    const aiImdbId = item.imdb_id || null;
-    const aiImdbUrl = item.imdb_url || null;
+      contentItem.year ||
+      (contentItem.release_date
+        ? contentItem.release_date.substring(0, 4)
+        : null);
+    const aiReason = contentItem.recommendationReason || contentItem.reason;
+    const aiImdbId = contentItem.imdb_id || null;
+    const aiImdbUrl = contentItem.imdb_url || null;
 
     // Race between the actual request and the timeout
     const verifiedItem = await Promise.race([
@@ -807,7 +809,7 @@ export const checkCachedRecommendations = async (
 
     if (supabaseCache && supabaseCache.length > 0) {
       console.log(
-        `[RecommendationProcessingService] Found ${supababCache.length} items in Supabase cache`,
+        `[RecommendationProcessingService] Found ${supabaseCache.length} items in Supabase cache`,
       );
 
       // Store in localStorage for faster access next time
