@@ -17,6 +17,10 @@ export async function matchRecommendationWithOmdbResults(
   },
   omdbResults: any[],
 ): Promise<ContentItem | null> {
+  const startTime = new Date();
+  console.log(
+    `[aiMatchingService] 🔄 matchRecommendationWithOmdbResults CALLED for ${originalRecommendation.title} at ${startTime.toISOString()}`,
+  );
   try {
     // CRITICAL: Log the full recommendation object to debug synopsis issues
     console.log(
@@ -42,6 +46,11 @@ export async function matchRecommendationWithOmdbResults(
       console.log(
         "[aiMatchingService] Only one result found, returning it directly",
       );
+      const endTime = new Date();
+      const processingTime = (endTime.getTime() - startTime.getTime()) / 1000;
+      console.log(
+        `[aiMatchingService] ✅ MATCHING COMPLETE for ${originalRecommendation.title} in ${processingTime.toFixed(2)}s (single result)`,
+      );
       return convertOmdbToContentItem(omdbResults[0], originalRecommendation);
     }
 
@@ -52,7 +61,8 @@ export async function matchRecommendationWithOmdbResults(
     }
 
     // CRITICAL: Ensure synopsis is properly included in the prompt
-    const synopsis = recommendation.synopsis || recommendation.overview || "";
+    const synopsis =
+      originalRecommendation.synopsis || originalRecommendation.overview || "";
     console.log(
       `[aiMatchingService] Using synopsis for prompt: ${synopsis.substring(0, 100)}...`,
     );
@@ -98,10 +108,17 @@ export async function matchRecommendationWithOmdbResults(
         })),
       },
     );
-    const response = await axios.post(
-      "/.netlify/functions/ai-content-matcher",
-      prompt,
-    );
+
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("AI matching timeout")), 10000); // 10 second timeout
+    });
+
+    // Race between the actual request and the timeout
+    const response = await Promise.race([
+      axios.post("/.netlify/functions/ai-content-matcher", prompt),
+      timeoutPromise,
+    ]);
     console.log(
       "[aiMatchingService] Received response from AI content matcher:",
       response.data,
@@ -129,6 +146,11 @@ export async function matchRecommendationWithOmdbResults(
         const contentItem = convertOmdbToContentItem(
           matchedOmdbResult,
           originalRecommendation,
+        );
+        const endTime = new Date();
+        const processingTime = (endTime.getTime() - startTime.getTime()) / 1000;
+        console.log(
+          `[aiMatchingService] ✅ MATCHING COMPLETE for ${originalRecommendation.title} in ${processingTime.toFixed(2)}s (AI matched)`,
         );
         console.log("[aiMatchingService] Converted content item:", contentItem);
         return contentItem;
@@ -392,8 +414,8 @@ export async function verifyRecommendationWithOmdb(
   console.log(`[verifyRecommendationWithOmdb] 🔍 VERIFYING: ${item.title}`);
   try {
     // ALWAYS try direct IMDB ID lookup first if available
-    if (aiImdbId || extractedImdbId) {
-      const imdbIds = [aiImdbId, extractedImdbId].filter(Boolean) as string[];
+    if (item.imdb_id) {
+      const imdbIds = [item.imdb_id].filter(Boolean) as string[];
       const uniqueImdbIds = [...new Set(imdbIds)];
 
       console.log(
@@ -418,19 +440,20 @@ export async function verifyRecommendationWithOmdb(
         const data = await response.json();
         if (data && data.Response === "True") {
           // For IMDB ID lookups, we trust the result more but still verify the title
-          const similarity = calculateTitleSimilarity(aiTitle, data.Title);
+          const similarity = calculateTitleSimilarity(item.title, data.Title);
           console.log(
             `[verifyRecommendationWithOmdb] Title similarity for "${data.Title}" (${imdbId}): ${similarity.toFixed(2)}`,
           );
 
           // Create the content item regardless of similarity score
-          const contentItem = convertOmdbToContentItem(data);
-          contentItem.recommendationReason = aiReason || "Recommended for you";
-          contentItem.reason = aiReason || "Recommended for you";
-          contentItem.synopsis = aiSynopsis || data.Plot;
+          const contentItem = convertOmdbToContentItem(data, item);
+          contentItem.recommendationReason =
+            item.recommendationReason || "Recommended for you";
+          contentItem.reason =
+            item.recommendationReason || "Recommended for you";
+          contentItem.synopsis = item.synopsis || data.Plot;
           contentItem.verified = true;
           contentItem.similarityScore = similarity;
-          contentItem.imdb_url = aiImdbUrl; // Preserve the original IMDB URL
 
           // If similarity is high, it's a confident match
           if (similarity >= 0.8) {
@@ -456,18 +479,11 @@ export async function verifyRecommendationWithOmdb(
       }
     }
 
-    // NEVER try direct IMDB ID lookup first - AI-provided IMDB IDs are unreliable
-    // Instead, always search by title which is more reliable
+    // If we get here, we couldn't find a match by IMDB ID
     console.log(
-      `[verifyRecommendationWithOmdb] Skipping IMDB ID lookup - AI-provided IDs are unreliable`,
+      `[verifyRecommendationWithOmdb] No valid match found by IMDB ID, falling back to title search`,
     );
-
-    // Log any provided IMDB IDs for debugging purposes only
-    if (aiImdbId || extractedImdbId) {
-      console.log(
-        `[verifyRecommendationWithOmdb] Note: AI provided IMDB ID(s) ${aiImdbId || ""} ${extractedImdbId || ""} but we're ignoring them and searching by title instead`,
-      );
-    }
+    return null;
   } catch (error) {
     console.error(
       "[verifyRecommendationWithOmdb] Error verifying recommendation with OMDB:",

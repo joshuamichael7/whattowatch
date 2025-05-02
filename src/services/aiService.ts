@@ -582,7 +582,10 @@ function calculateTextSimilarity(text1: string, text2: string): number {
 export async function verifyRecommendationWithOmdb(
   item: ContentItem,
 ): Promise<ContentItem | null> {
-  console.log(`[verifyRecommendationWithOmdb] 🔍 VERIFYING: ${item.title}`);
+  const startTime = new Date();
+  console.log(
+    `[verifyRecommendationWithOmdb] 🔍 VERIFYING: ${item.title} at ${startTime.toISOString()}`,
+  );
 
   // CRITICAL: If the item has no synopsis/overview, create a minimal one based on the title
   // This helps the AI matching process which requires some text to work with
@@ -686,6 +689,12 @@ export async function verifyRecommendationWithOmdb(
 
           // Return the content item from IMDB ID lookup regardless of similarity
           // This prioritizes IMDB ID over title matching
+          const endTime = new Date();
+          const processingTime =
+            (endTime.getTime() - startTime.getTime()) / 1000;
+          console.log(
+            `[verifyRecommendationWithOmdb] ✅ VERIFICATION COMPLETE for ${item.title} in ${processingTime.toFixed(2)}s`,
+          );
           return contentItem;
         } else {
           console.log(

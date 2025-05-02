@@ -90,6 +90,14 @@ const RecommendationGrid = ({
   );
   const [loadedItems, setLoadedItems] =
     useState<RecommendationItem[]>(recommendations);
+
+  // Log when recommendations are received
+  useEffect(() => {
+    console.log(
+      `[RecommendationGrid] 📥 RECEIVED ${recommendations.length} RECOMMENDATIONS:`,
+      recommendations.map((rec) => ({ id: rec.id, title: rec.title })),
+    );
+  }, [recommendations]);
   const [sortBy, setSortBy] = useState("relevance");
   const [filterVisible, setFilterVisible] = useState(false);
   const [ratingFilter, setRatingFilter] = useState([0, 10]);
@@ -142,105 +150,87 @@ const RecommendationGrid = ({
 
   // Background processing for recommendations using the dedicated service
   useEffect(() => {
+    console.log(
+      `[RecommendationGrid] 🔍 PROCESSING EFFECT TRIGGERED with ${recommendations.length} recommendations`,
+    );
     if (!recommendations || recommendations.length === 0) return;
 
-    // CRITICAL: FORCE IMMEDIATE PROCESSING - Load the service synchronously
+    // CRITICAL: FORCE IMMEDIATE PROCESSING - Pre-import the service to avoid any delay
     console.log(
       `[RecommendationGrid] 🔥 FORCE IMMEDIATE PROCESSING of ${recommendations.length} recommendations`,
     );
 
-    // Import the service immediately
-    import("@/services/recommendationProcessingService")
-      .then((service) => {
+    // CRITICAL: Import the module synchronously at the top level to avoid any delay
+    console.log(
+      `[RecommendationGrid] ⏱️ START IMPORT of recommendationProcessingService at ${new Date().toISOString()}`,
+    );
+    // Direct import to avoid any async delay
+    const service = await import("@/services/recommendationProcessingService");
+    console.log(
+      `[RecommendationGrid] ✅ FINISHED IMPORT of recommendationProcessingService at ${new Date().toISOString()}`,
+    );
+
+    // CRITICAL: Process each recommendation IMMEDIATELY and SEQUENTIALLY to ensure they all get processed
+    console.log(
+      `[RecommendationGrid] Starting sequential processing of ${recommendations.length} recommendations`,
+    );
+
+    // CRITICAL: Process recommendations one by one with no delay
+    for (let i = 0; i < recommendations.length; i++) {
+      const rec = recommendations[i];
+      console.log(
+        `[RecommendationGrid] FORCE PROCESSING recommendation ${i + 1}/${recommendations.length}: ${rec.title}`,
+      );
+
+      try {
+        // CRITICAL: Use await to ensure each recommendation is fully processed before moving to the next
+        const result = await service.processRecommendation(rec);
+
         console.log(
-          `[RecommendationGrid] ⚡ Service imported, FORCE PROCESSING recommendations NOW`,
+          `[RecommendationGrid] ✅ PROCESSED ${rec.title}: ${result ? "SUCCESS" : "FAILED"}`,
         );
 
-        // CRITICAL: Process each recommendation IMMEDIATELY and SEQUENTIALLY to ensure they all get processed
-        const processSequentially = async () => {
-          console.log(
-            `[RecommendationGrid] Starting sequential processing of ${recommendations.length} recommendations`,
-          );
-
-          for (let i = 0; i < recommendations.length; i++) {
-            const rec = recommendations[i];
-            console.log(
-              `[RecommendationGrid] FORCE PROCESSING recommendation ${i + 1}/${recommendations.length}: ${rec.title}`,
-            );
-
-            try {
-              // CRITICAL: Use await to ensure each recommendation is fully processed before moving to the next
-              const result = await service.processRecommendation(rec);
-
-              console.log(
-                `[RecommendationGrid] ✅ PROCESSED ${rec.title}: ${result ? "SUCCESS" : "FAILED"}`,
-              );
-
-              // CRITICAL: Update UI immediately after each recommendation is processed
-              const processedRecs = service.getProcessedRecommendations();
-              setProcessedRecommendations({ ...processedRecs });
-            } catch (error) {
-              console.error(
-                `[RecommendationGrid] ❌ ERROR processing ${rec.title}:`,
-                error,
-              );
-            }
-          }
-
-          console.log(
-            `[RecommendationGrid] ✅ COMPLETED sequential processing of all recommendations`,
-          );
-        };
-
-        // Start processing immediately
-        processSequentially();
-
-        // ALSO start background processing in parallel as a backup
-        service.startBackgroundProcessing();
-
-        // Set up aggressive polling to update UI
-        const pollInterval = setInterval(() => {
-          const processedRecs = service.getProcessedRecommendations();
-          const processedCount = Object.keys(processedRecs).length;
-          console.log(
-            `[RecommendationGrid] POLL: ${processedCount}/${recommendations.length} processed`,
-          );
-
-          if (processedCount > 0) {
-            setProcessedRecommendations({ ...processedRecs });
-          }
-
-          // Check if all recommendations are processed
-          if (processedCount >= recommendations.length) {
-            console.log(
-              `[RecommendationGrid] All recommendations processed, stopping polling`,
-            );
-            clearInterval(pollInterval);
-          }
-        }, 500); // Poll every half second for faster updates
-
-        // Clean up interval on unmount
-        return () => clearInterval(pollInterval);
-      })
-      .catch((error) => {
+        // CRITICAL: Update UI immediately after each recommendation is processed
+        const processedRecs = service.getProcessedRecommendations();
+        setProcessedRecommendations({ ...processedRecs });
+      } catch (error) {
         console.error(
-          `[RecommendationGrid] CRITICAL ERROR in processing:`,
+          `[RecommendationGrid] ❌ ERROR processing ${rec.title}:`,
           error,
         );
-      });
-
-    // Also store recommendations in localStorage directly as backup
-    try {
-      localStorage.setItem(
-        "pendingRecommendationsToProcess",
-        JSON.stringify(recommendations),
-      );
-      console.log(
-        `[RecommendationGrid] Stored ${recommendations.length} recommendations in localStorage directly`,
-      );
-    } catch (err) {
-      console.error("[RecommendationGrid] Error storing in localStorage:", err);
+      }
     }
+
+    console.log(
+      `[RecommendationGrid] ✅ COMPLETED sequential processing of all recommendations`,
+    );
+
+    // ALSO start background processing in parallel as a backup
+    service.startBackgroundProcessing();
+
+    // Set up aggressive polling to update UI
+    const pollInterval = setInterval(() => {
+      const processedRecs = service.getProcessedRecommendations();
+      const processedCount = Object.keys(processedRecs).length;
+      console.log(
+        `[RecommendationGrid] POLL: ${processedCount}/${recommendations.length} processed`,
+      );
+
+      if (processedCount > 0) {
+        setProcessedRecommendations({ ...processedRecs });
+      }
+
+      // Check if all recommendations are processed
+      if (processedCount >= recommendations.length) {
+        console.log(
+          `[RecommendationGrid] All recommendations processed, stopping polling`,
+        );
+        clearInterval(pollInterval);
+      }
+    }, 200); // Poll every 200ms for even faster updates
+
+    // Clean up interval on unmount
+    return () => clearInterval(pollInterval);
   }, [recommendations]);
 
   useEffect(() => {

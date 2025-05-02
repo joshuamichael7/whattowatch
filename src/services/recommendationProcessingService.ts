@@ -262,6 +262,9 @@ export const processRecommendation = async (
   rec: any,
   retryCount: number = 0,
 ): Promise<ContentItem | null> => {
+  console.log(
+    `[RecommendationProcessingService] 🔄 processRecommendation CALLED for ${rec.title} at ${new Date().toISOString()}`,
+  );
   const MAX_RETRIES = 2;
 
   // ALWAYS use the title as the tracking ID - NEVER use IMDB IDs from AI recommendations as they're unreliable
@@ -290,6 +293,9 @@ export const processRecommendation = async (
       `[RecommendationProcessingService] ⚠️ Recommendation ${rec.title} is already being processed, but FORCING processing anyway`,
     );
     // Continue processing instead of returning null
+    // CRITICAL: Delete the processing flag to ensure we can process it again
+    delete processingRecommendations[rec.id];
+    updateProcessingRecommendationsStorage();
   }
 
   console.log(
@@ -300,9 +306,10 @@ export const processRecommendation = async (
   processingRecommendations[rec.id] = true;
   updateProcessingRecommendationsStorage();
 
-  // CRITICAL: Log that processing has started
+  // CRITICAL: Log that processing has started with timestamp
+  const startTime = new Date();
   console.log(
-    `[RecommendationProcessingService] ⚡ STARTED PROCESSING: ${rec.title} (ID: ${rec.id})`,
+    `[RecommendationProcessingService] ⚡ STARTED PROCESSING: ${rec.title} (ID: ${rec.id}) at ${startTime.toISOString()}`,
   );
 
   try {
@@ -347,10 +354,20 @@ export const processRecommendation = async (
       `[RecommendationProcessingService] Processing recommendation: ${rec.title}${retryCount > 0 ? ` (retry ${retryCount}/${MAX_RETRIES})` : ""}`,
     );
 
-    // Add timeout to prevent hanging requests
+    // CRITICAL: Add timeout to prevent hanging
     const timeoutPromise = new Promise<null>((_, reject) => {
-      setTimeout(() => reject(new Error("Request timeout")), 15000); // 15 second timeout
+      setTimeout(() => reject(new Error("Verification timeout")), 10000); // 10 second timeout
     });
+
+    // Get the AI data
+    const aiTitle = item.title;
+    const aiSynopsis = item.synopsis || item.overview || "";
+    const aiYear =
+      item.year ||
+      (item.release_date ? item.release_date.substring(0, 4) : null);
+    const aiReason = item.recommendationReason || item.reason;
+    const aiImdbId = item.imdb_id || null;
+    const aiImdbUrl = item.imdb_url || null;
 
     // Race between the actual request and the timeout
     const verifiedItem = await Promise.race([
@@ -391,8 +408,10 @@ export const processRecommendation = async (
     });
 
     if (verifiedItem) {
+      const endTime = new Date();
+      const processingTime = (endTime.getTime() - startTime.getTime()) / 1000;
       console.log(
-        `[RecommendationProcessingService] ✅ SUCCESSFULLY PROCESSED: ${rec.title}`,
+        `[RecommendationProcessingService] ✅ SUCCESSFULLY PROCESSED: ${rec.title} in ${processingTime.toFixed(2)}s`,
       );
       // Preserve the original recommendation reason if it exists
       if (rec.recommendationReason || rec.reason) {
@@ -537,7 +556,7 @@ import {
  */
 export const startBackgroundProcessing = async () => {
   console.log(
-    `[RecommendationProcessingService] 🔄 STARTING BACKGROUND PROCESSING`,
+    `[RecommendationProcessingService] 🔄 STARTING BACKGROUND PROCESSING at ${new Date().toISOString()}`,
   );
 
   // Log to console for tracking background processing
