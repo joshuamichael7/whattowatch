@@ -324,6 +324,57 @@ const MovieDetailPage = () => {
 
         // If not in context, proceed with the new multistep approach
         if (locationRecommendation) {
+          // Check if we have a recommendation but it's not being processed
+          // This is to prevent duplicate processing when navigating from RecommendationGrid
+          if (
+            location.state?.fromRecommendations &&
+            !isProcessingRecommendation
+          ) {
+            console.log(
+              "Using recommendation data from location state without processing",
+            );
+            // Create a basic movie object from the recommendation data
+            const movieFromRec: ContentItem = {
+              id: locationRecommendation.id || id,
+              imdb_id:
+                locationRecommendation.imdb_id || id.startsWith("tt")
+                  ? id
+                  : undefined,
+              title: locationRecommendation.title || decodeURIComponent(id),
+              poster_path:
+                locationRecommendation.poster ||
+                locationRecommendation.poster_path,
+              media_type:
+                locationRecommendation.type === "movie" ? "movie" : "tv",
+              vote_average: locationRecommendation.rating || 0,
+              vote_count: 0,
+              genre_ids: [],
+              overview:
+                locationRecommendation.synopsis ||
+                locationRecommendation.overview ||
+                "",
+              synopsis:
+                locationRecommendation.synopsis ||
+                locationRecommendation.overview ||
+                "",
+              recommendationReason:
+                locationRecommendation.reason ||
+                locationRecommendation.recommendationReason ||
+                "",
+              reason:
+                locationRecommendation.reason ||
+                locationRecommendation.recommendationReason ||
+                "",
+              release_date: locationRecommendation.year,
+              year: locationRecommendation.year,
+              aiRecommended: true,
+            };
+
+            setMovie(movieFromRec);
+            setVerificationStatus("Using recommendation data");
+            setIsLoading(false);
+            return;
+          }
           setVerificationStatus("Searching for title matches in OMDB...");
 
           // Step 1: Search OMDB by title to get potential matches
