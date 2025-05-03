@@ -133,6 +133,7 @@ exports.handler = async (event, context) => {
       limit = 20,
       apiVersion,
       modelName,
+      skipImdbId = false, // New parameter to control whether to request IMDB IDs
     } = JSON.parse(event.body || "{}");
 
     if (!preferences) {
@@ -172,7 +173,7 @@ exports.handler = async (event, context) => {
         : `${Math.floor(preferences.viewingTime / 60)} hour${preferences.viewingTime >= 120 ? "s" : ""}${preferences.viewingTime % 60 > 0 ? ` ${preferences.viewingTime % 60} minutes` : ""}`;
 
     // Construct the prompt for Gemini
-    const prompt = `I need personalized movie and TV show recommendations based on the following preferences:\n\n
+    let prompt = `I need personalized movie and TV show recommendations based on the following preferences:\n\n
     - Preferred genres: ${genresText || "No specific genres"}\n
     - Current mood: ${preferences.mood}\n
     - Available viewing time: ${viewingTimeText}\n
@@ -199,10 +200,14 @@ exports.handler = async (event, context) => {
     IMPORTANT: Make sure the titles are accurate and match real movies or TV shows. The IMDB ID and URL must be correct and match the actual IMDB entry for the title.\n
     Only return the JSON array, no other text.`;
 
+    // We're always skipping IMDB ID requests now, so this block is simplified
+    // The prompt is already set to not request IMDB IDs
+
     // Construct the API endpoint URL
     const apiEndpoint = `https://generativelanguage.googleapis.com/${defaultConfig.apiVersion}/models/${defaultConfig.modelName}:generateContent`;
 
     console.log(`Using Gemini API endpoint: ${apiEndpoint}`);
+    console.log(`Skip IMDB ID: ${skipImdbId}`);
 
     // Make the API request
     const response = await axios.post(

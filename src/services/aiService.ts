@@ -401,16 +401,6 @@ export async function getPersonalizedRecommendations(
         "Using AI recommendations from quiz",
         preferences.aiRecommendations,
       );
-
-      // Log the IMDB IDs for debugging
-      console.log(
-        "AI recommendation IMDB IDs:",
-        preferences.aiRecommendations.map((rec) => ({
-          title: rec.title,
-          imdb_id: rec.imdb_id,
-          year: rec.year,
-        })),
-      );
     }
 
     // Call the Netlify function to get personalized recommendations
@@ -424,6 +414,8 @@ export async function getPersonalizedRecommendations(
         preferences,
         limit: limit * 2, // Request more items than needed to account for filtering
         forceAi: true, // Always force AI for personalized recommendations
+        // Always skip IMDB IDs from the AI - we'll verify ourselves
+        skipImdbId: true,
       }),
     });
 
@@ -450,22 +442,13 @@ export async function getPersonalizedRecommendations(
       `[getPersonalizedRecommendations] Received ${data.recommendations.length} recommendations`,
     );
 
-    // Add more logging to see what we're getting from the API
-    console.log(
-      `[getPersonalizedRecommendations] First few recommendations:`,
-      data.recommendations.slice(0, 3).map((r) => ({
-        title: r.title,
-        year: r.year,
-      })),
-    );
-
     // Log the raw recommendations from the API with full details
     console.log("========== RAW AI RECOMMENDATIONS ==========");
-    console.log(JSON.stringify(data.recommendations, null, 2));
+    console.log(JSON.stringify(data.recommendations.slice(0, 3), null, 2));
     console.log("===========================================");
 
-    // Convert recommendations to ContentItem format
-    const recommendations: ContentItem[] = [];
+    // Convert recommendations to ContentItem format and prepare for verification
+    const rawRecommendations = [];
 
     for (const item of data.recommendations) {
       // Skip items without title
@@ -476,53 +459,55 @@ export async function getPersonalizedRecommendations(
         continue;
       }
 
-      // Don't generate UUID, just use the title as the ID if no IMDB ID is available
-      const imdbId = item.imdb_id || item.imdbID || null;
-
       // Log each item's fields for debugging
       console.log(`Processing recommendation: ${item.title}`, {
         title: item.title,
         year: item.year,
-        synopsis: item.synopsis,
+        synopsis: item.synopsis || "No synopsis available",
         reason: item.reason,
         recommendationReason: item.recommendationReason,
-        imdb_id: imdbId,
       });
 
-      recommendations.push({
-        id: imdbId || item.title, // Use IMDB ID if available, otherwise use title
+      // Make sure we capture the synopsis from the AI recommendation
+      const synopsis = item.synopsis || "";
+
+      rawRecommendations.push({
+        id: item.title, // Use title as ID since we don't have IMDB ID yet
         title: item.title,
-        poster_path: item.poster || "",
-        media_type: item.type === "movie" ? "movie" : "tv",
-        vote_average: parseFloat(item.rating || "0") || 0,
-        vote_count: 0,
-        genre_ids: [],
-        overview: item.synopsis || "",
-        synopsis: item.synopsis || "",
-        recommendationReason:
-          item.recommendationReason ||
-          item.reason ||
-          "Matches your preferences",
+        year: item.year,
+        synopsis: synopsis, // Ensure we capture the synopsis
+        overview: synopsis, // Also store as overview
         reason:
           item.reason ||
           item.recommendationReason ||
           "Matches your preferences",
-        year: item.year,
-        aiRecommended: true,
-        needsVerification: true, // Flag that this needs verification
-        originalAiData: item, // Store original AI data for verification
+        recommendationReason:
+          item.recommendationReason ||
+          item.reason ||
+          "Matches your preferences",
+        type: item.type || "movie",
+        rating: item.rating || "0",
+        poster: item.poster || "",
       });
 
       // Stop once we have enough recommendations
-      if (recommendations.length >= limit) {
+      if (rawRecommendations.length >= limit) {
         break;
       }
     }
 
     console.log(
-      `[getPersonalizedRecommendations] Returning ${recommendations.length} recommendations`,
+      `[getPersonalizedRecommendations] Processing ${rawRecommendations.length} recommendations for verification`,
     );
-    return recommendations;
+
+    // Process all recommendations upfront
+    const verifiedRecommendations =
+      await verifyAllRecommendations(rawRecommendations);
+
+    console.log(
+      `[getPersonalizedRecommendations] Returning ${verifiedRecommendations.length} verified recommendations`,
+    );
+    return verifiedRecommendations;
   } catch (error) {
     console.error(
       "[getPersonalizedRecommendations] Error getting personalized recommendations:",
@@ -530,6 +515,268 @@ export async function getPersonalizedRecommendations(
     );
     return [];
   }
+}
+
+/**
+ * Verify all recommendations upfront before displaying them
+ * @param recommendations Raw recommendations from AI
+ * @returns Verified ContentItem[] with OMDB data
+ */
+async function verifyAllRecommendations(
+  recommendations: any[],
+): Promise<ContentItem[]> {
+  const verifiedItems: ContentItem[] = [];
+  const failedItems: any[] = [];
+
+  // Process recommendations in batches to avoid overwhelming the API
+  const batchSize = 3;
+  const batches = [];
+
+  for (let i = 0; i < recommendations.length; i += batchSize) {
+    batches.push(recommendations.slice(i, i + batchSize));
+  }
+
+  console.log(
+    `[verifyAllRecommendations] Processing ${batches.length} batches of recommendations`,
+  );
+
+  for (const [batchIndex, batch] of batches.entries()) {
+    console.log(
+      `[verifyAllRecommendations] Processing batch ${batchIndex + 1} of ${batches.length}`,
+    );
+
+    // Process each batch sequentially to avoid rate limiting
+    const batchResults = await Promise.all(
+      batch.map(async (recommendation) => {
+        try {
+          console.log(
+            `[verifyAllRecommendations] Processing "${recommendation.title}"`,
+          );
+
+          // Step 1: Search OMDB for potential matches by title
+          const searchQuery = recommendation.year
+            ? `${recommendation.title} ${recommendation.year}`
+            : recommendation.title;
+
+          console.log(
+            `[verifyAllRecommendations] Searching OMDB for "${searchQuery}"`,
+          );
+
+          const searchResponse = await fetch(
+            `/.netlify/functions/omdb?s=${encodeURIComponent(searchQuery)}`,
+          );
+
+          if (!searchResponse.ok) {
+            console.error(
+              `[verifyAllRecommendations] OMDB search failed for "${searchQuery}": ${searchResponse.status}`,
+            );
+            return { success: false, recommendation };
+          }
+
+          const searchData = await searchResponse.json();
+          let searchResults = [];
+
+          if (
+            searchData.Response !== "True" ||
+            !searchData.Search ||
+            searchData.Search.length === 0
+          ) {
+            console.log(
+              `[verifyAllRecommendations] No results found for "${searchQuery}", trying without year`,
+            );
+
+            // Try without year if no results
+            if (recommendation.year) {
+              const fallbackResponse = await fetch(
+                `/.netlify/functions/omdb?s=${encodeURIComponent(recommendation.title)}`,
+              );
+
+              if (!fallbackResponse.ok) {
+                console.error(
+                  `[verifyAllRecommendations] Fallback OMDB search failed for "${recommendation.title}": ${fallbackResponse.status}`,
+                );
+                return { success: false, recommendation };
+              }
+
+              const fallbackData = await fallbackResponse.json();
+
+              if (
+                fallbackData.Response !== "True" ||
+                !fallbackData.Search ||
+                fallbackData.Search.length === 0
+              ) {
+                console.log(
+                  `[verifyAllRecommendations] No results found for "${recommendation.title}" even without year`,
+                );
+                return { success: false, recommendation };
+              }
+
+              searchResults = fallbackData.Search;
+            } else {
+              console.log(
+                `[verifyAllRecommendations] No results found for "${recommendation.title}"`,
+              );
+              return { success: false, recommendation };
+            }
+          } else {
+            searchResults = searchData.Search;
+          }
+
+          console.log(
+            `[verifyAllRecommendations] Found ${searchResults.length} potential matches for "${recommendation.title}"`,
+          );
+
+          // Step 2: Get detailed info for potential matches (limit to top 5)
+          const potentialMatches = [];
+          const maxMatches = Math.min(5, searchResults.length);
+
+          for (let i = 0; i < maxMatches; i++) {
+            const match = searchResults[i];
+            try {
+              const detailResponse = await fetch(
+                `/.netlify/functions/omdb?i=${match.imdbID}&plot=full`,
+              );
+
+              if (!detailResponse.ok) continue;
+
+              const detailData = await detailResponse.json();
+              if (detailData.Response === "True") {
+                potentialMatches.push({
+                  title: detailData.Title,
+                  year: detailData.Year,
+                  type: detailData.Type,
+                  imdbID: detailData.imdbID,
+                  plot: detailData.Plot,
+                  actors: detailData.Actors,
+                  director: detailData.Director,
+                  genre: detailData.Genre,
+                  poster: detailData.Poster !== "N/A" ? detailData.Poster : "",
+                });
+              }
+            } catch (error) {
+              console.error(
+                `[verifyAllRecommendations] Error getting details for ${match.imdbID}:`,
+                error,
+              );
+            }
+          }
+
+          if (potentialMatches.length === 0) {
+            console.log(
+              `[verifyAllRecommendations] No detailed matches found for "${recommendation.title}"`,
+            );
+            return { success: false, recommendation };
+          }
+
+          console.log(
+            `[verifyAllRecommendations] Got ${potentialMatches.length} detailed matches for "${recommendation.title}"`,
+          );
+
+          // Step 3: If there's only one potential match, use it directly without AI verification
+          if (potentialMatches.length === 1) {
+            console.log(
+              `[verifyAllRecommendations] Only one potential match found for "${recommendation.title}", using it directly`,
+            );
+
+            // Create a ContentItem from the single match
+            const singleMatch = potentialMatches[0];
+            const contentItem = {
+              id: singleMatch.imdbID,
+              imdb_id: singleMatch.imdbID,
+              title: singleMatch.title,
+              poster_path:
+                singleMatch.poster !== "N/A" ? singleMatch.poster : "",
+              media_type: singleMatch.type === "movie" ? "movie" : "tv",
+              vote_average: 0,
+              vote_count: 0,
+              genre_ids: [],
+              genre_strings: singleMatch.genre
+                ? singleMatch.genre.split(", ")
+                : [],
+              overview: singleMatch.plot || "",
+              synopsis: recommendation.synopsis || singleMatch.plot || "",
+              recommendationReason: recommendation.recommendationReason,
+              reason: recommendation.reason,
+              aiRecommended: true,
+              verified: true,
+            };
+
+            return { success: true, item: contentItem };
+          }
+
+          // For multiple potential matches, use AI to find the best match
+          console.log(
+            `[verifyAllRecommendations] Using AI to match "${recommendation.title}" with ${potentialMatches.length} potential matches`,
+          );
+
+          // Log the synopsis being sent to the AI for matching
+          console.log(
+            `[verifyAllRecommendations] Synopsis for "${recommendation.title}": ${recommendation.synopsis?.substring(0, 100)}${recommendation.synopsis?.length > 100 ? "..." : ""}`,
+          );
+
+          const aiMatchResponse = await matchRecommendationWithOmdbResults(
+            {
+              title: recommendation.title,
+              year: recommendation.year,
+              reason: recommendation.reason,
+              synopsis: recommendation.synopsis, // Make sure to include synopsis
+            },
+            potentialMatches,
+          );
+
+          if (!aiMatchResponse) {
+            console.log(
+              `[verifyAllRecommendations] AI couldn't find a match for "${recommendation.title}"`,
+            );
+            return { success: false, recommendation };
+          }
+
+          console.log(
+            `[verifyAllRecommendations] AI matched "${recommendation.title}" with "${aiMatchResponse.title}" (${aiMatchResponse.imdb_id})`,
+          );
+
+          // Step 4: Add the verified recommendation to our results
+          // Preserve the original recommendation reason
+          aiMatchResponse.recommendationReason =
+            recommendation.recommendationReason;
+          aiMatchResponse.reason = recommendation.reason;
+          aiMatchResponse.aiRecommended = true;
+          aiMatchResponse.verified = true;
+
+          return { success: true, item: aiMatchResponse };
+        } catch (error) {
+          console.error(
+            `[verifyAllRecommendations] Error processing "${recommendation.title}":`,
+            error,
+          );
+          return { success: false, recommendation };
+        }
+      }),
+    );
+
+    // Process batch results
+    for (const result of batchResults) {
+      if (result.success) {
+        verifiedItems.push(result.item);
+      } else {
+        failedItems.push(result.recommendation);
+      }
+    }
+
+    // Add a small delay between batches to avoid rate limiting
+    if (batchIndex < batches.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
+  console.log(
+    `[verifyAllRecommendations] Successfully verified ${verifiedItems.length} items`,
+  );
+  console.log(
+    `[verifyAllRecommendations] Failed to verify ${failedItems.length} items`,
+  );
+
+  return verifiedItems;
 }
 
 /**

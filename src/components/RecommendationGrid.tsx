@@ -57,13 +57,17 @@ interface RecommendationItem {
   rating: number;
   genres: string[];
   synopsis: string;
+  overview?: string; // Added for compatibility with ContentItem
   streamingOn: string[];
   recommendationReason: string;
+  reason?: string; // Alternative field for recommendation reason
   runtime?: string;
   contentRating?: string;
   content_rating?: string;
   imdb_id?: string; // Added to support direct IMDB ID links
   imdb_url?: string; // Added to support direct IMDB URL links
+  verified?: boolean; // Flag to indicate if the recommendation is pre-verified
+  needsVerification?: boolean; // Flag to indicate if verification is needed
 }
 
 interface RecommendationGridProps {
@@ -123,6 +127,16 @@ const RecommendationGrid = ({
 
   useEffect(() => {
     const fetchAdditionalDetails = async (itemId: string) => {
+      // Skip fetching if the item is already in processedRecommendations
+      if (processedRecommendations[itemId]) {
+        console.log(
+          "Using pre-processed details for item:",
+          itemId,
+          processedRecommendations[itemId],
+        );
+        return;
+      }
+
       try {
         const details = await getContentById(itemId);
         console.log(
@@ -130,6 +144,14 @@ const RecommendationGrid = ({
           useDirectApi,
           details,
         );
+
+        // Add the fetched details to processedRecommendations
+        if (details) {
+          setProcessedRecommendations((prev) => ({
+            ...prev,
+            [itemId]: details,
+          }));
+        }
       } catch (error) {
         console.error("Error fetching details:", error);
       }
@@ -138,7 +160,7 @@ const RecommendationGrid = ({
     if (recommendations.length > 0 && selectedItem) {
       fetchAdditionalDetails(selectedItem.id);
     }
-  }, [selectedItem, useDirectApi]);
+  }, [selectedItem, useDirectApi, processedRecommendations]);
 
   // Background processing for recommendations using the dedicated service
   useEffect(() => {
@@ -157,40 +179,58 @@ const RecommendationGrid = ({
         };
 
         try {
-          const cachedRecommendations =
-            await service.checkCachedRecommendations(cacheParams);
-
-          if (cachedRecommendations && cachedRecommendations.length > 0) {
-            console.log(
-              `[RecommendationGrid] Using ${cachedRecommendations.length} cached recommendations`,
-            );
-            setProcessedRecommendations(
-              cachedRecommendations.reduce((acc, item) => {
-                if (item.id) acc[item.id] = item;
-                return acc;
-              }, {}),
-            );
-          } else {
-            // No cached recommendations, process new ones
-            console.log(
-              `[RecommendationGrid] No cached recommendations found, processing ${recommendations.length} new recommendations`,
-            );
-
-            // Store recommendations for background processing
-            service.storeRecommendationsForProcessing(recommendations);
-
-            // Start the background processing
-            service.startBackgroundProcessing();
-
-            // Load any previously processed recommendations
-            const processedRecs = service.getProcessedRecommendations();
-            setProcessedRecommendations(processedRecs);
-          }
-        } catch (cacheError) {
-          console.error(
-            "[RecommendationGrid] Error checking cache:",
-            cacheError,
+          // Check if recommendations are already pre-verified
+          const preVerifiedItems = recommendations.filter(
+            (rec) => rec.verified === true,
           );
+
+          if (preVerifiedItems.length === recommendations.length) {
+            console.log(
+              `[RecommendationGrid] All ${preVerifiedItems.length} recommendations are pre-verified, skipping processing`,
+            );
+
+            // Convert pre-verified recommendations to ContentItem format
+            const preVerifiedContentItems = preVerifiedItems.reduce(
+              (acc, item) => {
+                if (item.id) {
+                  acc[item.id] = {
+                    ...item,
+                    id: item.id,
+                    title: item.title,
+                    media_type: item.type,
+                    poster_path: item.poster || item.poster_path,
+                    vote_average: item.rating || 0,
+                    overview: item.synopsis || item.overview || "",
+                    genre_strings: item.genres || [],
+                    year: item.year,
+                    imdb_id: item.imdb_id,
+                  };
+                }
+                return acc;
+              },
+              {},
+            );
+
+            setProcessedRecommendations(preVerifiedContentItems);
+            return;
+          }
+
+          // Skip cache check - we're processing directly
+          console.log(
+            `[RecommendationGrid] Processing ${recommendations.length} recommendations directly`,
+          );
+
+          // Store recommendations for background processing
+          service.storeRecommendationsForProcessing(recommendations);
+
+          // Start the background processing
+          service.startBackgroundProcessing();
+
+          // Load any previously processed recommendations
+          const processedRecs = service.getProcessedRecommendations();
+          setProcessedRecommendations(processedRecs);
+        } catch (error) {
+          console.error("[RecommendationGrid] Error checking cache:", error);
 
           // Fallback to standard processing
           service.storeRecommendationsForProcessing(recommendations);
@@ -230,13 +270,20 @@ const RecommendationGrid = ({
   };
 
   const getPosterImage = (item: RecommendationItem) => {
-    console.log(`Getting poster for ${item.title}:`, {
-      poster: item.poster,
-      poster_path: item.poster_path,
-    });
+    // Check if we have a processed version with better poster data
+    if (item.id && processedRecommendations[item.id]?.poster_path) {
+      const processedItem = processedRecommendations[item.id];
+      if (
+        processedItem.poster_path &&
+        processedItem.poster_path !== "N/A" &&
+        !processedItem.poster_path.includes("null")
+      ) {
+        return processedItem.poster_path;
+      }
+    }
 
+    // Fall back to the original logic
     if (item.poster && item.poster !== "N/A" && !item.poster.includes("null")) {
-      console.log(`Using poster: ${item.poster}`);
       return item.poster;
     }
     if (
@@ -244,11 +291,14 @@ const RecommendationGrid = ({
       item.poster_path !== "N/A" &&
       !item.poster_path.includes("null")
     ) {
-      console.log(`Using poster_path: ${item.poster_path}`);
       return item.poster_path;
     }
 
-    console.log(`No valid poster found for ${item.title}, using placeholder`);
+    // Check if there's a Poster field (OMDB format)
+    if (item.Poster && item.Poster !== "N/A" && !item.Poster.includes("null")) {
+      return item.Poster;
+    }
+
     return "https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?w=800&q=80";
   };
 

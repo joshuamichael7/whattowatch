@@ -12,7 +12,7 @@ export async function matchRecommendationWithOmdbResults(
     title: string;
     year?: string;
     reason?: string;
-    synopsis?: string;
+    synopsis?: string; // Ensure synopsis is included
   },
   omdbResults: any[],
 ): Promise<ContentItem | null> {
@@ -27,10 +27,10 @@ export async function matchRecommendationWithOmdbResults(
       `[aiMatchingService] Found ${omdbResults.length} potential OMDB matches`,
     );
 
-    // If there's only one result, return it immediately
+    // If there's only one result, use it directly without AI verification
     if (omdbResults.length === 1) {
       console.log(
-        "[aiMatchingService] Only one result found, returning it directly",
+        "[aiMatchingService] Only one result found, using it directly without AI verification",
       );
       return convertOmdbToContentItem(omdbResults[0], originalRecommendation);
     }
@@ -47,7 +47,7 @@ export async function matchRecommendationWithOmdbResults(
         title: originalRecommendation.title,
         year: originalRecommendation.year,
         reason: originalRecommendation.reason,
-        synopsis: originalRecommendation.synopsis,
+        synopsis: originalRecommendation.synopsis || "", // Ensure synopsis is included even if empty
       },
       omdbResults: omdbResults.map((result) => ({
         title: result.Title || result.title,
@@ -62,6 +62,11 @@ export async function matchRecommendationWithOmdbResults(
           (result.genre_strings ? result.genre_strings.join(", ") : ""),
       })),
     };
+
+    // Log the synopsis to ensure it's being sent
+    console.log(
+      `[matchRecommendationWithOmdbResults] Synopsis for "${originalRecommendation.title}": ${originalRecommendation.synopsis?.substring(0, 100)}${originalRecommendation.synopsis?.length > 100 ? "..." : ""}`,
+    );
 
     // Call the AI matching function
     console.log(
