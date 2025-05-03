@@ -43,7 +43,6 @@ import { getContentById } from "@/lib/omdbClient";
 import { ContentItem, genreMap } from "@/types/omdb";
 import UserFeedbackButton from "./UserFeedbackButton";
 import WatchlistButton from "./WatchlistButton";
-import ProcessingStatusIndicator from "./ProcessingStatusIndicator";
 // Recommendation processing is now handled by the dedicated service
 // import { verifyRecommendationWithOmdb } from "@/services/aiService";
 
@@ -91,116 +90,6 @@ const RecommendationGrid = ({
   );
   const [loadedItems, setLoadedItems] =
     useState<RecommendationItem[]>(recommendations);
-
-  // Log when recommendations are received
-  useEffect(() => {
-    console.log(
-      `[RecommendationGrid] 📥 RECEIVED ${recommendations.length} RECOMMENDATIONS:`,
-      recommendations.map((rec) => ({ id: rec.id, title: rec.title })),
-    );
-
-    // Test the debug-log function to verify Netlify functions are working
-    if (recommendations && recommendations.length > 0) {
-      console.log(`[RecommendationGrid] 🧪 Testing debug-log Netlify function`);
-      fetch("/.netlify/functions/debug-log", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: "Test from RecommendationGrid",
-          data: { recommendationCount: recommendations.length },
-        }),
-      })
-        .then((response) => {
-          console.log(
-            `[RecommendationGrid] 🧪 Debug-log test response status: ${response.status}`,
-          );
-          return response.json();
-        })
-        .then((data) => {
-          console.log(`[RecommendationGrid] 🧪 Debug-log test response:`, data);
-        })
-        .catch((error) => {
-          console.error(`[RecommendationGrid] 🧪 Debug-log test error:`, error);
-        });
-    }
-
-    // CRITICAL: Store recommendations for processing immediately when they're received
-    if (recommendations && recommendations.length > 0) {
-      console.log(
-        `[RecommendationGrid] 🚨 IMMEDIATELY storing ${recommendations.length} recommendations for processing`,
-      );
-      // Store in localStorage for background processing
-      try {
-        localStorage.setItem(
-          "pendingRecommendationsToProcess",
-          JSON.stringify(recommendations),
-        );
-        console.log(
-          `[RecommendationGrid] ✅ Successfully stored ${recommendations.length} recommendations in localStorage`,
-        );
-
-        // CRITICAL: Process recommendations on the server side
-        console.log(
-          `[RecommendationGrid] 🔥 SENDING RECOMMENDATIONS TO SERVER FOR PROCESSING`,
-        );
-        console.log(
-          `[RecommendationGrid] 📊 RECOMMENDATIONS DATA:`,
-          JSON.stringify(recommendations.slice(0, 2)),
-        );
-        import("@/services/serverProcessingService")
-          .then((serverService) => {
-            console.log(
-              `[RecommendationGrid] ✅ SERVER PROCESSING SERVICE IMPORTED, CALLING processRecommendationsOnServer`,
-            );
-
-            // Call the server processing function
-            console.log(
-              `[RecommendationGrid] 🚀 ABOUT TO CALL processRecommendationsOnServer with ${recommendations.length} recommendations`,
-            );
-            return serverService.processRecommendationsOnServer(
-              recommendations,
-            );
-          })
-          .then((result) => {
-            console.log(
-              `[RecommendationGrid] ✅ SERVER PROCESSING COMPLETE: ${result.processed} processed, ${result.errors} errors`,
-            );
-
-            // Update the UI with processed recommendations
-            const processedRecs = serverService.getProcessedRecommendations();
-            setProcessedRecommendations({ ...processedRecs });
-          })
-          .catch((error) => {
-            console.error(
-              `[RecommendationGrid] ❌ SERVER PROCESSING ERROR:`,
-              error,
-            );
-
-            // Fallback to client-side processing if server fails
-            console.log(
-              `[RecommendationGrid] ⚠️ Falling back to client-side processing`,
-            );
-            import("@/services/recommendationProcessingService")
-              .then((service) => {
-                return service.startBackgroundProcessing();
-              })
-              .catch((fallbackError) => {
-                console.error(
-                  `[RecommendationGrid] ❌ FALLBACK PROCESSING ERROR:`,
-                  fallbackError,
-                );
-              });
-          });
-      } catch (err) {
-        console.error(
-          "[RecommendationGrid] ❌ Error storing in localStorage:",
-          err,
-        );
-      }
-    }
-  }, [recommendations]);
   const [sortBy, setSortBy] = useState("relevance");
   const [filterVisible, setFilterVisible] = useState(false);
   const [ratingFilter, setRatingFilter] = useState([0, 10]);
@@ -251,44 +140,75 @@ const RecommendationGrid = ({
     }
   }, [selectedItem, useDirectApi]);
 
-  // Check for processed recommendations periodically
+  // Background processing for recommendations using the dedicated service
   useEffect(() => {
-    console.log(
-      `[RecommendationGrid] 🔍 CHECKING FOR PROCESSED RECOMMENDATIONS with ${recommendations.length} recommendations`,
-    );
     if (!recommendations || recommendations.length === 0) return;
 
-    // Set up polling to update UI with processed recommendations
-    const pollInterval = setInterval(() => {
-      try {
-        // Import the service to get processed recommendations
-        import("@/services/serverProcessingService").then((serverService) => {
-          const processedRecs = serverService.getProcessedRecommendations();
-          const processedCount = Object.keys(processedRecs).length;
+    // Import the recommendation processing service
+    import("@/services/recommendationProcessingService")
+      .then(async (service) => {
+        // First check if we have cached recommendations
+        const cacheParams = {
+          type: typeFilter,
+          rating: ratingFilter,
+          year: yearFilter,
+          userId: userId || "anonymous",
+          count: recommendations.length,
+        };
 
-          if (processedCount > 0) {
+        try {
+          const cachedRecommendations =
+            await service.checkCachedRecommendations(cacheParams);
+
+          if (cachedRecommendations && cachedRecommendations.length > 0) {
             console.log(
-              `[RecommendationGrid] POLL: ${processedCount}/${recommendations.length} processed recommendations found`,
+              `[RecommendationGrid] Using ${cachedRecommendations.length} cached recommendations`,
             );
-            setProcessedRecommendations({ ...processedRecs });
-          }
-
-          // Check if all recommendations are processed
-          if (processedCount >= recommendations.length) {
+            setProcessedRecommendations(
+              cachedRecommendations.reduce((acc, item) => {
+                if (item.id) acc[item.id] = item;
+                return acc;
+              }, {}),
+            );
+          } else {
+            // No cached recommendations, process new ones
             console.log(
-              `[RecommendationGrid] All recommendations processed, stopping polling`,
+              `[RecommendationGrid] No cached recommendations found, processing ${recommendations.length} new recommendations`,
             );
-            clearInterval(pollInterval);
-          }
-        });
-      } catch (pollError) {
-        console.error(`[RecommendationGrid] Error during polling:`, pollError);
-      }
-    }, 2000); // Poll every 2 seconds
 
-    // Clean up interval on unmount
-    return () => clearInterval(pollInterval);
-  }, [recommendations]); // Keep recommendations dependency to ensure polling runs when recommendations change
+            // Store recommendations for background processing
+            service.storeRecommendationsForProcessing(recommendations);
+
+            // Start the background processing
+            service.startBackgroundProcessing();
+
+            // Load any previously processed recommendations
+            const processedRecs = service.getProcessedRecommendations();
+            setProcessedRecommendations(processedRecs);
+          }
+        } catch (cacheError) {
+          console.error(
+            "[RecommendationGrid] Error checking cache:",
+            cacheError,
+          );
+
+          // Fallback to standard processing
+          service.storeRecommendationsForProcessing(recommendations);
+          service.startBackgroundProcessing();
+          const processedRecs = service.getProcessedRecommendations();
+          setProcessedRecommendations(processedRecs);
+        }
+      })
+      .catch((error) => {
+        console.error(
+          "[RecommendationGrid] Error importing recommendation processing service:",
+          error,
+        );
+      });
+
+    // No cleanup function needed as we want processing to continue
+    // even if the component unmounts
+  }, [recommendations, typeFilter, ratingFilter, yearFilter, userId]);
 
   useEffect(() => {
     if (userId && userPreferences) {
@@ -347,9 +267,6 @@ const RecommendationGrid = ({
 
   return (
     <div className="w-full bg-background p-4 md:p-6 font-body">
-      {/* Processing Status Indicator */}
-      <ProcessingStatusIndicator />
-
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <h2 className="text-2xl font-bold font-heading">
           {userId
@@ -469,11 +386,8 @@ const RecommendationGrid = ({
                     ...rec,
                     imdb_url: rec.imdb_url,
                     synopsis: rec.synopsis,
-                    overview: rec.overview || rec.synopsis, // Ensure overview is also set
+                    overview: rec.overview,
                     reason: rec.reason || rec.recommendationReason,
-                    // CRITICAL: Ensure all fields are properly passed
-                    recommendationReason:
-                      rec.recommendationReason || rec.reason,
                   },
                   processedContent: processedRecommendations[rec.id],
                   fromRecommendations: true,
@@ -517,11 +431,6 @@ const RecommendationGrid = ({
                   </CardTitle>
                   <CardDescription className="flex items-center gap-2">
                     <span>{rec.year}</span>
-                    {rec.contentRating || rec.content_rating ? (
-                      <Badge variant="secondary" className="text-xs font-bold">
-                        {rec.contentRating || rec.content_rating}
-                      </Badge>
-                    ) : null}
                     {rec.rating > 0 && (
                       <span className="flex items-center">
                         <Star
@@ -629,12 +538,10 @@ const RecommendationGrid = ({
                           <DialogDescription className="flex items-center gap-3">
                             <span>{selectedItem.year}</span>
                             {(selectedItem.contentRating ||
-                              selectedItem.content_rating ||
-                              selectedItem.Rated) && (
-                              <Badge variant="secondary" className="font-bold">
+                              selectedItem.content_rating) && (
+                              <Badge variant="outline">
                                 {selectedItem.contentRating ||
-                                  selectedItem.content_rating ||
-                                  selectedItem.Rated}
+                                  selectedItem.content_rating}
                               </Badge>
                             )}
                             {selectedItem.runtime && (
@@ -674,8 +581,7 @@ const RecommendationGrid = ({
                                 Synopsis
                               </h4>
                               <p className="text-sm text-muted-foreground">
-                                {selectedItem.synopsis ||
-                                  selectedItem.overview ||
+                                {selectedItem.overview ||
                                   "No description available"}
                               </p>
                             </div>
@@ -736,10 +642,6 @@ const RecommendationGrid = ({
                                     recommendation: {
                                       ...selectedItem,
                                       imdb_url: selectedItem.imdb_url, // Ensure imdb_url is passed in state
-                                      synopsis: selectedItem.synopsis,
-                                      overview:
-                                        selectedItem.overview ||
-                                        selectedItem.synopsis,
                                     },
                                     processedContent:
                                       processedRecommendations[selectedItem.id],
@@ -911,7 +813,7 @@ const defaultRecommendations: RecommendationItem[] = [
     type: "tv",
     year: "2020",
     poster:
-      "https://images.unsplash.com/photo-1581905764498-f1b60bae941a?w=800&q=80",
+      "https://images.unsplash.com/photo-1580541631950-7282082b03fe?w=800&q=80",
     rating: 8.6,
     genres: ["Drama"],
     synopsis:

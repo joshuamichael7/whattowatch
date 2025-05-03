@@ -159,9 +159,7 @@ export const updateProcessedRecommendations = (
 /**
  * Store recommendations for background processing
  */
-export const storeRecommendationsForProcessing = async (
-  recommendations: any[],
-) => {
+export const storeRecommendationsForProcessing = (recommendations: any[]) => {
   try {
     // Get processed recommendations
     const processedRecommendations = getProcessedRecommendations();
@@ -173,80 +171,13 @@ export const storeRecommendationsForProcessing = async (
     );
 
     if (unprocessedRecs.length > 0) {
-      // Ensure each recommendation has a unique ID
-      const recsWithIds = unprocessedRecs.map((rec) => {
-        if (!rec.id) {
-          rec.id = `rec_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        }
-
-        // Ensure synopsis is preserved in both fields for redundancy
-        if (rec.synopsis && !rec.overview) {
-          rec.overview = rec.synopsis;
-        } else if (rec.overview && !rec.synopsis) {
-          rec.synopsis = rec.overview;
-        }
-
-        // Ensure reason is preserved in both fields for redundancy
-        if (rec.reason && !rec.recommendationReason) {
-          rec.recommendationReason = rec.reason;
-        } else if (rec.recommendationReason && !rec.reason) {
-          rec.reason = rec.recommendationReason;
-        }
-
-        return rec;
-      });
-
-      // Store in localStorage
       localStorage.setItem(
         "pendingRecommendationsToProcess",
-        JSON.stringify(recsWithIds),
+        JSON.stringify(unprocessedRecs),
       );
       console.log(
-        `[RecommendationProcessingService] Stored ${recsWithIds.length} recommendations for background processing`,
+        `[RecommendationProcessingService] Stored ${unprocessedRecs.length} recommendations for background processing`,
       );
-
-      // Process the first 3 recommendations immediately to make them available faster
-      if (recsWithIds.length > 0) {
-        const initialBatchSize = Math.min(3, recsWithIds.length);
-        console.log(
-          `[RecommendationProcessingService] Immediately processing first ${initialBatchSize} recommendations`,
-        );
-
-        // Process first batch in parallel
-        const processingPromises = [];
-
-        for (let i = 0; i < initialBatchSize; i++) {
-          const rec = recsWithIds[i];
-          console.log(
-            `[RecommendationProcessingService] Starting immediate processing for: ${rec.title}`,
-          );
-
-          const promise = processRecommendation(rec).then((result) => {
-            if (result) {
-              console.log(
-                `[RecommendationProcessingService] Immediate processing complete for: ${rec.title}`,
-              );
-            } else {
-              console.log(
-                `[RecommendationProcessingService] Immediate processing failed for: ${rec.title}`,
-              );
-            }
-            return result;
-          });
-
-          processingPromises.push(promise);
-        }
-
-        // Wait for all initial processing to complete
-        Promise.allSettled(processingPromises).then((results) => {
-          const successCount = results.filter(
-            (r) => r.status === "fulfilled" && r.value,
-          ).length;
-          console.log(
-            `[RecommendationProcessingService] Initial batch processing complete. Success: ${successCount}/${initialBatchSize}`,
-          );
-        });
-      }
     }
     return unprocessedRecs.length;
   } catch (error) {
@@ -262,86 +193,30 @@ export const processRecommendation = async (
   rec: any,
   retryCount: number = 0,
 ): Promise<ContentItem | null> => {
-  // CRITICAL: Use window.console.log and console.error to ensure visibility
-  window.console.log(
-    `%c[RecommendationProcessingService] 🔄 PROCESSING RECOMMENDATION: ${rec.title}`,
-    "background: #ff9800; color: #000; padding: 4px; border-radius: 2px; font-weight: bold; font-size: 14px;",
-  );
-
-  // Also log to console.error to ensure visibility
-  console.error(
-    `[RecommendationProcessingService] 🔄 PROCESSING RECOMMENDATION: ${rec.title} at ${new Date().toISOString()}`,
-  );
-
-  // CRITICAL: Add more visible logging
-  window.console.log(
-    `%c[RecommendationProcessingService] 🔄 processRecommendation CALLED for ${rec.title} at ${new Date().toISOString()}`,
-    "background: #ff9800; color: #000; padding: 2px 4px; border-radius: 2px; font-weight: bold;",
-  );
   const MAX_RETRIES = 2;
 
-  // ALWAYS use the title as the tracking ID - NEVER use IMDB IDs from AI recommendations as they're unreliable
-  // We only get reliable IMDB IDs after matching with OMDB
-  if (!rec.id) {
-    rec.id = rec.title;
-    console.log(
-      `[RecommendationProcessingService] Using title as identifier for recommendation: ${rec.title}`,
-    );
-  }
-
-  // CRITICAL: Check if we've already processed this recommendation
+  // Skip if we've already processed this recommendation
   const processedRecommendations = getProcessedRecommendations();
   if (processedRecommendations[rec.id]) {
     console.log(
-      `[RecommendationProcessingService] ⚠️ Found already processed recommendation: ${rec.title}`,
+      `[RecommendationProcessingService] Skipping already processed recommendation: ${rec.title}`,
     );
-    // CRITICAL: Return the processed recommendation instead of skipping
     return processedRecommendations[rec.id];
   }
 
-  // CRITICAL: Force processing even if it's already being processed
-  // This ensures we don't get stuck recommendations
+  // Skip if this recommendation is currently being processed
   if (processingRecommendations[rec.id]) {
     console.log(
-      `[RecommendationProcessingService] ⚠️ Recommendation ${rec.title} is already being processed, but FORCING processing anyway`,
+      `[RecommendationProcessingService] Skipping recommendation that's already being processed: ${rec.title}`,
     );
-    // Continue processing instead of returning null
-    // CRITICAL: Delete the processing flag to ensure we can process it again
-    delete processingRecommendations[rec.id];
-    updateProcessingRecommendationsStorage();
+    return null;
   }
-
-  console.log(
-    `[RecommendationProcessingService] 🔄 FORCE PROCESSING recommendation: ${rec.title} (ID: ${rec.id})`,
-  );
 
   // Mark this recommendation as being processed
   processingRecommendations[rec.id] = true;
   updateProcessingRecommendationsStorage();
 
-  // CRITICAL: Log that processing has started with timestamp
-  const startTime = new Date();
-  console.log(
-    `%c[RecommendationProcessingService] ⚡ STARTED PROCESSING: ${rec.title} (ID: ${rec.id}) at ${startTime.toISOString()}`,
-    "background: #f44336; color: #fff; padding: 2px 4px; border-radius: 2px; font-weight: bold;",
-  );
-
   try {
-    // Log the full recommendation object to help with debugging
-    console.log(
-      `[RecommendationProcessingService] Processing recommendation:`,
-      {
-        id: rec.id,
-        title: rec.title,
-        year: rec.year,
-        imdb_id: rec.imdb_id,
-        imdb_url: rec.imdb_url,
-        synopsis: rec.synopsis ? rec.synopsis.substring(0, 50) + "..." : "none",
-        overview: rec.overview ? rec.overview.substring(0, 50) + "..." : "none",
-        reason: rec.reason || rec.recommendationReason || "none",
-      },
-    );
-
     // Convert recommendation to ContentItem format for verification
     const contentItem: ContentItem = {
       id: rec.id,
@@ -351,39 +226,24 @@ export const processRecommendation = async (
       vote_average: rec.rating || 0,
       vote_count: 0,
       genre_ids: [],
-      overview: rec.overview || rec.synopsis || "",
-      synopsis: rec.synopsis || rec.overview || "",
+      overview: rec.synopsis || "",
+      synopsis: rec.synopsis || "",
       recommendationReason: rec.recommendationReason || rec.reason || "",
       reason: rec.reason || rec.recommendationReason || "",
       year: rec.year,
       imdb_id: rec.imdb_id,
       imdb_url: rec.imdb_url,
       aiRecommended: true,
-      // Preserve content rating if available
-      content_rating: rec.contentRating || rec.content_rating || "",
-      contentRating: rec.contentRating || rec.content_rating || "",
     };
 
     console.log(
       `[RecommendationProcessingService] Processing recommendation: ${rec.title}${retryCount > 0 ? ` (retry ${retryCount}/${MAX_RETRIES})` : ""}`,
     );
 
-    // CRITICAL: Add timeout to prevent hanging
+    // Add timeout to prevent hanging requests
     const timeoutPromise = new Promise<null>((_, reject) => {
-      setTimeout(() => reject(new Error("Verification timeout")), 10000); // 10 second timeout
+      setTimeout(() => reject(new Error("Request timeout")), 15000); // 15 second timeout
     });
-
-    // Get the AI data
-    const aiTitle = contentItem.title;
-    const aiSynopsis = contentItem.synopsis || contentItem.overview || "";
-    const aiYear =
-      contentItem.year ||
-      (contentItem.release_date
-        ? contentItem.release_date.substring(0, 4)
-        : null);
-    const aiReason = contentItem.recommendationReason || contentItem.reason;
-    const aiImdbId = contentItem.imdb_id || null;
-    const aiImdbUrl = contentItem.imdb_url || null;
 
     // Race between the actual request and the timeout
     const verifiedItem = await Promise.race([
@@ -424,34 +284,13 @@ export const processRecommendation = async (
     });
 
     if (verifiedItem) {
-      const endTime = new Date();
-      const processingTime = (endTime.getTime() - startTime.getTime()) / 1000;
       console.log(
-        `%c[RecommendationProcessingService] ✅ SUCCESSFULLY PROCESSED: ${rec.title} in ${processingTime.toFixed(2)}s`,
-        "background: #4CAF50; color: #fff; padding: 4px; border-radius: 2px; font-weight: bold; font-size: 14px;",
+        `[RecommendationProcessingService] Successfully processed recommendation: ${rec.title}`,
       );
       // Preserve the original recommendation reason if it exists
       if (rec.recommendationReason || rec.reason) {
         verifiedItem.recommendationReason =
           rec.recommendationReason || rec.reason;
-      }
-
-      // Preserve content rating from original recommendation if OMDB didn't provide one
-      if (
-        (rec.contentRating || rec.content_rating) &&
-        (!verifiedItem.content_rating || verifiedItem.content_rating === "")
-      ) {
-        verifiedItem.content_rating = rec.contentRating || rec.content_rating;
-        verifiedItem.contentRating = rec.contentRating || rec.content_rating;
-      }
-
-      // If OMDB provided a rating (Rated field), make sure it's copied to our standard fields
-      if (
-        verifiedItem.Rated &&
-        (!verifiedItem.content_rating || verifiedItem.content_rating === "")
-      ) {
-        verifiedItem.content_rating = verifiedItem.Rated;
-        verifiedItem.contentRating = verifiedItem.Rated;
       }
 
       // Update processed recommendations in localStorage with 48-hour expiry
@@ -481,48 +320,23 @@ export const processRecommendation = async (
 
     // If verification failed but wasn't a network error (already handled in catch)
     if (retryCount === 0) {
-      // CRITICAL: Create a usable fallback item with all available data
+      // Store a minimal version to prevent repeated processing attempts
       const fallbackItem: ContentItem = {
         ...contentItem,
-        id: rec.id,
-        title: rec.title,
-        poster_path: rec.poster || rec.poster_path || "",
-        media_type: rec.type === "movie" ? "movie" : "tv",
-        vote_average: rec.rating || 0,
-        vote_count: 0,
-        genre_ids: [],
-        overview: rec.synopsis || rec.overview || "",
-        synopsis: rec.synopsis || rec.overview || "",
-        recommendationReason: rec.recommendationReason || rec.reason || "",
-        reason: rec.reason || rec.recommendationReason || "",
-        year: rec.year,
         verified: false,
         processingFailed: true,
         failureReason: "Verification returned null",
-        // Ensure we have all the fields from the original recommendation
-        imdb_id: rec.imdb_id,
-        imdb_url: rec.imdb_url,
-        content_rating: rec.contentRating || rec.content_rating || "",
-        contentRating: rec.contentRating || rec.content_rating || "",
-        aiRecommended: true,
       };
-
-      console.log(
-        `[RecommendationProcessingService] ⚠️ Using fallback item for ${rec.title} with all available data`,
-      );
 
       // Store with shorter expiry (12 hours) so we can retry sooner
       updateProcessedRecommendations(rec.id, fallbackItem, 12);
-
-      // CRITICAL: Return the fallback item instead of null
-      return fallbackItem;
     }
 
     return null;
   } catch (error) {
     console.error(
-      `%c[RecommendationProcessingService] ❌ ERROR processing recommendation ${rec.title}: ${error.message}`,
-      "background: #f44336; color: #fff; padding: 4px; border-radius: 2px; font-weight: bold; font-size: 14px;",
+      `[RecommendationProcessingService] Error processing recommendation ${rec.title}:`,
+      error,
     );
 
     // For non-retryable errors, store a minimal version to prevent repeated processing attempts
@@ -542,8 +356,6 @@ export const processRecommendation = async (
         failureReason: error.message || "Unknown error",
         recommendationReason: rec.recommendationReason || rec.reason || "",
         year: rec.year,
-        content_rating: rec.contentRating || rec.content_rating || "",
-        contentRating: rec.contentRating || rec.content_rating || "",
         aiRecommended: true,
       };
 
@@ -572,158 +384,9 @@ import {
  * and includes improved error handling and Supabase caching
  */
 export const startBackgroundProcessing = async () => {
-  // CRITICAL: Add highly visible logging with window.console to ensure it's not overridden
-  window.console.log(
-    `%c[RecommendationProcessingService] 🚀 STARTING BACKGROUND PROCESSING at ${new Date().toISOString()}`,
-    "background: #4caf50; color: #fff; padding: 4px; border-radius: 2px; font-weight: bold; font-size: 16px;",
+  console.log(
+    `[RecommendationProcessingService] Starting background processing`,
   );
-
-  // Also log to console.error to ensure visibility
-  console.error(
-    `[RecommendationProcessingService] 🚀 STARTING BACKGROUND PROCESSING at ${new Date().toISOString()}`,
-  );
-
-  // Store a log entry in localStorage for debugging
-  try {
-    const logs = JSON.parse(
-      localStorage.getItem("backgroundProcessingLogs") || "[]",
-    );
-    logs.unshift({
-      timestamp: new Date().toISOString(),
-      message: "Background processing started",
-      type: "info",
-    });
-    if (logs.length > 100) logs.length = 100;
-    localStorage.setItem("backgroundProcessingLogs", JSON.stringify(logs));
-  } catch (err) {
-    console.error("Error storing log in localStorage:", err);
-  }
-
-  // Log to console for tracking background processing
-  const logBackgroundProcessing = (
-    message: string,
-    type: "info" | "error" | "success" = "info",
-  ) => {
-    try {
-      const now = new Date();
-      const timestamp = now.toISOString();
-
-      // Log to console with appropriate styling based on type
-      if (type === "error") {
-        console.error(`[BackgroundProcessing ${timestamp}] ${message}`);
-      } else if (type === "success") {
-        console.log(
-          `%c[BackgroundProcessing ${timestamp}] ${message}`,
-          "color: green; font-weight: bold",
-        );
-      } else {
-        console.log(
-          `%c[BackgroundProcessing ${timestamp}] ${message}`,
-          "color: blue",
-        );
-      }
-
-      // CRITICAL: Also store logs in localStorage for debugging
-      try {
-        const logsStr =
-          localStorage.getItem("backgroundProcessingLogs") || "[]";
-        const logs = JSON.parse(logsStr);
-        logs.unshift({
-          timestamp,
-          message,
-          type,
-        });
-        // Keep only the last 100 logs
-        if (logs.length > 100) logs.length = 100;
-        localStorage.setItem("backgroundProcessingLogs", JSON.stringify(logs));
-      } catch (storageErr) {
-        console.error("Error storing log in localStorage:", storageErr);
-      }
-    } catch (err) {
-      console.error("Error logging to console:", err);
-    }
-  };
-
-  console.group("Background Processing Started");
-  logBackgroundProcessing("Starting background processing", "info");
-
-  // CRITICAL: Process ALL pending recommendations immediately
-  try {
-    const pendingRecsString = localStorage.getItem(
-      "pendingRecommendationsToProcess",
-    );
-    if (pendingRecsString) {
-      const pendingRecs = JSON.parse(pendingRecsString);
-      if (pendingRecs.length > 0) {
-        logBackgroundProcessing(
-          `🚀 FORCE PROCESSING ALL ${pendingRecs.length} RECOMMENDATIONS IMMEDIATELY`,
-          "info",
-        );
-
-        // Process ALL recommendations in parallel
-        pendingRecs.forEach((rec: any) => {
-          if (!rec.id) {
-            rec.id = rec.title; // ALWAYS use title, NEVER use IMDB ID from AI recommendations
-          }
-
-          logBackgroundProcessing(
-            `⚡ Starting immediate processing for: ${rec.title} (ID: ${rec.id})`,
-            "info",
-          );
-
-          // Process without awaiting to maximize parallelism
-          processRecommendation(rec)
-            .then((result) => {
-              if (result) {
-                logBackgroundProcessing(
-                  `✅ Processing COMPLETE for: ${rec.title}`,
-                  "success",
-                );
-
-                // Remove from pending list immediately
-                try {
-                  const currentPendingStr = localStorage.getItem(
-                    "pendingRecommendationsToProcess",
-                  );
-                  if (currentPendingStr) {
-                    const currentPending = JSON.parse(currentPendingStr);
-                    const updatedPending = currentPending.filter(
-                      (item: any) => item.id !== rec.id,
-                    );
-                    localStorage.setItem(
-                      "pendingRecommendationsToProcess",
-                      JSON.stringify(updatedPending),
-                    );
-                    logBackgroundProcessing(
-                      `Removed ${rec.title} from pending list. ${updatedPending.length} remaining.`,
-                      "info",
-                    );
-                  }
-                } catch (err) {
-                  console.error("Error updating pending list:", err);
-                }
-              } else {
-                logBackgroundProcessing(
-                  `❌ Processing FAILED for: ${rec.title}`,
-                  "error",
-                );
-              }
-            })
-            .catch((err) => {
-              logBackgroundProcessing(
-                `❌ ERROR processing ${rec.title}: ${err.message}`,
-                "error",
-              );
-            });
-        });
-      }
-    }
-  } catch (error) {
-    logBackgroundProcessing(
-      `Error in immediate processing: ${error.message}`,
-      "error",
-    );
-  }
 
   // Create a worker-like function that will continue running even if component unmounts
   const backgroundWorker = async () => {
@@ -733,17 +396,15 @@ export const startBackgroundProcessing = async () => {
         "pendingRecommendationsToProcess",
       );
       if (!pendingRecsString) {
-        logBackgroundProcessing(
-          "No pending recommendations to process",
-          "info",
+        console.log(
+          "[RecommendationProcessingService] No pending recommendations to process",
         );
         return;
       }
 
       const pendingRecs = JSON.parse(pendingRecsString);
-      logBackgroundProcessing(
-        `Found ${pendingRecs.length} pending recommendations to process`,
-        "info",
+      console.log(
+        `[RecommendationProcessingService] Found ${pendingRecs.length} pending recommendations to process`,
       );
 
       // Track successfully processed recommendations for Supabase caching
@@ -752,33 +413,19 @@ export const startBackgroundProcessing = async () => {
       // Process each recommendation one by one to avoid overwhelming the API
       for (const rec of pendingRecs) {
         try {
-          logBackgroundProcessing(
-            `Processing recommendation: ${rec.title}`,
-            "info",
-          );
-
           // Process with retry logic
           const processedItem = await processRecommendation(rec);
 
           if (processedItem) {
             processedItems.push(processedItem);
-            logBackgroundProcessing(
-              `Successfully processed recommendation: ${rec.title}`,
-              "success",
-            );
-          } else {
-            logBackgroundProcessing(
-              `Failed to process recommendation: ${rec.title}`,
-              "error",
-            );
           }
 
           // Add a small delay between API calls to avoid rate limiting
           await new Promise((resolve) => setTimeout(resolve, 500));
         } catch (itemError) {
-          logBackgroundProcessing(
-            `Error processing item ${rec.title}: ${itemError.message}`,
-            "error",
+          console.error(
+            `[RecommendationProcessingService] Error processing item ${rec.title}:`,
+            itemError,
           );
           // Continue with next item instead of failing the entire batch
           continue;
@@ -788,11 +435,6 @@ export const startBackgroundProcessing = async () => {
       // Cache successfully processed recommendations in Supabase if we have any
       if (processedItems.length > 0) {
         try {
-          logBackgroundProcessing(
-            `Caching ${processedItems.length} processed recommendations in Supabase`,
-            "info",
-          );
-
           // Generate a cache key based on the first item's properties
           const firstItem = pendingRecs[0];
           const cacheKey = generateCacheKey({
@@ -803,40 +445,32 @@ export const startBackgroundProcessing = async () => {
 
           // Cache in Supabase with 48-hour expiry
           await cacheRecommendationsInSupabase(cacheKey, processedItems, 48);
-
-          logBackgroundProcessing(
-            `Successfully cached recommendations in Supabase with key: ${cacheKey}`,
-            "success",
-          );
         } catch (cacheError) {
-          logBackgroundProcessing(
-            `Error caching in Supabase: ${cacheError.message}`,
-            "error",
+          console.error(
+            "[RecommendationProcessingService] Error caching in Supabase:",
+            cacheError,
           );
           // Non-critical error, continue execution
         }
       }
 
-      logBackgroundProcessing(
-        `Completed background processing. Successfully processed: ${processedItems.length}/${pendingRecs.length}`,
-        "success",
+      console.log(
+        `[RecommendationProcessingService] Completed background processing for recommendations. Successfully processed: ${processedItems.length}/${pendingRecs.length}`,
       );
-      console.groupEnd();
     } catch (error) {
-      logBackgroundProcessing(
-        `Background worker error: ${error.message}`,
-        "error",
+      console.error(
+        "[RecommendationProcessingService] Background worker error:",
+        error,
       );
     }
   };
 
   // Start the background worker and don't wait for it to complete
   backgroundWorker().catch((error) => {
-    logBackgroundProcessing(
-      `Background worker error: ${error.message}`,
-      "error",
+    console.error(
+      "[RecommendationProcessingService] Background worker error:",
+      error,
     );
-    console.groupEnd();
   });
 };
 

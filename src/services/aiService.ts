@@ -26,17 +26,9 @@ async function validateRecommendationByTitleOnly(
     let searchQuery = title;
 
     // Search by title
-    console.log(`[aiService] Searching OMDB for title: ${searchQuery}`);
-    const response = await fetch(`/.netlify/functions/omdb`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ s: searchQuery }),
-    });
-    console.log(`[aiService] OMDB search response status: ${response.status}`);
-
+    const response = await fetch(
+      `/.netlify/functions/omdb?s=${encodeURIComponent(searchQuery)}`,
+    );
     if (!response.ok) {
       console.error(
         `[validateRecommendationByTitleOnly] Error searching by title: ${response.status}`,
@@ -61,14 +53,9 @@ async function validateRecommendationByTitleOnly(
       // Try a more lenient search by taking just the first word or first few characters
       const simplifiedTitle = title.split(" ")[0];
       if (simplifiedTitle && simplifiedTitle.length > 2) {
-        const altResponse = await fetch(`/.netlify/functions/omdb`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({ s: simplifiedTitle }),
-        });
+        const altResponse = await fetch(
+          `/.netlify/functions/omdb?s=${encodeURIComponent(simplifiedTitle)}`,
+        );
         if (altResponse.ok) {
           const altData = await altResponse.json();
           if (
@@ -129,7 +116,6 @@ export async function getSimilarContentTitles(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Accept: "application/json",
       },
       body: JSON.stringify({
         title,
@@ -175,22 +161,12 @@ export async function getSimilarContentTitles(
 
       try {
         // Search OMDB for potential matches
-        console.log(`[aiService] Looking up IMDB ID: ${item.title}`);
-        const response = await fetch(`/.netlify/functions/omdb`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({ s: item.title }),
-        });
-        console.log(
-          `[aiService] IMDB lookup response status: ${response.status}`,
+        const searchResponse = await fetch(
+          `/.netlify/functions/omdb?s=${encodeURIComponent(item.title)}`,
         );
-
-        if (!response.ok) {
+        if (!searchResponse.ok) {
           console.error(
-            `[getSimilarContentTitles] OMDB search failed for "${item.title}": ${response.status}`,
+            `[getSimilarContentTitles] OMDB search failed for "${item.title}": ${searchResponse.status}`,
           );
           continue;
         }
@@ -215,14 +191,9 @@ export async function getSimilarContentTitles(
           // Try simplified search with just the first word
           const simplifiedTitle = item.title.split(" ")[0];
           if (simplifiedTitle && simplifiedTitle.length > 2) {
-            const simplifiedResponse = await fetch(`/.netlify/functions/omdb`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
-              body: JSON.stringify({ s: simplifiedTitle }),
-            });
+            const simplifiedResponse = await fetch(
+              `/.netlify/functions/omdb?s=${encodeURIComponent(simplifiedTitle)}`,
+            );
             if (simplifiedResponse.ok) {
               const simplifiedData = await simplifiedResponse.json();
 
@@ -448,7 +419,6 @@ export async function getPersonalizedRecommendations(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Accept: "application/json",
       },
       body: JSON.stringify({
         preferences,
@@ -612,21 +582,6 @@ function calculateTextSimilarity(text1: string, text2: string): number {
 export async function verifyRecommendationWithOmdb(
   item: ContentItem,
 ): Promise<ContentItem | null> {
-  const startTime = new Date();
-  console.log(
-    `[verifyRecommendationWithOmdb] 🔍 VERIFYING: ${item.title} at ${startTime.toISOString()}`,
-  );
-
-  // CRITICAL: If the item has no synopsis/overview, create a minimal one based on the title
-  // This helps the AI matching process which requires some text to work with
-  if (!item.synopsis && !item.overview) {
-    item.synopsis = `Content about ${item.title}`;
-    item.overview = `Content about ${item.title}`;
-    console.log(
-      `[verifyRecommendationWithOmdb] Added minimal synopsis for ${item.title}`,
-    );
-  }
-
   try {
     console.log(`[verifyRecommendationWithOmdb] Verifying "${item.title}"`);
 
@@ -676,14 +631,9 @@ export async function verifyRecommendationWithOmdb(
         console.log(
           `[verifyRecommendationWithOmdb] Trying direct IMDB ID lookup: ${imdbId}`,
         );
-        const response = await fetch(`/.netlify/functions/omdb`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({ i: imdbId, plot: "full" }),
-        });
+        const response = await fetch(
+          `/.netlify/functions/omdb?i=${imdbId}&plot=full`,
+        );
 
         if (!response.ok) {
           console.error(
@@ -724,12 +674,6 @@ export async function verifyRecommendationWithOmdb(
 
           // Return the content item from IMDB ID lookup regardless of similarity
           // This prioritizes IMDB ID over title matching
-          const endTime = new Date();
-          const processingTime =
-            (endTime.getTime() - startTime.getTime()) / 1000;
-          console.log(
-            `[verifyRecommendationWithOmdb] ✅ VERIFICATION COMPLETE for ${item.title} in ${processingTime.toFixed(2)}s`,
-          );
           return contentItem;
         } else {
           console.log(
@@ -744,14 +688,9 @@ export async function verifyRecommendationWithOmdb(
       `[verifyRecommendationWithOmdb] IMDB ID lookup failed or had low similarity. Searching by title: "${aiTitle}"${aiYear ? ` (${aiYear})` : ""}`,
     );
     const searchQuery = aiYear ? `${aiTitle} ${aiYear}` : aiTitle;
-    const response = await fetch(`/.netlify/functions/omdb`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ s: searchQuery }),
-    });
+    const response = await fetch(
+      `/.netlify/functions/omdb?s=${encodeURIComponent(searchQuery)}`,
+    );
 
     if (!response.ok) {
       console.error(
@@ -784,14 +723,9 @@ export async function verifyRecommendationWithOmdb(
         console.log(
           `[verifyRecommendationWithOmdb] Trying search without year: "${aiTitle}"`,
         );
-        const altResponse = await fetch(`/.netlify/functions/omdb`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({ s: aiTitle }),
-        });
+        const altResponse = await fetch(
+          `/.netlify/functions/omdb?s=${encodeURIComponent(aiTitle)}`,
+        );
 
         if (!altResponse.ok) {
           console.error(
@@ -836,14 +770,9 @@ export async function verifyRecommendationWithOmdb(
           console.log(
             `[verifyRecommendationWithOmdb] Single result found, getting full details for ${altData.Search[0].imdbID}`,
           );
-          const detailResponse = await fetch(`/.netlify/functions/omdb`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({ i: altData.Search[0].imdbID, plot: "full" }),
-          });
+          const detailResponse = await fetch(
+            `/.netlify/functions/omdb?i=${altData.Search[0].imdbID}&plot=full`,
+          );
           if (detailResponse.ok) {
             const detailData = await detailResponse.json();
             if (detailData && detailData.Response === "True") {
@@ -879,14 +808,9 @@ export async function verifyRecommendationWithOmdb(
         console.log(
           `[verifyRecommendationWithOmdb] Trying fuzzy search with first few words: "${firstFewWords}"`,
         );
-        const fuzzyResponse = await fetch(`/.netlify/functions/omdb`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({ s: firstFewWords }),
-        });
+        const fuzzyResponse = await fetch(
+          `/.netlify/functions/omdb?s=${encodeURIComponent(firstFewWords)}`,
+        );
 
         if (fuzzyResponse.ok) {
           const fuzzyData = await fuzzyResponse.json();
@@ -957,14 +881,9 @@ export async function verifyRecommendationWithOmdb(
       );
 
       // Get full details for the best match
-      const detailResponse = await fetch(`/.netlify/functions/omdb`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ i: bestMatch.result.imdbID, plot: "full" }),
-      });
+      const detailResponse = await fetch(
+        `/.netlify/functions/omdb?i=${bestMatch.result.imdbID}&plot=full`,
+      );
 
       if (detailResponse.ok) {
         const detailData = await detailResponse.json();
@@ -1423,14 +1342,14 @@ async function findBestMatchWithSynopsis(
  */
 async function getFullDetails(imdbId: string): Promise<any> {
   try {
-    const response = await fetch(`/.netlify/functions/omdb`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ i: imdbId, plot: "full" }),
+    const params = new URLSearchParams({
+      i: imdbId,
+      plot: "full",
     });
+
+    const response = await fetch(
+      `/.netlify/functions/omdb?${params.toString()}`,
+    );
     if (!response.ok) return null;
 
     const data = await response.json();

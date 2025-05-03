@@ -23,14 +23,7 @@ async function fetchFromOmdb(params: URLSearchParams) {
       console.log(`[omdbClient] Title query: ${params.get("t")}`);
     }
 
-    const response = await fetch(API_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(Object.fromEntries(params)),
-    });
+    const response = await fetch(`${API_ENDPOINT}?${params.toString()}`);
     if (!response.ok) {
       console.error(
         `OMDB API response not OK: ${response.status} ${response.statusText}`,
@@ -1084,15 +1077,9 @@ export async function getSimilarContent(
     );
 
     console.log("[DEBUG] Before calling similar-content Netlify function");
-    // CRITICAL: Use POST method instead of GET for Netlify functions
-    const response = await fetch(`/.netlify/functions/similar-content`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(Object.fromEntries(params)),
-    });
+    const response = await fetch(
+      `/.netlify/functions/similar-content?${params.toString()}`,
+    );
     console.log(
       "[DEBUG] After calling similar-content Netlify function, status:",
       response.status,
