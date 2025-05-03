@@ -114,9 +114,17 @@ export async function matchRecommendationWithOmdbResults(
       setTimeout(() => reject(new Error("AI matching timeout")), 10000); // 10 second timeout
     });
 
+    // CRITICAL: Ensure we're using POST method with proper headers
+    const axiosConfig = {
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    };
+
     // Race between the actual request and the timeout
     const response = await Promise.race([
-      axios.post("/.netlify/functions/ai-content-matcher", prompt),
+      axios.post("/.netlify/functions/ai-content-matcher", prompt, axiosConfig),
       timeoutPromise,
     ]);
     console.log(
