@@ -1,6 +1,23 @@
 // Netlify function to proxy OMDB API requests
 // This is a fallback for when edge functions aren't available
 exports.handler = async function (event, context) {
+  // Set CORS headers
+  const headers = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  };
+
+  // Handle OPTIONS request (preflight)
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ message: "Preflight call successful" }),
+    };
+  }
+
   try {
     // Get the API key from environment variables
     const API_KEY = process.env.OMDB_API_KEY;
@@ -8,14 +25,30 @@ exports.handler = async function (event, context) {
     if (!API_KEY) {
       return {
         statusCode: 500,
+        headers,
         body: JSON.stringify({
           error: "Missing OMDB API key in server environment variables.",
         }),
       };
     }
 
-    // Get query parameters from the request
-    const params = event.queryStringParameters || {};
+    // Get parameters from query string or request body
+    let params = {};
+
+    if (event.httpMethod === "GET") {
+      params = event.queryStringParameters || {};
+    } else if (event.httpMethod === "POST") {
+      try {
+        params = JSON.parse(event.body || "{}");
+      } catch (error) {
+        console.error("Error parsing request body:", error);
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: "Invalid JSON in request body" }),
+        };
+      }
+    }
 
     // Check if this is a trending request
     if (params.trending === "true") {
@@ -50,16 +83,20 @@ exports.handler = async function (event, context) {
 
       return {
         statusCode: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers,
         body: JSON.stringify(data),
       };
     }
 
     // Add the API key to the parameters
-    const searchParams = new URLSearchParams(params);
+    const searchParams = new URLSearchParams();
+
+    // Add all parameters to the search params
+    Object.keys(params).forEach((key) => {
+      searchParams.set(key, params[key]);
+    });
+
+    // Ensure API key is set
     searchParams.set("apikey", API_KEY);
 
     // Make the request to OMDB API
@@ -70,16 +107,17 @@ exports.handler = async function (event, context) {
 
     return {
       statusCode: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*", // For CORS support
-      },
+      headers,
       body: JSON.stringify(data),
     };
   } catch (error) {
     console.error("Error in OMDB function:", error);
     return {
       statusCode: 500,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
       body: JSON.stringify({
         error: "Error fetching from OMDB API",
         message: error.message,

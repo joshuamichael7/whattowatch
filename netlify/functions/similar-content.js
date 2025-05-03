@@ -14,7 +14,7 @@ exports.handler = async (event, context) => {
   const headers = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
     "Content-Type": "application/json",
   };
 
@@ -27,8 +27,8 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // Only allow POST requests
-  if (event.httpMethod !== "POST") {
+  // Allow both GET and POST requests
+  if (event.httpMethod !== "POST" && event.httpMethod !== "GET") {
     return {
       statusCode: 405,
       headers,
@@ -37,7 +37,24 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Parse the request body
+    // Parse parameters from query string or request body
+    let requestData = {};
+
+    if (event.httpMethod === "GET") {
+      requestData = event.queryStringParameters || {};
+    } else if (event.httpMethod === "POST") {
+      try {
+        requestData = JSON.parse(event.body || "{}");
+      } catch (error) {
+        console.error("Error parsing request body:", error);
+        return {
+          statusCode: 400,
+          headers,
+          body: JSON.stringify({ error: "Invalid JSON in request body" }),
+        };
+      }
+    }
+
     const {
       title,
       overview,
@@ -46,14 +63,14 @@ exports.handler = async (event, context) => {
       apiVersion,
       modelName,
       includeReasoning = true,
-    } = event.body ? JSON.parse(event.body) : {};
+    } = requestData;
 
     if (!title || !overview) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({
-          error: "Missing title or overview in request body",
+          error: "Missing title or overview in request",
         }),
       };
     }
