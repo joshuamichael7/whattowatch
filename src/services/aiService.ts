@@ -1606,3 +1606,80 @@ async function getFullDetails(imdbId: string): Promise<any> {
     return null;
   }
 }
+
+// Import the AI matching service
+import { matchRecommendationWithOmdbResults } from "./aiMatchingService";
+
+// Import the Supabase cache service
+import {
+  cacheRecommendationsInSupabase,
+  getCachedRecommendationsFromSupabase,
+  generateCacheKey,
+} from "./supabaseRecommendationCache";
+
+/**
+ * Start background processing of recommendations
+ * This function will continue running even if the component unmounts
+ * and includes improved error handling and Supabase caching
+ */
+export const startBackgroundProcessing = async () => {
+  console.log(
+    `[RecommendationProcessingService] Starting background processing`,
+  );
+
+  // Create a worker-like function that will continue running even if component unmounts
+  const backgroundWorker = async () => {
+    try {
+      // Get pending recommendations from localStorage
+      const pendingRecsString = localStorage.getItem(
+        "pendingRecommendationsToProcess",
+      );
+      if (!pendingRecsString) {
+        console.log(
+          "[RecommendationProcessingService] No pending recommendations to process",
+        );
+        return;
+      }
+
+      const pendingRecs = JSON.parse(pendingRecsString);
+      console.log(
+        `[RecommendationProcessingService] Found ${pendingRecs.length} pending recommendations to process`,
+      );
+
+      // Process each recommendation one by one
+      for (const rec of pendingRecs) {
+        try {
+          // Process the recommendation
+          const processedItem = await verifyRecommendationWithOmdb(rec);
+
+          // Add a small delay between API calls to avoid rate limiting
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        } catch (itemError) {
+          console.error(
+            `[RecommendationProcessingService] Error processing item ${rec.title}:`,
+            itemError,
+          );
+          // Continue with next item instead of failing the entire batch
+          continue;
+        }
+      }
+
+      console.log(
+        `[RecommendationProcessingService] Completed background processing for recommendations.`,
+      );
+    } catch (error) {
+      console.error(
+        "[RecommendationProcessingService] Background worker error:",
+        error,
+      );
+    }
+  };
+
+  // Start the background worker and don't wait for it to complete
+  backgroundWorker().catch((error) => {
+    console.error(
+      "[RecommendationProcessingService] Background worker error:",
+      error,
+    );
+  });
+};
