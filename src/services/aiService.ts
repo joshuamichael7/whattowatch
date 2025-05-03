@@ -26,14 +26,9 @@ async function validateRecommendationByTitleOnly(
     let searchQuery = title;
 
     // Search by title
-    const response = await fetch(`/.netlify/functions/omdb`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ s: searchQuery }),
-    });
+    const response = await fetch(
+      `/.netlify/functions/omdb?i=${imdbId}&plot=full`,
+    );
     if (!response.ok) {
       console.error(
         `[validateRecommendationByTitleOnly] Error searching by title: ${response.status}`,
@@ -58,14 +53,9 @@ async function validateRecommendationByTitleOnly(
       // Try a more lenient search by taking just the first word or first few characters
       const simplifiedTitle = title.split(" ")[0];
       if (simplifiedTitle && simplifiedTitle.length > 2) {
-        const altResponse = await fetch(`/.netlify/functions/omdb`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({ s: simplifiedTitle }),
-        });
+        const altResponse = await fetch(
+          `/.netlify/functions/omdb?i=${simplifiedTitle}&plot=full`,
+        );
         if (altResponse.ok) {
           const altData = await altResponse.json();
           if (
