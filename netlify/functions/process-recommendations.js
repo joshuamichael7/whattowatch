@@ -28,17 +28,37 @@ exports.handler = async (event, context) => {
     };
   }
 
-  console.log("🔄 SERVER: process-recommendations function triggered");
+  console.log(
+    "🔄 SERVER: process-recommendations function triggered at " +
+      new Date().toISOString(),
+  );
+  console.log("🔄 SERVER: HTTP Method: " + event.httpMethod);
+  console.log("🔄 SERVER: Headers: " + JSON.stringify(event.headers));
+  console.log(
+    "🔄 SERVER: Body length: " + (event.body ? event.body.length : 0),
+  );
 
   try {
     // Parse the request body
     let recommendations = [];
     try {
+      console.log("🔄 SERVER: Parsing request body");
       const requestBody = JSON.parse(event.body || "{}");
+      console.log("🔄 SERVER: Request body parsed successfully");
+      console.log(
+        "🔄 SERVER: Request body keys: " + Object.keys(requestBody).join(", "),
+      );
+
       recommendations = requestBody.recommendations || [];
       console.log(
         `🔄 SERVER: Received ${recommendations.length} recommendations to process`,
       );
+      if (recommendations.length > 0) {
+        console.log(
+          "🔄 SERVER: First recommendation: " +
+            JSON.stringify(recommendations[0]),
+        );
+      }
     } catch (parseError) {
       console.error("❌ SERVER: Error parsing request body:", parseError);
       return {

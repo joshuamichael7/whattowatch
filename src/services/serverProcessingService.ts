@@ -23,22 +23,54 @@ export async function processRecommendationsOnServer(
       `[serverProcessingService] 🚀 Sending ${recommendations.length} recommendations to server for processing`,
     );
 
-    // Call the Netlify function to process recommendations
-    const response = await fetch(
-      "/.netlify/functions/process-recommendations",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ recommendations }),
-      },
+    console.log(
+      `[serverProcessingService] 📡 CALLING NETLIFY FUNCTION with ${recommendations.length} recommendations`,
     );
+    console.log(
+      `[serverProcessingService] 📊 FIRST RECOMMENDATION:`,
+      JSON.stringify(recommendations[0]),
+    );
+
+    // Call the Netlify function to process recommendations
+    try {
+      console.log(
+        `[serverProcessingService] 🔄 FETCH STARTING at ${new Date().toISOString()}`,
+      );
+      const response = await fetch(
+        "/.netlify/functions/process-recommendations",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ recommendations }),
+        },
+      );
+      console.log(
+        `[serverProcessingService] ✅ FETCH COMPLETED with status: ${response.status}`,
+      );
+    } catch (fetchError) {
+      console.error(`[serverProcessingService] ❌ FETCH ERROR:`, fetchError);
+      throw fetchError;
+    }
 
     if (!response.ok) {
       console.error(
         `[serverProcessingService] ❌ Server returned error: ${response.status} ${response.statusText}`,
       );
+
+      // Try to get more error details
+      try {
+        const errorText = await response.text();
+        console.error(
+          `[serverProcessingService] ❌ Error response body: ${errorText}`,
+        );
+      } catch (textError) {
+        console.error(
+          `[serverProcessingService] ❌ Could not read error response: ${textError}`,
+        );
+      }
+
       throw new Error(`Server returned status: ${response.status}`);
     }
 

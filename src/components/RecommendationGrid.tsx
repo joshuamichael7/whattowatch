@@ -99,6 +99,33 @@ const RecommendationGrid = ({
       recommendations.map((rec) => ({ id: rec.id, title: rec.title })),
     );
 
+    // Test the debug-log function to verify Netlify functions are working
+    if (recommendations && recommendations.length > 0) {
+      console.log(`[RecommendationGrid] 🧪 Testing debug-log Netlify function`);
+      fetch("/.netlify/functions/debug-log", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: "Test from RecommendationGrid",
+          data: { recommendationCount: recommendations.length },
+        }),
+      })
+        .then((response) => {
+          console.log(
+            `[RecommendationGrid] 🧪 Debug-log test response status: ${response.status}`,
+          );
+          return response.json();
+        })
+        .then((data) => {
+          console.log(`[RecommendationGrid] 🧪 Debug-log test response:`, data);
+        })
+        .catch((error) => {
+          console.error(`[RecommendationGrid] 🧪 Debug-log test error:`, error);
+        });
+    }
+
     // CRITICAL: Store recommendations for processing immediately when they're received
     if (recommendations && recommendations.length > 0) {
       console.log(
@@ -118,6 +145,10 @@ const RecommendationGrid = ({
         console.log(
           `[RecommendationGrid] 🔥 SENDING RECOMMENDATIONS TO SERVER FOR PROCESSING`,
         );
+        console.log(
+          `[RecommendationGrid] 📊 RECOMMENDATIONS DATA:`,
+          JSON.stringify(recommendations.slice(0, 2)),
+        );
         import("@/services/serverProcessingService")
           .then((serverService) => {
             console.log(
@@ -125,6 +156,9 @@ const RecommendationGrid = ({
             );
 
             // Call the server processing function
+            console.log(
+              `[RecommendationGrid] 🚀 ABOUT TO CALL processRecommendationsOnServer with ${recommendations.length} recommendations`,
+            );
             return serverService.processRecommendationsOnServer(
               recommendations,
             );
