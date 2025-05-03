@@ -262,6 +262,11 @@ export const processRecommendation = async (
   rec: any,
   retryCount: number = 0,
 ): Promise<ContentItem | null> => {
+  console.log(
+    `%c[RecommendationProcessingService] 🔄 PROCESSING RECOMMENDATION: ${rec.title}`,
+    "background: #ff9800; color: #000; padding: 4px; border-radius: 2px; font-weight: bold; font-size: 14px;",
+  );
+
   // CRITICAL: Add more visible logging
   console.log(
     `%c[RecommendationProcessingService] 🔄 processRecommendation CALLED for ${rec.title} at ${new Date().toISOString()}`,
@@ -416,7 +421,8 @@ export const processRecommendation = async (
       const endTime = new Date();
       const processingTime = (endTime.getTime() - startTime.getTime()) / 1000;
       console.log(
-        `[RecommendationProcessingService] ✅ SUCCESSFULLY PROCESSED: ${rec.title} in ${processingTime.toFixed(2)}s`,
+        `%c[RecommendationProcessingService] ✅ SUCCESSFULLY PROCESSED: ${rec.title} in ${processingTime.toFixed(2)}s`,
+        "background: #4CAF50; color: #fff; padding: 4px; border-radius: 2px; font-weight: bold; font-size: 14px;",
       );
       // Preserve the original recommendation reason if it exists
       if (rec.recommendationReason || rec.reason) {
@@ -509,8 +515,8 @@ export const processRecommendation = async (
     return null;
   } catch (error) {
     console.error(
-      `[RecommendationProcessingService] Error processing recommendation ${rec.title}:`,
-      error,
+      `%c[RecommendationProcessingService] ❌ ERROR processing recommendation ${rec.title}: ${error.message}`,
+      "background: #f44336; color: #fff; padding: 4px; border-radius: 2px; font-weight: bold; font-size: 14px;",
     );
 
     // For non-retryable errors, store a minimal version to prevent repeated processing attempts
@@ -560,10 +566,27 @@ import {
  * and includes improved error handling and Supabase caching
  */
 export const startBackgroundProcessing = async () => {
+  // CRITICAL: Add highly visible logging
   console.log(
-    `%c[RecommendationProcessingService] 🔄 STARTING BACKGROUND PROCESSING at ${new Date().toISOString()}`,
-    "background: #4caf50; color: #fff; padding: 2px 4px; border-radius: 2px; font-weight: bold;",
+    `%c[RecommendationProcessingService] 🚀 STARTING BACKGROUND PROCESSING at ${new Date().toISOString()}`,
+    "background: #4caf50; color: #fff; padding: 4px; border-radius: 2px; font-weight: bold; font-size: 16px;",
   );
+
+  // Store a log entry in localStorage for debugging
+  try {
+    const logs = JSON.parse(
+      localStorage.getItem("backgroundProcessingLogs") || "[]",
+    );
+    logs.unshift({
+      timestamp: new Date().toISOString(),
+      message: "Background processing started",
+      type: "info",
+    });
+    if (logs.length > 100) logs.length = 100;
+    localStorage.setItem("backgroundProcessingLogs", JSON.stringify(logs));
+  } catch (err) {
+    console.error("Error storing log in localStorage:", err);
+  }
 
   // Log to console for tracking background processing
   const logBackgroundProcessing = (

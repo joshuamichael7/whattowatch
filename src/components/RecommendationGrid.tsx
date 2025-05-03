@@ -278,7 +278,7 @@ const RecommendationGrid = ({
         error,
       );
     });
-  }, [recommendations]);
+  }, [recommendations]); // Keep recommendations dependency to ensure processing runs when recommendations change
 
   useEffect(() => {
     if (userId && userPreferences) {
