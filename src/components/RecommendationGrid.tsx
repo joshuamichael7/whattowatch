@@ -122,18 +122,43 @@ const RecommendationGrid = ({
             console.error(
               `CRITICAL: IMPORT SUCCESSFUL, CALLING processRecommendation DIRECTLY`,
             );
-            // Process the first recommendation immediately as a test
-            if (recommendations.length > 0) {
+            // Process ALL recommendations immediately
+            const processingPromises = recommendations.map((rec) => {
               console.error(
-                `CRITICAL: PROCESSING FIRST RECOMMENDATION: ${recommendations[0].title}`,
+                `CRITICAL: PROCESSING RECOMMENDATION: ${rec.title}`,
               );
-              return service.processRecommendation(recommendations[0]);
-            }
+              return service
+                .processRecommendation(rec)
+                .then((result) => {
+                  console.error(
+                    `CRITICAL: PROCESSED ${rec.title}: ${result ? "SUCCESS" : "FAILED"}`,
+                  );
+                  return result;
+                })
+                .catch((error) => {
+                  console.error(
+                    `CRITICAL: ERROR PROCESSING ${rec.title}:`,
+                    error,
+                  );
+                  return null;
+                });
+            });
+
+            // Wait for all processing to complete
+            return Promise.all(processingPromises);
           })
-          .then((result) => {
+          .then((results) => {
+            const successCount = results.filter(Boolean).length;
             console.error(
-              `CRITICAL: DIRECT PROCESSING RESULT:`,
-              result ? "SUCCESS" : "FAILED",
+              `CRITICAL: PROCESSING COMPLETE - ${successCount}/${recommendations.length} recommendations processed successfully`,
+            );
+
+            // Update the UI with processed recommendations
+            import("@/services/recommendationProcessingService").then(
+              (service) => {
+                const processedRecs = service.getProcessedRecommendations();
+                setProcessedRecommendations({ ...processedRecs });
+              },
             );
           })
           .catch((error) => {
