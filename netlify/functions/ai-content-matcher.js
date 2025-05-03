@@ -98,14 +98,14 @@ ${omdbResults
   .map(
     (result, index) => `
 Result ${index + 1}:
-Title: ${result.title}
-Year: ${result.year}
-Type: ${result.type}
-IMDB ID: ${result.imdbID}
-Plot: ${result.plot || "No plot available"}
-Actors: ${result.actors || "No actors listed"}
-Director: ${result.director || "No director listed"}
-Genre: ${result.genre || "No genre listed"}
+Title: ${result.title || result.Title}
+Year: ${result.year || result.Year}
+Type: ${result.type || result.Type}
+IMDB ID: ${result.imdbID || result.imdb_id}
+Plot: ${result.plot || result.Plot || "No plot available"}
+Actors: ${result.actors || result.Actors || "No actors listed"}
+Director: ${result.director || result.Director || "No director listed"}
+Genre: ${result.genre || result.Genre || "No genre listed"}
 `,
   )
   .join("")}

@@ -122,6 +122,11 @@ export async function matchRecommendationWithOmdbResults(
       },
     };
 
+    // Log the request being sent
+    console.log(
+      "[aiMatchingService] Sending POST request to ai-content-matcher with prompt",
+    );
+
     // Race between the actual request and the timeout
     const response = await Promise.race([
       axios.post("/.netlify/functions/ai-content-matcher", prompt, axiosConfig),
@@ -129,7 +134,7 @@ export async function matchRecommendationWithOmdbResults(
     ]);
     console.log(
       "[aiMatchingService] Received response from AI content matcher:",
-      response.data,
+      JSON.stringify(response.data),
     );
 
     if (response.data && response.data.matchedResult) {
