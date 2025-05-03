@@ -466,10 +466,19 @@ export async function getPersonalizedRecommendations(
         synopsis: item.synopsis || "No synopsis available",
         reason: item.reason,
         recommendationReason: item.recommendationReason,
+        contentRating: item.contentRating || item.content_rating,
       });
 
       // Make sure we capture the synopsis from the AI recommendation
       const synopsis = item.synopsis || "";
+
+      // Determine content rating - for TV shows, default to TV-14 if not specified
+      // This helps with filtering when the API doesn't return content ratings
+      let contentRating = item.contentRating || item.content_rating;
+      if (!contentRating && item.type === "tv") {
+        // Default TV shows to TV-14 unless explicitly rated otherwise
+        contentRating = "TV-14";
+      }
 
       rawRecommendations.push({
         id: item.title, // Use title as ID since we don't have IMDB ID yet
@@ -488,6 +497,8 @@ export async function getPersonalizedRecommendations(
         type: item.type || "movie",
         rating: item.rating || "0",
         poster: item.poster || "",
+        contentRating: contentRating,
+        content_rating: contentRating,
       });
 
       // Stop once we have enough recommendations

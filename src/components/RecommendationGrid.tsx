@@ -212,6 +212,8 @@ const RecommendationGrid = ({
                     genre_strings: item.genres || [],
                     year: item.year,
                     imdb_id: item.imdb_id,
+                    content_rating: item.content_rating || item.contentRating,
+                    contentRating: item.contentRating || item.content_rating,
                   };
                 }
                 return acc;
@@ -236,7 +238,19 @@ const RecommendationGrid = ({
 
           // Load any previously processed recommendations
           const processedRecs = service.getProcessedRecommendations();
-          setProcessedRecommendations(processedRecs);
+
+          // Make sure content ratings are properly set in processed recommendations
+          const updatedProcessedRecs = { ...processedRecs };
+          Object.keys(updatedProcessedRecs).forEach((id) => {
+            const item = updatedProcessedRecs[id];
+            if (item.content_rating && !item.contentRating) {
+              item.contentRating = item.content_rating;
+            } else if (item.contentRating && !item.content_rating) {
+              item.content_rating = item.contentRating;
+            }
+          });
+
+          setProcessedRecommendations(updatedProcessedRecs);
         } catch (error) {
           console.error("[RecommendationGrid] Error checking cache:", error);
 
@@ -276,13 +290,31 @@ const RecommendationGrid = ({
 
       // Filter recommendations based on content rating
       const filtered = recommendations.filter((rec) => {
-        const rating = rec.contentRating || rec.content_rating;
+        // Check both in the original recommendation and in processed recommendations
+        const originalRating = rec.contentRating || rec.content_rating;
+        const processedRating =
+          rec.id && processedRecommendations[rec.id]
+            ? processedRecommendations[rec.id].contentRating ||
+              processedRecommendations[rec.id].content_rating
+            : null;
+
+        const rating = processedRating || originalRating;
 
         // If no rating is available, include the recommendation
         if (!rating) return true;
 
+        // Log the rating for debugging
+        console.log(`Content rating for ${rec.title}: ${rating}`);
+
         // Check if the rating is in the accepted ratings list
-        return userContentFilters.acceptedRatings?.includes(rating);
+        const isAccepted = userContentFilters.acceptedRatings?.includes(rating);
+
+        // If not accepted, log it
+        if (!isAccepted) {
+          console.log(`Filtering out "${rec.title}" with rating ${rating}`);
+        }
+
+        return isAccepted;
       });
 
       console.log(
@@ -299,7 +331,14 @@ const RecommendationGrid = ({
       console.log(`Loading recommendations for user ${userId}`);
       console.log("User preferences:", userPreferences);
     }
-  }, [recommendations, profile, contentFilterOptions, userId, userPreferences]);
+  }, [
+    recommendations,
+    profile,
+    contentFilterOptions,
+    userId,
+    userPreferences,
+    processedRecommendations,
+  ]);
 
   const handleFilterApply = () => {
     onFilterChange({
