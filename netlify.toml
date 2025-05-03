@@ -1,6 +1,6 @@
 # Netlify configuration file
 [build]
-  command = "npm install @rollup/rollup-linux-x64-gnu @rollup/rollup-linux-x64-musl --no-save && npm run build-no-errors"
+  command = "npm install @rollup/rollup-linux-x64-gnu --no-save && npm run build-no-errors"
   publish = "dist"
   functions = "netlify/functions"
 
