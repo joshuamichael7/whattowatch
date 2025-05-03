@@ -1,29 +1,25 @@
 # Netlify configuration file
+
 [build]
-  command = "npm install @rollup/rollup-linux-x64-gnu --no-save && npm run build-no-errors"
+  command = "npm run build"
   publish = "dist"
-  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "18"
-  NPM_FLAGS = "--no-optional"
 
-[dev]
-  command = "npm run dev"
-  port = 3000
-  targetPort = 5173
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = true
 
-# Cache control for static assets
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+# Disable chunking for Radix UI compatibility
+[build.processing.js]
+  bundle = false
 
 # Edge functions configuration
-[[edge_functions]]
-  path = "/api/omdb/*"
-  function = "omdb-edge"
+[functions]
+  directory = "netlify/functions"
 
-[[edge_functions]]
-  path = "/api/test"
-  function = "test-edge"
+[functions."omdb-edge"]
+  path = "netlify/edge-functions/omdb-edge.js"
