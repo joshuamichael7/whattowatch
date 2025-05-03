@@ -439,8 +439,17 @@ export async function verifyRecommendationWithOmdb(
         console.log(
           `[verifyRecommendationWithOmdb] Trying direct IMDB ID lookup: ${imdbId}`,
         );
-        const response = await fetch(
-          `/.netlify/functions/omdb?i=${imdbId}&plot=full`,
+        console.log(`[aiMatchingService] Looking up IMDB ID: ${imdbId}`);
+        const response = await fetch(`/.netlify/functions/omdb`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ i: imdbId, plot: "full" }),
+        });
+        console.log(
+          `[aiMatchingService] IMDB lookup response status: ${response.status}`,
         );
 
         if (!response.ok) {

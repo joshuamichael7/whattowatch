@@ -26,6 +26,7 @@ async function validateRecommendationByTitleOnly(
     let searchQuery = title;
 
     // Search by title
+    console.log(`[aiService] Searching OMDB for title: ${searchQuery}`);
     const response = await fetch(`/.netlify/functions/omdb`, {
       method: "POST",
       headers: {
@@ -34,6 +35,8 @@ async function validateRecommendationByTitleOnly(
       },
       body: JSON.stringify({ s: searchQuery }),
     });
+    console.log(`[aiService] OMDB search response status: ${response.status}`);
+
     if (!response.ok) {
       console.error(
         `[validateRecommendationByTitleOnly] Error searching by title: ${response.status}`,
@@ -172,7 +175,8 @@ export async function getSimilarContentTitles(
 
       try {
         // Search OMDB for potential matches
-        const searchResponse = await fetch(`/.netlify/functions/omdb`, {
+        console.log(`[aiService] Looking up IMDB ID: ${item.title}`);
+        const response = await fetch(`/.netlify/functions/omdb`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -180,9 +184,13 @@ export async function getSimilarContentTitles(
           },
           body: JSON.stringify({ s: item.title }),
         });
-        if (!searchResponse.ok) {
+        console.log(
+          `[aiService] IMDB lookup response status: ${response.status}`,
+        );
+
+        if (!response.ok) {
           console.error(
-            `[getSimilarContentTitles] OMDB search failed for "${item.title}": ${searchResponse.status}`,
+            `[getSimilarContentTitles] OMDB search failed for "${item.title}": ${response.status}`,
           );
           continue;
         }
