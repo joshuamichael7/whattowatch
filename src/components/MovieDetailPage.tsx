@@ -116,6 +116,20 @@ const MovieDetailPage = () => {
             locationState.recommendation.recommendationReason;
         }
 
+        // Add content rating from original recommendation if available and if OMDB doesn't have one
+        if (
+          (locationState?.recommendation?.contentRating ||
+            locationState?.recommendation?.content_rating) &&
+          !contentDetails.content_rating &&
+          !contentDetails.Rated
+        ) {
+          contentDetails.content_rating =
+            locationState.recommendation.contentRating ||
+            locationState.recommendation.content_rating;
+          // Also set contentRating for consistency
+          contentDetails.contentRating = contentDetails.content_rating;
+        }
+
         // Add synopsis from original recommendation if available and if OMDB doesn't have one
         if (
           (locationState?.recommendation?.synopsis ||
@@ -298,6 +312,20 @@ const MovieDetailPage = () => {
             const storedProcessed =
               localStorage.getItem("processedRecommendations") || "{}";
             const processedItems = JSON.parse(storedProcessed);
+
+            // Ensure content_rating and contentRating are both set for consistency
+            if (
+              processedContent.content_rating &&
+              !processedContent.contentRating
+            ) {
+              processedContent.contentRating = processedContent.content_rating;
+            } else if (
+              processedContent.contentRating &&
+              !processedContent.content_rating
+            ) {
+              processedContent.contentRating = processedContent.contentRating;
+            }
+
             processedItems[id] = processedContent;
             localStorage.setItem(
               "processedRecommendations",
@@ -336,6 +364,16 @@ const MovieDetailPage = () => {
               setMovie(matchedItem);
 
               // Set verification status based on stored data
+              // Ensure content_rating and contentRating are both set for consistency
+              if (matchedItem.content_rating && !matchedItem.contentRating) {
+                matchedItem.contentRating = matchedItem.content_rating;
+              } else if (
+                matchedItem.contentRating &&
+                !matchedItem.content_rating
+              ) {
+                matchedItem.contentRating = matchedItem.contentRating;
+              }
+
               if (matchedItem.aiRecommended) {
                 setVerificationStatus(
                   matchedItem.verified
@@ -450,6 +488,9 @@ const MovieDetailPage = () => {
               year: locationRecommendation.year,
               aiRecommended: true,
             };
+
+            // Also set contentRating for consistency
+            movieFromRec.contentRating = movieFromRec.content_rating;
 
             setMovie(movieFromRec);
             setVerificationStatus(
@@ -859,8 +900,10 @@ const MovieDetailPage = () => {
                 <Film className="mr-1 h-3 w-3" />
                 {movie.media_type === "movie" ? "Movie" : "TV Show"}
               </Badge>
-              {movie.content_rating && (
-                <Badge variant="secondary">{movie.content_rating}</Badge>
+              {(movie.content_rating || movie.Rated || movie.contentRating) && (
+                <Badge variant="secondary">
+                  {movie.content_rating || movie.Rated || movie.contentRating}
+                </Badge>
               )}
               {movie.aiRecommended && (
                 <Badge variant="secondary" className="ml-2 bg-primary/20">

@@ -43,6 +43,8 @@ import { getContentById } from "@/lib/omdbClient";
 import { ContentItem, genreMap } from "@/types/omdb";
 import UserFeedbackButton from "./UserFeedbackButton";
 import WatchlistButton from "./WatchlistButton";
+import { ContentFilterOptions } from "./ContentFilters";
+import { useAuth } from "@/contexts/AuthContext";
 // Recommendation processing is now handled by the dedicated service
 // import { verifyRecommendationWithOmdb } from "@/services/aiService";
 
@@ -78,6 +80,7 @@ interface RecommendationGridProps {
   onFeedbackSubmit?: (itemId: string, isPositive: boolean) => void;
   userId?: string;
   userPreferences?: any;
+  contentFilterOptions?: ContentFilterOptions;
 }
 
 const RecommendationGrid = ({
@@ -88,11 +91,16 @@ const RecommendationGrid = ({
   onFeedbackSubmit = () => {},
   userId,
   userPreferences,
+  contentFilterOptions,
 }: RecommendationGridProps) => {
+  // Get user profile from AuthContext to access content rating preferences
+  const { profile } = useAuth();
   const [selectedItem, setSelectedItem] = useState<RecommendationItem | null>(
     null,
   );
   const [loadedItems, setLoadedItems] =
+    useState<RecommendationItem[]>(recommendations);
+  const [filteredRecommendations, setFilteredRecommendations] =
     useState<RecommendationItem[]>(recommendations);
   const [sortBy, setSortBy] = useState("relevance");
   const [filterVisible, setFilterVisible] = useState(false);
@@ -250,15 +258,48 @@ const RecommendationGrid = ({
     // even if the component unmounts
   }, [recommendations, typeFilter, ratingFilter, yearFilter, userId]);
 
+  // Filter recommendations based on content rating preferences
   useEffect(() => {
+    if (!recommendations || recommendations.length === 0) return;
+
+    // Get content rating preferences from user profile or passed contentFilterOptions
+    const userContentFilters = profile?.content_filters || contentFilterOptions;
+
+    if (
+      userContentFilters?.acceptedRatings &&
+      userContentFilters.acceptedRatings.length > 0
+    ) {
+      console.log(
+        "Filtering by accepted ratings:",
+        userContentFilters.acceptedRatings,
+      );
+
+      // Filter recommendations based on content rating
+      const filtered = recommendations.filter((rec) => {
+        const rating = rec.contentRating || rec.content_rating;
+
+        // If no rating is available, include the recommendation
+        if (!rating) return true;
+
+        // Check if the rating is in the accepted ratings list
+        return userContentFilters.acceptedRatings?.includes(rating);
+      });
+
+      console.log(
+        `Filtered ${recommendations.length - filtered.length} items based on content rating`,
+      );
+      setFilteredRecommendations(filtered);
+    } else {
+      // If no content rating preferences, use all recommendations
+      setFilteredRecommendations(recommendations);
+    }
+
+    // Additional user preferences handling
     if (userId && userPreferences) {
       console.log(`Loading recommendations for user ${userId}`);
       console.log("User preferences:", userPreferences);
-
-      // Here you would typically fetch personalized recommendations
-      // based on the user's preferences
     }
-  }, [userId, userPreferences]);
+  }, [recommendations, profile, contentFilterOptions, userId, userPreferences]);
 
   const handleFilterApply = () => {
     onFilterChange({
@@ -412,7 +453,7 @@ const RecommendationGrid = ({
         </div>
       )}
 
-      {recommendations.length === 0 ? (
+      {filteredRecommendations.length === 0 ? (
         <div className="text-center py-12">
           <h3 className="text-xl font-medium mb-2 font-heading">
             No recommendations found
@@ -423,21 +464,61 @@ const RecommendationGrid = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 font-body">
-          {recommendations.map((rec) => (
+          {filteredRecommendations.map((rec) => (
             <Card
               key={rec.id || rec.title} // Use title as fallback if id is null
               className="overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow"
             >
               <Link
-                to={`/${rec.type}/${rec.imdb_id || encodeURIComponent(rec.title)}`}
+                to={`/${rec.type}/${processedRecommendations[rec.id]?.imdb_id || rec.imdb_id || encodeURIComponent(processedRecommendations[rec.id]?.title || rec.title)}`}
                 className="flex flex-col h-full"
                 state={{
                   recommendation: {
                     ...rec,
-                    imdb_url: rec.imdb_url,
-                    synopsis: rec.synopsis,
-                    overview: rec.overview,
+                    title: processedRecommendations[rec.id]?.title || rec.title,
+                    imdb_id:
+                      processedRecommendations[rec.id]?.imdb_id || rec.imdb_id,
+                    imdb_url:
+                      processedRecommendations[rec.id]?.imdb_url ||
+                      rec.imdb_url,
+                    synopsis:
+                      processedRecommendations[rec.id]?.synopsis ||
+                      rec.synopsis ||
+                      processedRecommendations[rec.id]?.overview ||
+                      rec.overview,
+                    overview:
+                      processedRecommendations[rec.id]?.overview ||
+                      rec.overview ||
+                      processedRecommendations[rec.id]?.synopsis ||
+                      rec.synopsis,
                     reason: rec.reason || rec.recommendationReason,
+                    poster_path:
+                      processedRecommendations[rec.id]?.poster_path ||
+                      rec.poster_path ||
+                      rec.poster,
+                    media_type:
+                      processedRecommendations[rec.id]?.media_type || rec.type,
+                    vote_average:
+                      processedRecommendations[rec.id]?.vote_average ||
+                      rec.rating ||
+                      0,
+                    genre_ids:
+                      processedRecommendations[rec.id]?.genre_ids || [],
+                    genre_strings:
+                      processedRecommendations[rec.id]?.genre_strings ||
+                      rec.genres,
+                    content_rating:
+                      processedRecommendations[rec.id]?.content_rating ||
+                      rec.contentRating ||
+                      rec.content_rating,
+                    contentRating:
+                      processedRecommendations[rec.id]?.contentRating ||
+                      processedRecommendations[rec.id]?.content_rating ||
+                      rec.contentRating ||
+                      rec.content_rating,
+                    year: processedRecommendations[rec.id]?.year || rec.year,
+                    verified:
+                      processedRecommendations[rec.id]?.verified || false,
                   },
                   processedContent: processedRecommendations[rec.id],
                   fromRecommendations: true,
@@ -477,10 +558,12 @@ const RecommendationGrid = ({
 
                 <CardHeader className="p-3 pb-0">
                   <CardTitle className="text-base line-clamp-1 font-heading">
-                    {rec.title}
+                    {processedRecommendations[rec.id]?.title || rec.title}
                   </CardTitle>
                   <CardDescription className="flex items-center gap-2">
-                    <span>{rec.year}</span>
+                    <span>
+                      {processedRecommendations[rec.id]?.year || rec.year}
+                    </span>
                     {rec.rating > 0 && (
                       <span className="flex items-center">
                         <Star
@@ -495,7 +578,37 @@ const RecommendationGrid = ({
 
                 <CardContent className="p-3 pt-2 flex-grow">
                   <div className="flex flex-wrap gap-1 mb-2">
-                    {rec.genres &&
+                    {/* Use processed genres if available */}
+                    {processedRecommendations[rec.id]?.genre_strings &&
+                      Array.isArray(
+                        processedRecommendations[rec.id].genre_strings,
+                      ) &&
+                      processedRecommendations[rec.id].genre_strings
+                        .slice(0, 2)
+                        .map((genre) => (
+                          <Badge
+                            key={genre}
+                            variant="outline"
+                            className="text-xs"
+                          >
+                            {genre}
+                          </Badge>
+                        ))}
+                    {processedRecommendations[rec.id]?.genre_strings &&
+                      Array.isArray(
+                        processedRecommendations[rec.id].genre_strings,
+                      ) &&
+                      processedRecommendations[rec.id].genre_strings.length >
+                        2 && (
+                        <Badge variant="outline" className="text-xs">
+                          +
+                          {processedRecommendations[rec.id].genre_strings
+                            .length - 2}
+                        </Badge>
+                      )}
+                    {/* Fallback to original genres if processed not available */}
+                    {!processedRecommendations[rec.id]?.genre_strings &&
+                      rec.genres &&
                       Array.isArray(rec.genres) &&
                       rec.genres.slice(0, 2).map((genre) => (
                         <Badge
@@ -506,7 +619,8 @@ const RecommendationGrid = ({
                           {genre}
                         </Badge>
                       ))}
-                    {rec.genres &&
+                    {!processedRecommendations[rec.id]?.genre_strings &&
+                      rec.genres &&
                       Array.isArray(rec.genres) &&
                       rec.genres.length > 2 && (
                         <Badge variant="outline" className="text-xs">
@@ -515,16 +629,21 @@ const RecommendationGrid = ({
                       )}
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">
-                    {rec.synopsis || rec.overview || "No synopsis available"}
+                    {processedRecommendations[rec.id]?.overview ||
+                      rec.synopsis ||
+                      rec.overview ||
+                      "No synopsis available"}
                   </p>
                   <p className="text-xs text-primary-foreground mt-1 bg-primary/10 p-1 rounded line-clamp-2 font-medium">
                     {rec.recommendationReason ||
                       rec.reason ||
                       "Matches your preferences"}
                   </p>
-                  {rec.imdb_id && (
+                  {(processedRecommendations[rec.id]?.imdb_id ||
+                    rec.imdb_id) && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      IMDB: {rec.imdb_id}
+                      IMDB:{" "}
+                      {processedRecommendations[rec.id]?.imdb_id || rec.imdb_id}
                     </p>
                   )}
                 </CardContent>
@@ -687,11 +806,90 @@ const RecommendationGrid = ({
                                 asChild
                               >
                                 <Link
-                                  to={`/${selectedItem.type}/${selectedItem.imdb_id || selectedItem.id || encodeURIComponent(selectedItem.title)}`}
+                                  to={`/${selectedItem.type}/${processedRecommendations[selectedItem.id]?.imdb_id || selectedItem.imdb_id || selectedItem.id || encodeURIComponent(processedRecommendations[selectedItem.id]?.title || selectedItem.title)}`}
                                   state={{
                                     recommendation: {
                                       ...selectedItem,
-                                      imdb_url: selectedItem.imdb_url, // Ensure imdb_url is passed in state
+                                      title:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.title || selectedItem.title,
+                                      imdb_id:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.imdb_id || selectedItem.imdb_id,
+                                      imdb_url:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.imdb_url || selectedItem.imdb_url,
+                                      synopsis:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.synopsis ||
+                                        selectedItem.synopsis ||
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.overview ||
+                                        selectedItem.overview,
+                                      overview:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.overview ||
+                                        selectedItem.overview ||
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.synopsis ||
+                                        selectedItem.synopsis,
+                                      reason:
+                                        selectedItem.reason ||
+                                        selectedItem.recommendationReason,
+                                      poster_path:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.poster_path ||
+                                        selectedItem.poster_path ||
+                                        selectedItem.poster,
+                                      media_type:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.media_type || selectedItem.type,
+                                      vote_average:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.vote_average ||
+                                        selectedItem.rating ||
+                                        0,
+                                      genre_ids:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.genre_ids || [],
+                                      genre_strings:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.genre_strings || selectedItem.genres,
+                                      content_rating:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.content_rating ||
+                                        selectedItem.contentRating ||
+                                        selectedItem.content_rating,
+                                      contentRating:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.contentRating ||
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.content_rating ||
+                                        selectedItem.contentRating ||
+                                        selectedItem.content_rating,
+                                      year:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.year || selectedItem.year,
+                                      verified:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.verified || false,
                                     },
                                     processedContent:
                                       processedRecommendations[selectedItem.id],
