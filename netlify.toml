@@ -1,27 +1,30 @@
-# netlify.toml
+# Netlify configuration file
+
 [build]
+  command = "npm run build-no-errors"
   publish = "dist"
-  command = "npm run build"
+  functions = "netlify/functions"
 
-[functions]
-  directory = "netlify/functions"
-  node_bundler = "esbuild"
+[build.environment]
+  NODE_VERSION = "18"
+  NPM_FLAGS = "--no-optional"
 
-# Redirect for the API
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
+[dev]
+  command = "npm run dev"
+  port = 3000
+  targetPort = 5173
 
-# Redirect for SPA
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# Cache control for static assets
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
 
-# Define the background function with a longer timeout
-[functions.tmdb-background-import]
-  included_files = ["src/**", "netlify/functions/**"]
-  external_node_modules = ["axios", "@supabase/supabase-js"]
-  background = true
-  timeout = 900 # 15 minutes in seconds
+# Edge functions configuration
+[[edge_functions]]
+  path = "/api/omdb/*"
+  function = "omdb-edge"
+
+[[edge_functions]]
+  path = "/api/test"
+  function = "test-edge"

@@ -1,5 +1,18 @@
 // Simple test edge function to verify edge functions are working
 export default async (request, context) => {
+  // Handle OPTIONS requests for CORS
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
+  }
+
   try {
     // Get environment variables - handle missing context.env
     const netlifyEnv =
@@ -14,19 +27,22 @@ export default async (request, context) => {
       process.env.OMDB_API_KEY ||
       (context && context.env ? context.env.get("OMDB_API_KEY") : null);
 
-    // Test OMDB API with hardcoded key
+    // Skip OMDB API test if no key is available
     let omdbTest = "not tested";
-    try {
-      const response = await fetch(
-        `https://www.omdbapi.com/?apikey=${omdbApiKey || ""}&s=inception&type=movie`,
-      );
-      const data = await response.json();
-      omdbTest =
-        data.Response === "True"
-          ? "working"
-          : "error: " + (data.Error || "unknown error");
-    } catch (omdbError) {
-      omdbTest = "error: " + omdbError.message;
+    if (omdbApiKey) {
+      try {
+        const response = await fetch(
+          `https://www.omdbapi.com/?apikey=${omdbApiKey}&s=inception&type=movie`,
+          { cf: { cacheTtl: 3600 } }, // Use Cloudflare's cache when possible
+        );
+        const data = await response.json();
+        omdbTest =
+          data.Response === "True"
+            ? "working"
+            : "error: " + (data.Error || "unknown error");
+      } catch (omdbError) {
+        omdbTest = "error: " + omdbError.message;
+      }
     }
 
     return new Response(
@@ -35,7 +51,6 @@ export default async (request, context) => {
         timestamp: new Date().toISOString(),
         url: request.url,
         method: request.method,
-        headers: Object.fromEntries([...request.headers]),
         env: {
           NETLIFY: netlifyEnv,
           CONTEXT: contextEnv,
@@ -47,6 +62,7 @@ export default async (request, context) => {
         headers: {
           "Content-Type": "application/json",
           "Access-Control-Allow-Origin": "*",
+          "Cache-Control": "public, max-age=60", // Cache for 1 minute
         },
       },
     );
