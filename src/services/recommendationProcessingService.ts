@@ -262,13 +262,19 @@ export const processRecommendation = async (
   rec: any,
   retryCount: number = 0,
 ): Promise<ContentItem | null> => {
-  console.log(
+  // CRITICAL: Use window.console.log and console.error to ensure visibility
+  window.console.log(
     `%c[RecommendationProcessingService] 🔄 PROCESSING RECOMMENDATION: ${rec.title}`,
     "background: #ff9800; color: #000; padding: 4px; border-radius: 2px; font-weight: bold; font-size: 14px;",
   );
 
+  // Also log to console.error to ensure visibility
+  console.error(
+    `[RecommendationProcessingService] 🔄 PROCESSING RECOMMENDATION: ${rec.title} at ${new Date().toISOString()}`,
+  );
+
   // CRITICAL: Add more visible logging
-  console.log(
+  window.console.log(
     `%c[RecommendationProcessingService] 🔄 processRecommendation CALLED for ${rec.title} at ${new Date().toISOString()}`,
     "background: #ff9800; color: #000; padding: 2px 4px; border-radius: 2px; font-weight: bold;",
   );
@@ -566,10 +572,15 @@ import {
  * and includes improved error handling and Supabase caching
  */
 export const startBackgroundProcessing = async () => {
-  // CRITICAL: Add highly visible logging
-  console.log(
+  // CRITICAL: Add highly visible logging with window.console to ensure it's not overridden
+  window.console.log(
     `%c[RecommendationProcessingService] 🚀 STARTING BACKGROUND PROCESSING at ${new Date().toISOString()}`,
     "background: #4caf50; color: #fff; padding: 4px; border-radius: 2px; font-weight: bold; font-size: 16px;",
+  );
+
+  // Also log to console.error to ensure visibility
+  console.error(
+    `[RecommendationProcessingService] 🚀 STARTING BACKGROUND PROCESSING at ${new Date().toISOString()}`,
   );
 
   // Store a log entry in localStorage for debugging
