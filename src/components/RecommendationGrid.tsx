@@ -223,14 +223,8 @@ const RecommendationGrid = ({
             );
 
             console.log(
-              "[DEBUG] Pre-verified content items with ratings:",
-              Object.values(preVerifiedContentItems).map((item) => ({
-                title: item.title,
-                contentRating:
-                  item.contentRating || item.content_rating || "NO_RATING",
-                id: item.id,
-                imdb_id: item.imdb_id,
-              })),
+              "Pre-verified content items with ratings:",
+              Object.values(preVerifiedContentItems).length,
             );
 
             setProcessedRecommendations(preVerifiedContentItems);
@@ -251,14 +245,8 @@ const RecommendationGrid = ({
           // Load any previously processed recommendations
           const processedRecs = service.getProcessedRecommendations();
           console.log(
-            "[DEBUG] Processed recommendations from service:",
-            Object.values(processedRecs).map((item) => ({
-              title: item.title,
-              contentRating:
-                item.contentRating || item.content_rating || "NO_RATING",
-              id: item.id,
-              imdb_id: item.imdb_id,
-            })),
+            "Processed recommendations from service:",
+            Object.values(processedRecs).length,
           );
           setProcessedRecommendations(processedRecs);
         } catch (error) {
@@ -289,43 +277,22 @@ const RecommendationGrid = ({
     // Get content rating preferences from user profile or passed contentFilterOptions
     const userContentFilters = profile?.content_filters || contentFilterOptions;
 
-    console.log("[DEBUG] Content filtering - User profile:", profile);
-    console.log(
-      "[DEBUG] Content filtering - Content filter options:",
-      contentFilterOptions,
-    );
-    console.log(
-      "[DEBUG] Content filtering - Using filters:",
-      userContentFilters,
-    );
-
     if (
       userContentFilters?.acceptedRatings &&
       userContentFilters.acceptedRatings.length > 0
     ) {
       console.log(
-        "[DEBUG] Filtering by accepted ratings:",
+        "Content filtering - Using accepted ratings:",
         userContentFilters.acceptedRatings,
-      );
-
-      // Log all recommendations with their content ratings before filtering
-      console.log(
-        "[DEBUG] All recommendations before filtering:",
-        recommendations.map((rec) => ({
-          title: rec.title,
-          contentRating: rec.contentRating || rec.content_rating || "NO_RATING",
-          id: rec.id,
-          imdb_id: rec.imdb_id,
-        })),
       );
 
       // Filter recommendations based on content rating
       const filtered = recommendations.filter((rec) => {
         const rating = rec.contentRating || rec.content_rating;
 
-        // Log each item's rating check
+        // Simple logging for each item's rating
         console.log(
-          `[DEBUG] Checking ${rec.title} - Rating: ${rating || "NO_RATING"}, Accepted: ${!rating || userContentFilters.acceptedRatings.includes(rating)}`,
+          `Content rating check: ${rec.title} - Rating: ${rating || "NO_RATING"}`,
         );
 
         // If no rating is available, include the recommendation
@@ -336,31 +303,20 @@ const RecommendationGrid = ({
       });
 
       console.log(
-        `[DEBUG] Filtered ${recommendations.length - filtered.length} items based on content rating`,
+        `Filtered ${recommendations.length - filtered.length} items based on content rating`,
       );
-      console.log(
-        "[DEBUG] Filtered recommendations:",
-        filtered.map((rec) => ({
-          title: rec.title,
-          contentRating: rec.contentRating || rec.content_rating || "NO_RATING",
-          id: rec.id,
-          imdb_id: rec.imdb_id,
-        })),
-      );
-
       setFilteredRecommendations(filtered);
     } else {
       // If no content rating preferences, use all recommendations
       console.log(
-        "[DEBUG] No content rating preferences found, using all recommendations",
+        "No content rating preferences found, using all recommendations",
       );
       setFilteredRecommendations(recommendations);
     }
 
     // Additional user preferences handling
     if (userId && userPreferences) {
-      console.log(`[DEBUG] Loading recommendations for user ${userId}`);
-      console.log("[DEBUG] User preferences:", userPreferences);
+      console.log(`Loading recommendations for user ${userId}`);
     }
   }, [recommendations, profile, contentFilterOptions, userId, userPreferences]);
 
@@ -419,22 +375,14 @@ const RecommendationGrid = ({
     );
   }
 
-  // Final check before rendering to ensure content rating filtering is applied
-  console.log("[DEBUG] FINAL CHECK BEFORE RENDERING:");
+  // Simple check before rendering to ensure content rating filtering is applied
   console.log(
-    "[DEBUG] filteredRecommendations:",
-    filteredRecommendations.map((rec) => ({
-      title: rec.title,
-      contentRating: rec.contentRating || rec.content_rating || "NO_RATING",
-      id: rec.id,
-      imdb_id: rec.imdb_id,
-    })),
+    "Content ratings in filtered recommendations:",
+    filteredRecommendations.map(
+      (rec) =>
+        `${rec.title}: ${rec.contentRating || rec.content_rating || "NO_RATING"}`,
+    ),
   );
-  console.log(
-    "[DEBUG] User profile content filters:",
-    profile?.content_filters,
-  );
-  console.log("[DEBUG] Content filter options:", contentFilterOptions);
 
   return (
     <div className="w-full bg-background p-4 md:p-6 font-body">
