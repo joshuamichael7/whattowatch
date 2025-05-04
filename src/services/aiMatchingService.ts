@@ -224,16 +224,6 @@ function convertOmdbToContentItem(
   console.log(`[aiMatchingService] Genres: ${genreStrings.join(", ")}`);
   console.log(`[aiMatchingService] Rating: ${rating}`);
 
-  // Determine the content rating
-  let contentRating =
-    omdbData.Rated !== "N/A" ? omdbData.Rated : omdbData.contentRating || "";
-
-  // For TV shows, if no rating is available, default to TV-14
-  // This helps with filtering when OMDB doesn't return content ratings
-  if (!contentRating && (type === "series" || type === "tv")) {
-    contentRating = "TV-14";
-  }
-
   return {
     id: imdbId,
     imdb_id: imdbId,
@@ -249,7 +239,7 @@ function convertOmdbToContentItem(
     genre_strings: genreStrings,
     overview: plot !== "N/A" ? plot : "",
     plot: plot !== "N/A" ? plot : "", // Add plot explicitly
-    content_rating: contentRating,
+    content_rating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
     year:
       omdbData.Year ||
       (omdbData.release_date
@@ -288,7 +278,8 @@ function convertOmdbToContentItem(
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     poster: omdbData.Poster !== "N/A" ? omdbData.Poster : omdbData.poster || "",
-    contentRating: contentRating,
+    contentRating:
+      omdbData.Rated !== "N/A" ? omdbData.Rated : omdbData.contentRating || "",
     // Add recommendation data from original recommendation
     recommendationReason: originalRecommendation.reason,
     synopsis: originalRecommendation.synopsis || plot,
