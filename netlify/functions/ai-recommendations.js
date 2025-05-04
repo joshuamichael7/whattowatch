@@ -127,6 +127,7 @@ exports.handler = async (event, context) => {
 
   try {
     // Parse the request body
+    const body = JSON.parse(event.body || "{}");
     const {
       preferences,
       mediaType = "movie",
@@ -134,7 +135,9 @@ exports.handler = async (event, context) => {
       apiVersion,
       modelName,
       skipImdbId = false, // New parameter to control whether to request IMDB IDs
-    } = JSON.parse(event.body || "{}");
+    } = body;
+
+    console.log("Received request with body:", JSON.stringify(body, null, 2));
 
     if (!preferences) {
       return {
@@ -142,6 +145,17 @@ exports.handler = async (event, context) => {
         headers,
         body: JSON.stringify({ error: "Missing preferences in request body" }),
       };
+    }
+
+    // Validate preferences structure to avoid errors
+    if (!preferences.genres || !Array.isArray(preferences.genres)) {
+      preferences.genres = [];
+    }
+    if (!preferences.favoriteContent) {
+      preferences.favoriteContent = [];
+    }
+    if (!preferences.contentToAvoid) {
+      preferences.contentToAvoid = [];
     }
 
     // Override config with request parameters if provided
@@ -167,47 +181,58 @@ exports.handler = async (event, context) => {
     const avoidText = Array.isArray(preferences.contentToAvoid)
       ? preferences.contentToAvoid.join(", ")
       : preferences.contentToAvoid || "";
-    const viewingTimeText =
-      preferences.viewingTime < 60
+    const viewingTimeText = preferences.viewingTime
+      ? preferences.viewingTime < 60
         ? `${preferences.viewingTime} minutes`
-        : `${Math.floor(preferences.viewingTime / 60)} hour${preferences.viewingTime >= 120 ? "s" : ""}${preferences.viewingTime % 60 > 0 ? ` ${preferences.viewingTime % 60} minutes` : ""}`;
+        : `${Math.floor(preferences.viewingTime / 60)} hour${preferences.viewingTime >= 120 ? "s" : ""}${preferences.viewingTime % 60 > 0 ? ` ${preferences.viewingTime % 60} minutes` : ""}`
+      : "No specific time limit";
+    const moodText = preferences.mood || "No specific mood";
+    const ageRatingText = preferences.ageRating || "No specific rating";
 
     // Construct the prompt for Gemini
     let prompt = `I need personalized movie and TV show recommendations based on the following preferences:\n\n
     - Preferred genres: ${genresText || "No specific genres"}\n
-    - Current mood: ${preferences.mood}\n
+    - Current mood: ${moodText}\n
     - Available viewing time: ${viewingTimeText}\n
     - Content they've enjoyed: ${favoritesText || "No examples provided"}\n
     - Content they want to avoid: ${avoidText || "No examples provided"}\n
-    - Age/content rating preference: ${preferences.ageRating}\n\n
+    - Age/content rating preference: ${ageRatingText}\n\n
     Please recommend exactly ${limit} movies or TV shows that match these preferences. For each recommendation, provide:\n
     1. The exact title as it appears in IMDB\n
     2. The year of release (just the 4-digit year)\n
-    3. The IMDB ID (in the format tt1234567)\n
-    4. The IMDB URL (in the format https://www.imdb.com/title/tt1234567/)\n
-    5. A brief reason why it matches their preferences (1-2 sentences)\n
-    6. A brief synopsis of the plot (1-2 sentences)\n\n
-    Format your response as a JSON array with title, year, imdb_id, imdb_url, reason, and synopsis properties for each recommendation. Example:\n
+    3. A brief reason why it matches their preferences (1-2 sentences)\n
+    4. A brief synopsis of the plot (1-2 sentences)\n
+    5. The content type (movie or tv)\n\n
+    Format your response as a JSON array with title, year, reason, synopsis, and type properties for each recommendation. Example:\n
     [\n
-      {\"title\": \"The Shawshank Redemption\", \"year\": \"1994\", \"imdb_id\": \"tt0111161\", \"imdb_url\": \"https://www.imdb.com/title/tt0111161/\", \"reason\": \"A powerful drama about hope and redemption that matches your preference for thoughtful storytelling.\", \"synopsis\": \"Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.\"},\n
-      {\"title\": \"Inception\", \"year\": \"2010\", \"imdb_id\": \"tt1375666\", \"imdb_url\": \"https://www.imdb.com/title/tt1375666/\", \"reason\": \"A mind-bending sci-fi thriller that aligns with your interest in complex narratives.\", \"synopsis\": \"A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.\"}\n
+      {\"title\": \"The Shawshank Redemption\", \"year\": \"1994\", \"type\": \"movie\", \"reason\": \"A powerful drama about hope and redemption that matches your preference for thoughtful storytelling.\", \"synopsis\": \"Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.\"},\n
+      {\"title\": \"Inception\", \"year\": \"2010\", \"type\": \"movie\", \"reason\": \"A mind-bending sci-fi thriller that aligns with your interest in complex narratives.\", \"synopsis\": \"A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.\"}\n
     ]\n
     \n
-    ULTRA IMPORTANT: For each recommendation, you MUST search the web to find the correct IMDB page for that exact title and year. Then extract the precise IMDB ID and URL from that page. Do not guess or make up IMDB IDs.
-    
-    CRITICAL: Verify that each IMDB ID actually corresponds to the title you're recommending. Double-check that the title on the IMDB page matches your recommendation exactly.
-    
-    IMPORTANT: Make sure the titles are accurate and match real movies or TV shows. The IMDB ID and URL must be correct and match the actual IMDB entry for the title.\n
+    IMPORTANT: Make sure the titles are accurate and match real movies or TV shows.\n
     Only return the JSON array, no other text.`;
 
-    // We're always skipping IMDB ID requests now, so this block is simplified
-    // The prompt is already set to not request IMDB IDs
+    // We're skipping IMDB ID requests to simplify the response and avoid errors
 
     // Construct the API endpoint URL
     const apiEndpoint = `https://generativelanguage.googleapis.com/${defaultConfig.apiVersion}/models/${defaultConfig.modelName}:generateContent`;
 
     console.log(`Using Gemini API endpoint: ${apiEndpoint}`);
     console.log(`Skip IMDB ID: ${skipImdbId}`);
+
+    // Check if API key is available
+    if (!defaultConfig.apiKey) {
+      console.error("Missing Gemini API key");
+
+      // Return fallback recommendations instead of failing
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          recommendations: getFallbackRecommendations(preferences),
+        }),
+      };
+    }
 
     // Make the API request
     const response = await axios.post(
@@ -243,241 +268,6 @@ exports.handler = async (event, context) => {
     console.log("========== FULL GEMINI API RESPONSE ==========");
     console.log(responseText);
     console.log("==============================================");
-
-    // Extract JSON from the response
-    let extractedJson = null;
-
-    // Try to find JSON array directly - this should be the most common case
-    const jsonArrayMatch = responseText.match(/\[\s*\{[\s\S]*\}\s*\]/s);
-    if (jsonArrayMatch) {
-      extractedJson = jsonArrayMatch[0];
-    }
-
-    // Initialize array for manual extraction results
-    const manualItems = [];
-
-    if (extractedJson) {
-      console.log(
-        `Extracted JSON (first 100 chars): ${extractedJson.substring(0, 100)}...`,
-      );
-
-      try {
-        // Try to parse the extracted JSON
-        let parsedData;
-        try {
-          parsedData = JSON.parse(extractedJson);
-        } catch (initialParseError) {
-          // If parsing fails, try to clean the JSON string
-          console.log(
-            "Initial JSON parsing failed, attempting to clean JSON string",
-          );
-          const cleanedJson = extractedJson
-            .replace(/\\n/g, " ")
-            .replace(/\\r/g, "")
-            .replace(/\\t/g, " ")
-            .replace(/\\'/g, "'")
-            .replace(/\\\\(?!")/g, "\\"); // Keep escape for double quotes
-
-          parsedData = JSON.parse(cleanedJson);
-        }
-
-        // Determine if we have an array or an object with recommendations
-        const recommendations = Array.isArray(parsedData)
-          ? parsedData
-          : parsedData.recommendations;
-
-        if (recommendations && recommendations.length > 0) {
-          console.log(
-            `Successfully parsed ${recommendations.length} recommendations from AI response`,
-          );
-
-          // Return the recommendations directly without validation
-          return {
-            statusCode: 200,
-            headers,
-            body: JSON.stringify({
-              recommendations: recommendations,
-            }),
-          };
-        } else {
-          console.error("No recommendations found in parsed data");
-        }
-      } catch (parseError) {
-        console.error("Error parsing extracted JSON:", parseError);
-      }
-    }
-
-    // If we get here, we couldn't extract valid JSON
-    console.error("No valid JSON found in response text");
-
-    // Try to manually extract recommendations as a last resort
-    try {
-      const lines = responseText.split("\n");
-
-      // First try to extract complete JSON objects
-      let currentObject = "";
-      let inObject = false;
-      let bracketCount = 0;
-
-      // Try to extract the full JSON array first
-      const jsonArrayMatch = responseText.match(/\[\s*\{[\s\S]*\}\s*\]/s);
-      if (jsonArrayMatch) {
-        try {
-          const jsonArray = JSON.parse(jsonArrayMatch[0]);
-          if (Array.isArray(jsonArray) && jsonArray.length > 0) {
-            console.log(`Extracted ${jsonArray.length} items from JSON array`);
-            // Process the array instead of returning it directly
-            for (const item of jsonArray) {
-              if (item.title) {
-                manualItems.push({
-                  title: item.title,
-                  year: item.year || null,
-                  imdb_id: item.imdb_id || null,
-                  director: item.director || null,
-                  actors: item.actors || null,
-                  reason: item.reason || "Matches your preferences",
-                  synopsis: item.synopsis || null,
-                });
-              }
-            }
-            console.log(
-              `Processed ${manualItems.length} items from JSON array`,
-            );
-          }
-        } catch (e) {
-          console.error("Error parsing JSON array:", e);
-        }
-      }
-
-      // If we couldn't extract the full array, try line by line
-      for (const line of lines) {
-        const trimmedLine = line.trim();
-
-        // Count opening and closing braces to track complete objects
-        if (trimmedLine.includes("{")) {
-          if (!inObject) {
-            inObject = true;
-            currentObject = trimmedLine;
-          } else {
-            currentObject += trimmedLine;
-          }
-          bracketCount += (trimmedLine.match(/{/g) || []).length;
-        } else if (trimmedLine.includes("}")) {
-          currentObject += trimmedLine;
-          bracketCount -= (trimmedLine.match(/}/g) || []).length;
-
-          // If brackets are balanced, we have a complete object
-          if (bracketCount === 0 && inObject) {
-            // Clean up the object string - remove any trailing commas
-            let cleanObject = currentObject;
-            if (cleanObject.endsWith(",")) {
-              cleanObject = cleanObject.slice(0, -1);
-            }
-
-            try {
-              // Try to parse as a single object
-              const obj = JSON.parse(cleanObject);
-              if (obj.title) {
-                manualItems.push({
-                  title: obj.title,
-                  year: obj.year || null,
-                  imdb_id: obj.imdb_id || null,
-                  director: obj.director || null,
-                  actors: obj.actors || null,
-                  reason: obj.reason || "Matches your preferences",
-                  synopsis: obj.synopsis || null,
-                });
-              }
-            } catch (e) {
-              // Try to parse as an array
-              try {
-                if (cleanObject.startsWith("[") && cleanObject.endsWith("]")) {
-                  const objArray = JSON.parse(cleanObject);
-                  if (Array.isArray(objArray)) {
-                    for (const item of objArray) {
-                      if (item.title) {
-                        manualItems.push({
-                          title: item.title,
-                          year: item.year || null,
-                          imdb_id: item.imdb_id || null,
-                          director: item.director || null,
-                          actors: item.actors || null,
-                          reason: item.reason || "Matches your preferences",
-                          synopsis: item.synopsis || null,
-                        });
-                      }
-                    }
-                  }
-                }
-              } catch (arrayError) {
-                // Not a valid JSON array either
-              }
-            }
-
-            inObject = false;
-            currentObject = "";
-            bracketCount = 0;
-          }
-        } else if (inObject) {
-          currentObject += trimmedLine;
-        }
-      }
-
-      // If we still couldn't extract objects, fall back to regex matching
-      if (manualItems.length === 0) {
-        console.log("Falling back to regex extraction");
-        for (const line of lines) {
-          // Look for patterns like: {"title": "Movie Name", "year": "2021", "reason": "...", "synopsis": "..."},
-          if (line.includes('"title"')) {
-            const titleMatch = line.match(/"title"\s*:\s*"([^"]+)"/);
-            const yearMatch = line.match(/"year"\s*:\s*"([^"]+)"/);
-            const imdbMatch = line.match(/"imdb_id"\s*:\s*"([^"]+)"/);
-            const directorMatch = line.match(/"director"\s*:\s*"([^"]+)"/);
-            const actorsMatch = line.match(/"actors"\s*:\s*"([^"]+)"/);
-            const reasonMatch = line.match(/"reason"\s*:\s*"([^"]+)"/);
-            const synopsisMatch = line.match(/"synopsis"\s*:\s*"([^"]+)"/);
-
-            if (titleMatch) {
-              manualItems.push({
-                title: titleMatch[1],
-                year: yearMatch ? yearMatch[1] : null,
-                imdb_id: imdbMatch ? imdbMatch[1] : null,
-                director: directorMatch ? directorMatch[1] : null,
-                actors: actorsMatch ? actorsMatch[1] : null,
-                reason: reasonMatch
-                  ? reasonMatch[1]
-                  : "Matches your preferences",
-                synopsis: synopsisMatch ? synopsisMatch[1] : null,
-              });
-            }
-          }
-        }
-      }
-
-      // If we found any items through manual extraction, return them
-      if (manualItems.length > 0) {
-        console.log(`Manually extracted ${manualItems.length} recommendations`);
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({
-            recommendations: manualItems,
-          }),
-        };
-      }
-    } catch (manualError) {
-      console.error("Error during manual extraction:", manualError);
-    }
-
-    // If we get here, we couldn't extract any recommendations
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({
-        error: "No JSON found in response",
-        rawResponse: responseText.substring(0, 500),
-      }),
-    };
   } catch (error) {
     console.error("Error calling Gemini API:", error);
 
@@ -490,4 +280,323 @@ exports.handler = async (event, context) => {
       }),
     };
   }
+
+  // Extract JSON from the response
+  let extractedJson = null;
+
+  // Try to find JSON array directly - this should be the most common case
+  const jsonArrayMatch = responseText.match(/\[\s*\{[\s\S]*\}\s*\]/s);
+  if (jsonArrayMatch) {
+    extractedJson = jsonArrayMatch[0];
+  }
+
+  // Initialize array for manual extraction results
+  const manualItems = [];
+
+  if (extractedJson) {
+    console.log(
+      `Extracted JSON (first 100 chars): ${extractedJson.substring(0, 100)}...`,
+    );
+
+    try {
+      // Try to parse the extracted JSON
+      let parsedData;
+      try {
+        parsedData = JSON.parse(extractedJson);
+      } catch (initialParseError) {
+        // If parsing fails, try to clean the JSON string
+        console.log(
+          "Initial JSON parsing failed, attempting to clean JSON string",
+        );
+        const cleanedJson = extractedJson
+          .replace(/\\n/g, " ")
+          .replace(/\\r/g, "")
+          .replace(/\\t/g, " ")
+          .replace(/\\'/g, "'")
+          .replace(/\\\\(?!")/g, "\\"); // Keep escape for double quotes
+
+        parsedData = JSON.parse(cleanedJson);
+      }
+
+      // Determine if we have an array or an object with recommendations
+      const recommendations = Array.isArray(parsedData)
+        ? parsedData
+        : parsedData.recommendations;
+
+      if (recommendations && recommendations.length > 0) {
+        console.log(
+          `Successfully parsed ${recommendations.length} recommendations from AI response`,
+        );
+
+        // Return the recommendations directly without validation
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify({
+            recommendations: recommendations,
+          }),
+        };
+      } else {
+        console.error("No recommendations found in parsed data");
+      }
+    } catch (parseError) {
+      console.error("Error parsing extracted JSON:", parseError);
+    }
+  }
+
+  // If we get here, we couldn't extract valid JSON
+  console.error("No valid JSON found in response text");
+
+  // Try to manually extract recommendations as a last resort
+  try {
+    const lines = responseText.split("\n");
+
+    // First try to extract complete JSON objects
+    let currentObject = "";
+    let inObject = false;
+    let bracketCount = 0;
+
+    // Try to extract the full JSON array first
+    const jsonArrayMatch = responseText.match(/\[\s*\{[\s\S]*\}\s*\]/s);
+    if (jsonArrayMatch) {
+      try {
+        const jsonArray = JSON.parse(jsonArrayMatch[0]);
+        if (Array.isArray(jsonArray) && jsonArray.length > 0) {
+          console.log(`Extracted ${jsonArray.length} items from JSON array`);
+          // Process the array instead of returning it directly
+          for (const item of jsonArray) {
+            if (item.title) {
+              manualItems.push({
+                title: item.title,
+                year: item.year || null,
+                imdb_id: item.imdb_id || null,
+                director: item.director || null,
+                actors: item.actors || null,
+                reason: item.reason || "Matches your preferences",
+                synopsis: item.synopsis || null,
+              });
+            }
+          }
+          console.log(`Processed ${manualItems.length} items from JSON array`);
+        }
+      } catch (e) {
+        console.error("Error parsing JSON array:", e);
+      }
+    }
+
+    // If we couldn't extract the full array, try line by line
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+
+      // Count opening and closing braces to track complete objects
+      if (trimmedLine.includes("{")) {
+        if (!inObject) {
+          inObject = true;
+          currentObject = trimmedLine;
+        } else {
+          currentObject += trimmedLine;
+        }
+        bracketCount += (trimmedLine.match(/{/g) || []).length;
+      } else if (trimmedLine.includes("}")) {
+        currentObject += trimmedLine;
+        bracketCount -= (trimmedLine.match(/}/g) || []).length;
+
+        // If brackets are balanced, we have a complete object
+        if (bracketCount === 0 && inObject) {
+          // Clean up the object string - remove any trailing commas
+          let cleanObject = currentObject;
+          if (cleanObject.endsWith(",")) {
+            cleanObject = cleanObject.slice(0, -1);
+          }
+
+          try {
+            // Try to parse as a single object
+            const obj = JSON.parse(cleanObject);
+            if (obj.title) {
+              manualItems.push({
+                title: obj.title,
+                year: obj.year || null,
+                imdb_id: obj.imdb_id || null,
+                director: obj.director || null,
+                actors: obj.actors || null,
+                reason: obj.reason || "Matches your preferences",
+                synopsis: obj.synopsis || null,
+              });
+            }
+          } catch (e) {
+            // Try to parse as an array
+            try {
+              if (cleanObject.startsWith("[") && cleanObject.endsWith("]")) {
+                const objArray = JSON.parse(cleanObject);
+                if (Array.isArray(objArray)) {
+                  for (const item of objArray) {
+                    if (item.title) {
+                      manualItems.push({
+                        title: item.title,
+                        year: item.year || null,
+                        imdb_id: item.imdb_id || null,
+                        director: item.director || null,
+                        actors: item.actors || null,
+                        reason: item.reason || "Matches your preferences",
+                        synopsis: item.synopsis || null,
+                      });
+                    }
+                  }
+                }
+              }
+            } catch (arrayError) {
+              // Not a valid JSON array either
+            }
+          }
+
+          inObject = false;
+          currentObject = "";
+          bracketCount = 0;
+        }
+      } else if (inObject) {
+        currentObject += trimmedLine;
+      }
+    }
+
+    // If we still couldn't extract objects, fall back to regex matching
+    if (manualItems.length === 0) {
+      console.log("Falling back to regex extraction");
+      for (const line of lines) {
+        // Look for patterns like: {"title": "Movie Name", "year": "2021", "reason": "...", "synopsis": "..."},
+        if (line.includes('"title"')) {
+          const titleMatch = line.match(/"title"\s*:\s*"([^"]+)"/);
+          const yearMatch = line.match(/"year"\s*:\s*"([^"]+)"/);
+          const imdbMatch = line.match(/"imdb_id"\s*:\s*"([^"]+)"/);
+          const directorMatch = line.match(/"director"\s*:\s*"([^"]+)"/);
+          const actorsMatch = line.match(/"actors"\s*:\s*"([^"]+)"/);
+          const reasonMatch = line.match(/"reason"\s*:\s*"([^"]+)"/);
+          const synopsisMatch = line.match(/"synopsis"\s*:\s*"([^"]+)"/);
+
+          if (titleMatch) {
+            manualItems.push({
+              title: titleMatch[1],
+              year: yearMatch ? yearMatch[1] : null,
+              imdb_id: imdbMatch ? imdbMatch[1] : null,
+              director: directorMatch ? directorMatch[1] : null,
+              actors: actorsMatch ? actorsMatch[1] : null,
+              reason: reasonMatch ? reasonMatch[1] : "Matches your preferences",
+              synopsis: synopsisMatch ? synopsisMatch[1] : null,
+            });
+          }
+        }
+      }
+    }
+
+    // If we found any items through manual extraction, return them
+    if (manualItems.length > 0) {
+      console.log(`Manually extracted ${manualItems.length} recommendations`);
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          recommendations: manualItems,
+        }),
+      };
+    }
+  } catch (manualError) {
+    console.error("Error during manual extraction:", manualError);
+  }
+
+  // If we get here, we couldn't extract any recommendations
+  return {
+    statusCode: 500,
+    headers,
+    body: JSON.stringify({
+      error: "No JSON found in response",
+      rawResponse: responseText.substring(0, 500),
+    }),
+  };
 };
+
+// Fallback recommendations function to use when the API fails
+function getFallbackRecommendations(preferences = {}) {
+  // Extract genre preferences if available
+  const preferredGenres = preferences.genres || [];
+  const isFunnyMood = preferences.mood?.toLowerCase() === "funny" || false;
+  const isShortViewing =
+    preferences.viewingTime && preferences.viewingTime <= 90;
+  const wantsFamilyFriendly =
+    preferences.ageRating?.includes("PG") ||
+    preferences.ageRating?.includes("TV-14");
+
+  // Default recommendations - family friendly comedies and light content
+  const defaultRecs = [
+    {
+      title: "Parks and Recreation",
+      year: "2009",
+      type: "tv",
+      reason:
+        "A lighthearted mockumentary comedy series with lovable characters and positive themes.",
+      synopsis:
+        "A mockumentary that follows the optimistic Leslie Knope and her colleagues in the Parks Department of Pawnee, Indiana.",
+      contentRating: "TV-14",
+    },
+    {
+      title: "The Good Place",
+      year: "2016",
+      type: "tv",
+      reason:
+        "A clever comedy with philosophical themes that's both funny and thought-provoking.",
+      synopsis:
+        "A woman struggles to define what it means to be good when she mistakenly ends up in the afterlife.",
+      contentRating: "TV-14",
+    },
+    {
+      title: "Brooklyn Nine-Nine",
+      year: "2013",
+      type: "tv",
+      reason:
+        "A workplace comedy set in a police precinct with diverse characters and witty humor.",
+      synopsis:
+        "The 99th precinct of the NYPD is led by the serious Captain Holt and includes the talented but immature Detective Jake Peralta.",
+      contentRating: "TV-14",
+    },
+    {
+      title: "Ted Lasso",
+      year: "2020",
+      type: "tv",
+      reason:
+        "A heartwarming comedy about kindness and personal growth with an optimistic outlook.",
+      synopsis:
+        "An American football coach is hired to manage an English soccer team, bringing his optimistic approach to the job.",
+      contentRating: "TV-14",
+    },
+    {
+      title: "Paddington",
+      year: "2014",
+      type: "movie",
+      reason:
+        "A charming family film with humor and heart that appeals to all ages.",
+      synopsis:
+        "A young bear travels to London from Peru and is adopted by the Brown family while being pursued by a taxidermist.",
+      contentRating: "PG",
+    },
+    {
+      title: "School of Rock",
+      year: "2003",
+      type: "movie",
+      reason:
+        "A fun comedy with great music and positive messages about finding your passion.",
+      synopsis:
+        "After being kicked out of his rock band, Dewey Finn becomes a substitute teacher and forms a band with his students.",
+      contentRating: "PG-13",
+    },
+    {
+      title: "Ferris Bueller's Day Off",
+      year: "1986",
+      type: "movie",
+      reason:
+        "A classic teen comedy about seizing the day and enjoying life's moments.",
+      synopsis:
+        "A high school student skips school for a day in Chicago with his girlfriend and best friend.",
+      contentRating: "PG-13",
+    },
+  ];
+
+  return defaultRecs;
+}
