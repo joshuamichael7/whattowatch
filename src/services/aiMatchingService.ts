@@ -202,6 +202,8 @@ function convertOmdbToContentItem(
   const poster = omdbData.Poster || omdbData.poster_path || omdbData.poster;
   const plot = omdbData.Plot || omdbData.overview || omdbData.plot || "";
   const type = omdbData.Type || omdbData.media_type || "movie";
+  const rated =
+    omdbData.Rated || omdbData.content_rating || omdbData.contentRating || "";
 
   // Extract genre information, ensuring we handle all possible formats
   let genreStrings: string[] = [];
@@ -217,12 +219,17 @@ function convertOmdbToContentItem(
   const rating = omdbData.imdbRating || omdbData.vote_average || "0";
   const voteCount = omdbData.imdbVotes || omdbData.vote_count || "0";
 
+  // Extract ratings array if available
+  const ratings =
+    omdbData.Ratings && Array.isArray(omdbData.Ratings) ? omdbData.Ratings : [];
+
   console.log(
     `[aiMatchingService] Converting OMDB data to ContentItem: ${title} (${imdbId})`,
   );
   console.log(`[aiMatchingService] Plot: ${plot?.substring(0, 50)}...`);
   console.log(`[aiMatchingService] Genres: ${genreStrings.join(", ")}`);
   console.log(`[aiMatchingService] Rating: ${rating}`);
+  console.log(`[aiMatchingService] Content Rating: ${rated}`);
 
   return {
     id: imdbId,
@@ -239,7 +246,8 @@ function convertOmdbToContentItem(
     genre_strings: genreStrings,
     overview: plot !== "N/A" ? plot : "",
     plot: plot !== "N/A" ? plot : "", // Add plot explicitly
-    content_rating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
+    content_rating: rated !== "N/A" ? rated : "",
+    contentRating: rated !== "N/A" ? rated : "", // Ensure both fields are set
     year:
       omdbData.Year ||
       (omdbData.release_date
@@ -275,13 +283,33 @@ function convertOmdbToContentItem(
         ? omdbData.BoxOffice
         : omdbData.boxOffice || "",
     imdb_rating: rating !== "N/A" ? rating.toString() : "",
+    imdbRating: rating !== "N/A" ? rating.toString() : "", // Add imdbRating for consistency
+    imdbVotes: voteCount !== "N/A" ? voteCount.toString() : "",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    poster: omdbData.Poster !== "N/A" ? omdbData.Poster : omdbData.poster || "",
-    contentRating:
-      omdbData.Rated !== "N/A" ? omdbData.Rated : omdbData.contentRating || "",
+    poster: poster !== "N/A" ? poster : "",
+    // Original OMDB fields
+    Title: title,
+    Year: omdbData.Year || "",
+    Rated: rated,
+    Released: omdbData.Released !== "N/A" ? omdbData.Released : "",
+    Runtime: omdbData.Runtime !== "N/A" ? omdbData.Runtime : "",
+    Genre: omdbData.Genre !== "N/A" ? omdbData.Genre : "",
+    Director: omdbData.Director !== "N/A" ? omdbData.Director : "",
+    Writer: omdbData.Writer !== "N/A" ? omdbData.Writer : "",
+    Actors: omdbData.Actors !== "N/A" ? omdbData.Actors : "",
+    Plot: plot,
+    Language: omdbData.Language !== "N/A" ? omdbData.Language : "",
+    Country: omdbData.Country !== "N/A" ? omdbData.Country : "",
+    Awards: omdbData.Awards !== "N/A" ? omdbData.Awards : "",
+    Poster: poster,
+    Ratings: ratings,
+    Metascore: omdbData.Metascore !== "N/A" ? omdbData.Metascore : "",
+    Type: type,
+    totalSeasons: omdbData.totalSeasons !== "N/A" ? omdbData.totalSeasons : "",
     // Add recommendation data from original recommendation
     recommendationReason: originalRecommendation.reason,
+    reason: originalRecommendation.reason, // Ensure both fields are set
     synopsis: originalRecommendation.synopsis || plot,
     aiRecommended: true,
     aiVerified: true,

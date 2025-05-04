@@ -917,18 +917,21 @@ const MovieDetailPage = () => {
             </h1>
 
             <div className="flex flex-wrap items-center text-sm text-muted-foreground mb-6">
-              {movie.release_date && (
+              {(movie.release_date || movie.Year) && (
                 <span className="flex items-center mr-4">
                   <Calendar className="mr-1 h-4 w-4" />
-                  {new Date(movie.release_date).getFullYear()}
+                  {movie.Year ||
+                    (movie.release_date
+                      ? new Date(movie.release_date).getFullYear()
+                      : "")}
                 </span>
               )}
-              {movie.runtime && (
+              {(movie.runtime || movie.Runtime) && (
                 <span className="flex items-center mr-4">
                   <Clock className="mr-1 h-4 w-4" />
                   {typeof movie.runtime === "number"
                     ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m`
-                    : movie.runtime}
+                    : movie.Runtime || movie.runtime}
                 </span>
               )}
               <span className="flex items-center">
@@ -941,34 +944,44 @@ const MovieDetailPage = () => {
             <div className="mb-6">
               <h2 className="text-xl font-semibold mb-2 font-heading">Plot</h2>
               <p className="text-muted-foreground">
-                {movie.plot || movie.synopsis || "No plot available."}
+                {movie.plot ||
+                  movie.Plot ||
+                  movie.synopsis ||
+                  movie.overview ||
+                  "No plot available."}
               </p>
             </div>
 
-            {movie.recommendationReason && (
+            {(movie.recommendationReason || movie.reason) && (
               <div className="mb-6 p-3 bg-primary/10 rounded-md">
                 <h2 className="text-xl font-semibold mb-2 font-heading">
                   Why it was recommended
                 </h2>
                 <p className="text-muted-foreground">
-                  {movie.recommendationReason}
+                  {movie.recommendationReason || movie.reason}
                 </p>
               </div>
             )}
 
-            {movie.genre_strings && movie.genre_strings.length > 0 && (
+            {/* Display genres from any available source */}
+            {((movie.genre_strings && movie.genre_strings.length > 0) ||
+              (movie.Genre && movie.Genre.split(", ").length > 0)) && (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-2 font-heading">
                   Genres
                 </h2>
                 <div className="flex flex-wrap gap-2">
-                  {movie.genre_strings.map((genre) => (
+                  {(
+                    movie.genre_strings ||
+                    (movie.Genre ? movie.Genre.split(", ") : [])
+                  ).map((genre) => (
                     <Badge key={genre}>{genre}</Badge>
                   ))}
                 </div>
               </div>
             )}
 
+            {/* Display streaming providers if available */}
             {movie.streaming_providers && (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-2 font-heading">
@@ -995,6 +1008,40 @@ const MovieDetailPage = () => {
                     </Button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Display additional OMDB data if available */}
+            {(movie.Director || movie.director) && (
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold mb-2 font-heading">
+                  Director
+                </h2>
+                <p className="text-muted-foreground">
+                  {movie.Director || movie.director}
+                </p>
+              </div>
+            )}
+
+            {(movie.Actors || movie.actors) && (
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold mb-2 font-heading">
+                  Cast
+                </h2>
+                <p className="text-muted-foreground">
+                  {movie.Actors || movie.actors}
+                </p>
+              </div>
+            )}
+
+            {(movie.Writer || movie.writer) && (
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold mb-2 font-heading">
+                  Writer
+                </h2>
+                <p className="text-muted-foreground">
+                  {movie.Writer || movie.writer}
+                </p>
               </div>
             )}
           </div>

@@ -492,6 +492,10 @@ function formatOMDBData(data: any): ContentItem {
   // Map genre strings to consistent IDs using our explicit mapping
   const genreIds = mapGenreStringsToIds(genreStrings);
 
+  // Extract ratings array if available
+  const ratings =
+    data.Ratings && Array.isArray(data.Ratings) ? data.Ratings : [];
+
   return {
     id: generateUUID(),
     imdb_id: data.imdbID,
@@ -514,6 +518,7 @@ function formatOMDBData(data: any): ContentItem {
     overview: data.Plot !== "N/A" ? data.Plot : "",
     runtime: data.Runtime !== "N/A" ? data.Runtime : "0",
     content_rating: data.Rated !== "N/A" ? data.Rated : null,
+    contentRating: data.Rated !== "N/A" ? data.Rated : null, // Add contentRating for consistency
     streaming_providers: null,
     popularity: 0,
     year: data.Year,
@@ -525,11 +530,29 @@ function formatOMDBData(data: any): ContentItem {
     country: data.Country !== "N/A" ? data.Country : "",
     awards: data.Awards !== "N/A" ? data.Awards : "",
     metascore: data.Metascore !== "N/A" ? data.Metascore : "",
-    // Fields below are from OMDB API but don't exist in our Supabase schema
-    // production: data.Production !== "N/A" ? data.Production : "",
-    // website: data.Website !== "N/A" ? data.Website : "",
-    // boxOffice: data.BoxOffice !== "N/A" ? data.BoxOffice : "",
+    // Include all OMDB fields
+    production: data.Production !== "N/A" ? data.Production : "",
+    website: data.Website !== "N/A" ? data.Website : "",
+    boxOffice: data.BoxOffice !== "N/A" ? data.BoxOffice : "",
     imdb_rating: data.imdbRating !== "N/A" ? data.imdbRating : "",
+    imdbRating: data.imdbRating !== "N/A" ? data.imdbRating : "", // Add imdbRating for consistency
+    imdbVotes: data.imdbVotes !== "N/A" ? data.imdbVotes : "",
+    Rated: data.Rated !== "N/A" ? data.Rated : "", // Original OMDB field
+    Released: data.Released !== "N/A" ? data.Released : "", // Original OMDB field
+    Runtime: data.Runtime !== "N/A" ? data.Runtime : "", // Original OMDB field
+    Genre: data.Genre !== "N/A" ? data.Genre : "", // Original OMDB field
+    Director: data.Director !== "N/A" ? data.Director : "", // Original OMDB field
+    Writer: data.Writer !== "N/A" ? data.Writer : "", // Original OMDB field
+    Actors: data.Actors !== "N/A" ? data.Actors : "", // Original OMDB field
+    Plot: data.Plot !== "N/A" ? data.Plot : "", // Original OMDB field
+    Language: data.Language !== "N/A" ? data.Language : "", // Original OMDB field
+    Country: data.Country !== "N/A" ? data.Country : "", // Original OMDB field
+    Awards: data.Awards !== "N/A" ? data.Awards : "", // Original OMDB field
+    Poster: data.Poster !== "N/A" ? data.Poster : "", // Original OMDB field
+    Ratings: ratings, // Original OMDB field
+    Metascore: data.Metascore !== "N/A" ? data.Metascore : "", // Original OMDB field
+    Type: data.Type !== "N/A" ? data.Type : "", // Original OMDB field
+    totalSeasons: data.totalSeasons !== "N/A" ? data.totalSeasons : "", // For TV series
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };

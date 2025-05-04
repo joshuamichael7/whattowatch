@@ -586,6 +586,7 @@ const RecommendationGrid = ({
 
                 <CardHeader className="p-3 pb-0">
                   <CardTitle className="text-base line-clamp-1 font-heading">
+                    {/* Always prioritize OMDB title from processed recommendations */}
                     {processedRecommendations[rec.id]?.title || rec.title}
                   </CardTitle>
                   <CardDescription className="flex items-center gap-2">
@@ -663,8 +664,9 @@ const RecommendationGrid = ({
                       "No synopsis available"}
                   </p>
                   <p className="text-xs text-primary-foreground mt-1 bg-primary/10 p-1 rounded line-clamp-2 font-medium">
-                    {rec.recommendationReason ||
-                      rec.reason ||
+                    {/* Always prioritize original AI recommendation reason */}
+                    {rec.reason ||
+                      rec.recommendationReason ||
                       "Matches your preferences"}
                   </p>
                   {(processedRecommendations[rec.id]?.imdb_id ||
