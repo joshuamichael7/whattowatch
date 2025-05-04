@@ -100,7 +100,7 @@ const RecommendationGrid = ({
   );
   const [loadedItems, setLoadedItems] =
     useState<RecommendationItem[]>(recommendations);
-  const [filteredRecommendations, setFilteredRecommendations] = 
+  const [filteredRecommendations, setFilteredRecommendations] =
     useState<RecommendationItem[]>(recommendations);
   const [sortBy, setSortBy] = useState("relevance");
   const [filterVisible, setFilterVisible] = useState(false);
@@ -261,31 +261,39 @@ const RecommendationGrid = ({
   // Filter recommendations based on content rating preferences
   useEffect(() => {
     if (!recommendations || recommendations.length === 0) return;
-    
+
     // Get content rating preferences from user profile or passed contentFilterOptions
     const userContentFilters = profile?.content_filters || contentFilterOptions;
-    
-    if (userContentFilters?.acceptedRatings && userContentFilters.acceptedRatings.length > 0) {
-      console.log("Filtering by accepted ratings:", userContentFilters.acceptedRatings);
-      
+
+    if (
+      userContentFilters?.acceptedRatings &&
+      userContentFilters.acceptedRatings.length > 0
+    ) {
+      console.log(
+        "Filtering by accepted ratings:",
+        userContentFilters.acceptedRatings,
+      );
+
       // Filter recommendations based on content rating
-      const filtered = recommendations.filter(rec => {
+      const filtered = recommendations.filter((rec) => {
         const rating = rec.contentRating || rec.content_rating;
-        
+
         // If no rating is available, include the recommendation
         if (!rating) return true;
-        
+
         // Check if the rating is in the accepted ratings list
-        return userContentFilters.acceptedRatings?.includes(rating);
+        return userContentFilters.acceptedRatings.includes(rating);
       });
-      
-      console.log(`Filtered ${recommendations.length - filtered.length} items based on content rating`);
+
+      console.log(
+        `Filtered ${recommendations.length - filtered.length} items based on content rating`,
+      );
       setFilteredRecommendations(filtered);
     } else {
       // If no content rating preferences, use all recommendations
       setFilteredRecommendations(recommendations);
     }
-    
+
     // Additional user preferences handling
     if (userId && userPreferences) {
       console.log(`Loading recommendations for user ${userId}`);
@@ -468,20 +476,49 @@ const RecommendationGrid = ({
                   recommendation: {
                     ...rec,
                     title: processedRecommendations[rec.id]?.title || rec.title,
-                    imdb_id: processedRecommendations[rec.id]?.imdb_id || rec.imdb_id,
-                    imdb_url: processedRecommendations[rec.id]?.imdb_url || rec.imdb_url,
-                    synopsis: processedRecommendations[rec.id]?.synopsis || rec.synopsis || processedRecommendations[rec.id]?.overview || rec.overview,
-                    overview: processedRecommendations[rec.id]?.overview || rec.overview || processedRecommendations[rec.id]?.synopsis || rec.synopsis,
+                    imdb_id:
+                      processedRecommendations[rec.id]?.imdb_id || rec.imdb_id,
+                    imdb_url:
+                      processedRecommendations[rec.id]?.imdb_url ||
+                      rec.imdb_url,
+                    synopsis:
+                      processedRecommendations[rec.id]?.synopsis ||
+                      rec.synopsis ||
+                      processedRecommendations[rec.id]?.overview ||
+                      rec.overview,
+                    overview:
+                      processedRecommendations[rec.id]?.overview ||
+                      rec.overview ||
+                      processedRecommendations[rec.id]?.synopsis ||
+                      rec.synopsis,
                     reason: rec.reason || rec.recommendationReason,
-                    poster_path: processedRecommendations[rec.id]?.poster_path || rec.poster_path || rec.poster,
-                    media_type: processedRecommendations[rec.id]?.media_type || rec.type,
-                    vote_average: processedRecommendations[rec.id]?.vote_average || rec.rating || 0,
-                    genre_ids: processedRecommendations[rec.id]?.genre_ids || [],
-                    genre_strings: processedRecommendations[rec.id]?.genre_strings || rec.genres,
-                    content_rating: processedRecommendations[rec.id]?.content_rating || rec.contentRating || rec.content_rating,
-                    contentRating: processedRecommendations[rec.id]?.contentRating || processedRecommendations[rec.id]?.content_rating || rec.contentRating || rec.content_rating,
+                    poster_path:
+                      processedRecommendations[rec.id]?.poster_path ||
+                      rec.poster_path ||
+                      rec.poster,
+                    media_type:
+                      processedRecommendations[rec.id]?.media_type || rec.type,
+                    vote_average:
+                      processedRecommendations[rec.id]?.vote_average ||
+                      rec.rating ||
+                      0,
+                    genre_ids:
+                      processedRecommendations[rec.id]?.genre_ids || [],
+                    genre_strings:
+                      processedRecommendations[rec.id]?.genre_strings ||
+                      rec.genres,
+                    content_rating:
+                      processedRecommendations[rec.id]?.content_rating ||
+                      rec.contentRating ||
+                      rec.content_rating,
+                    contentRating:
+                      processedRecommendations[rec.id]?.contentRating ||
+                      processedRecommendations[rec.id]?.content_rating ||
+                      rec.contentRating ||
+                      rec.content_rating,
                     year: processedRecommendations[rec.id]?.year || rec.year,
-                    verified: processedRecommendations[rec.id]?.verified || false
+                    verified:
+                      processedRecommendations[rec.id]?.verified || false,
                   },
                   processedContent: processedRecommendations[rec.id],
                   fromRecommendations: true,
@@ -524,7 +561,9 @@ const RecommendationGrid = ({
                     {processedRecommendations[rec.id]?.title || rec.title}
                   </CardTitle>
                   <CardDescription className="flex items-center gap-2">
-                    <span>{processedRecommendations[rec.id]?.year || rec.year}</span>
+                    <span>
+                      {processedRecommendations[rec.id]?.year || rec.year}
+                    </span>
                     {rec.rating > 0 && (
                       <span className="flex items-center">
                         <Star
@@ -540,26 +579,36 @@ const RecommendationGrid = ({
                 <CardContent className="p-3 pt-2 flex-grow">
                   <div className="flex flex-wrap gap-1 mb-2">
                     {/* Use processed genres if available */}
-                    {processedRecommendations[rec.id]?.genre_strings && 
-                      Array.isArray(processedRecommendations[rec.id].genre_strings) &&
-                      processedRecommendations[rec.id].genre_strings.slice(0, 2).map((genre) => (
-                        <Badge
-                          key={genre}
-                          variant="outline"
-                          className="text-xs"
-                        >
-                          {genre}
-                        </Badge>
-                      ))}
-                    {processedRecommendations[rec.id]?.genre_strings && 
-                      Array.isArray(processedRecommendations[rec.id].genre_strings) &&
-                      processedRecommendations[rec.id].genre_strings.length > 2 && (
+                    {processedRecommendations[rec.id]?.genre_strings &&
+                      Array.isArray(
+                        processedRecommendations[rec.id].genre_strings,
+                      ) &&
+                      processedRecommendations[rec.id].genre_strings
+                        .slice(0, 2)
+                        .map((genre) => (
+                          <Badge
+                            key={genre}
+                            variant="outline"
+                            className="text-xs"
+                          >
+                            {genre}
+                          </Badge>
+                        ))}
+                    {processedRecommendations[rec.id]?.genre_strings &&
+                      Array.isArray(
+                        processedRecommendations[rec.id].genre_strings,
+                      ) &&
+                      processedRecommendations[rec.id].genre_strings.length >
+                        2 && (
                         <Badge variant="outline" className="text-xs">
-                          +{processedRecommendations[rec.id].genre_strings.length - 2}
+                          +
+                          {processedRecommendations[rec.id].genre_strings
+                            .length - 2}
                         </Badge>
-                      ))}
+                      )}
                     {/* Fallback to original genres if processed not available */}
-                    {(!processedRecommendations[rec.id]?.genre_strings) && rec.genres &&
+                    {!processedRecommendations[rec.id]?.genre_strings &&
+                      rec.genres &&
                       Array.isArray(rec.genres) &&
                       rec.genres.slice(0, 2).map((genre) => (
                         <Badge
@@ -570,7 +619,8 @@ const RecommendationGrid = ({
                           {genre}
                         </Badge>
                       ))}
-                    {(!processedRecommendations[rec.id]?.genre_strings) && rec.genres &&
+                    {!processedRecommendations[rec.id]?.genre_strings &&
+                      rec.genres &&
                       Array.isArray(rec.genres) &&
                       rec.genres.length > 2 && (
                         <Badge variant="outline" className="text-xs">
@@ -579,16 +629,21 @@ const RecommendationGrid = ({
                       )}
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">
-                    {processedRecommendations[rec.id]?.overview || rec.synopsis || rec.overview || "No synopsis available"}
+                    {processedRecommendations[rec.id]?.overview ||
+                      rec.synopsis ||
+                      rec.overview ||
+                      "No synopsis available"}
                   </p>
                   <p className="text-xs text-primary-foreground mt-1 bg-primary/10 p-1 rounded line-clamp-2 font-medium">
                     {rec.recommendationReason ||
                       rec.reason ||
                       "Matches your preferences"}
                   </p>
-                  {(processedRecommendations[rec.id]?.imdb_id || rec.imdb_id) && (
+                  {(processedRecommendations[rec.id]?.imdb_id ||
+                    rec.imdb_id) && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      IMDB: {processedRecommendations[rec.id]?.imdb_id || rec.imdb_id}
+                      IMDB:{" "}
+                      {processedRecommendations[rec.id]?.imdb_id || rec.imdb_id}
                     </p>
                   )}
                 </CardContent>
@@ -755,21 +810,86 @@ const RecommendationGrid = ({
                                   state={{
                                     recommendation: {
                                       ...selectedItem,
-                                      title: processedRecommendations[selectedItem.id]?.title || selectedItem.title,
-                                      imdb_id: processedRecommendations[selectedItem.id]?.imdb_id || selectedItem.imdb_id,
-                                      imdb_url: processedRecommendations[selectedItem.id]?.imdb_url || selectedItem.imdb_url,
-                                      synopsis: processedRecommendations[selectedItem.id]?.synopsis || selectedItem.synopsis || processedRecommendations[selectedItem.id]?.overview || selectedItem.overview,
-                                      overview: processedRecommendations[selectedItem.id]?.overview || selectedItem.overview || processedRecommendations[selectedItem.id]?.synopsis || selectedItem.synopsis,
-                                      reason: selectedItem.reason || selectedItem.recommendationReason,
-                                      poster_path: processedRecommendations[selectedItem.id]?.poster_path || selectedItem.poster_path || selectedItem.poster,
-                                      media_type: processedRecommendations[selectedItem.id]?.media_type || selectedItem.type,
-                                      vote_average: processedRecommendations[selectedItem.id]?.vote_average || selectedItem.rating || 0,
-                                      genre_ids: processedRecommendations[selectedItem.id]?.genre_ids || [],
-                                      genre_strings: processedRecommendations[selectedItem.id]?.genre_strings || selectedItem.genres,
-                                      content_rating: processedRecommendations[selectedItem.id]?.content_rating || selectedItem.contentRating || selectedItem.content_rating,
-                                      contentRating: processedRecommendations[selectedItem.id]?.contentRating || processedRecommendations[selectedItem.id]?.content_rating || selectedItem.contentRating || selectedItem.content_rating,
-                                      year: processedRecommendations[selectedItem.id]?.year || selectedItem.year,
-                                      verified: processedRecommendations[selectedItem.id]?.verified || false
+                                      title:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.title || selectedItem.title,
+                                      imdb_id:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.imdb_id || selectedItem.imdb_id,
+                                      imdb_url:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.imdb_url || selectedItem.imdb_url,
+                                      synopsis:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.synopsis ||
+                                        selectedItem.synopsis ||
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.overview ||
+                                        selectedItem.overview,
+                                      overview:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.overview ||
+                                        selectedItem.overview ||
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.synopsis ||
+                                        selectedItem.synopsis,
+                                      reason:
+                                        selectedItem.reason ||
+                                        selectedItem.recommendationReason,
+                                      poster_path:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.poster_path ||
+                                        selectedItem.poster_path ||
+                                        selectedItem.poster,
+                                      media_type:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.media_type || selectedItem.type,
+                                      vote_average:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.vote_average ||
+                                        selectedItem.rating ||
+                                        0,
+                                      genre_ids:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.genre_ids || [],
+                                      genre_strings:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.genre_strings || selectedItem.genres,
+                                      content_rating:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.content_rating ||
+                                        selectedItem.contentRating ||
+                                        selectedItem.content_rating,
+                                      contentRating:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.contentRating ||
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.content_rating ||
+                                        selectedItem.contentRating ||
+                                        selectedItem.content_rating,
+                                      year:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.year || selectedItem.year,
+                                      verified:
+                                        processedRecommendations[
+                                          selectedItem.id
+                                        ]?.verified || false,
                                     },
                                     processedContent:
                                       processedRecommendations[selectedItem.id],
