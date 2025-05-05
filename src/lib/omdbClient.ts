@@ -581,9 +581,19 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
       params.append("t", id);
     }
 
+    // Make sure we're requesting the full plot to get all data including Rated field
     params.append("plot", "full");
 
-    console.log(`Fetching from OMDB with params: ${params.toString()}`);
+    // Log the params to verify what we're sending
+    console.log(
+      `[omdbClient] Requesting OMDB with params: ${params.toString()}`,
+    );
+
+    // Log the full URL being requested for debugging
+    console.log(
+      `[omdbClient] Full request URL: ${API_ENDPOINT}?${params.toString()}`,
+    );
+
     const data = await fetchFromOmdb(params);
     if (!data) {
       console.error(`No data returned from OMDB for ID: ${id}`);

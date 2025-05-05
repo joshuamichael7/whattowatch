@@ -209,7 +209,7 @@ function convertOmdbToContentItem(
   if (
     yearStr.includes("–") ||
     yearStr.includes("-") ||
-    yearStr.endsWith("–") ||
+    yearStr.endsWith("��") ||
     yearStr.includes("present")
   ) {
     type = "tv";
@@ -230,6 +230,22 @@ function convertOmdbToContentItem(
 
   // Log the entire OMDB data object to see all fields and values
   console.log("[aiMatchingService] Full OMDB data:", JSON.stringify(omdbData));
+
+  // Check if we're getting the raw OMDB data directly
+  if (omdbData.Response === "True") {
+    console.log("[aiMatchingService] Direct OMDB API response detected");
+  }
+
+  // Explicitly log all fields that should be in the OMDB response
+  console.log("[aiMatchingService] CRITICAL FIELDS CHECK:");
+  console.log("- Title:", omdbData.Title || omdbData.title);
+  console.log("- Year:", omdbData.Year || omdbData.year);
+  console.log("- Rated:", omdbData.Rated);
+  console.log("- Released:", omdbData.Released);
+  console.log("- Runtime:", omdbData.Runtime);
+  console.log("- Genre:", omdbData.Genre);
+  console.log("- Director:", omdbData.Director);
+  console.log("- Plot:", (omdbData.Plot || "").substring(0, 50) + "...");
 
   // Get the 'Rated' field from OMDB response exactly as is
   // Do not default to anything - show exactly what OMDB returns
