@@ -202,8 +202,16 @@ function convertOmdbToContentItem(
   const poster = omdbData.Poster || omdbData.poster_path || omdbData.poster;
   const plot = omdbData.Plot || omdbData.overview || omdbData.plot || "";
   const type = omdbData.Type || omdbData.media_type || "movie";
-  const rated =
+
+  // Ensure we properly extract the content rating
+  // OMDB returns this as 'Rated' (e.g., "TV-14", "PG-13")
+  // Handle cases where rating might be null, undefined, or "N/A"
+  let rated =
     omdbData.Rated || omdbData.content_rating || omdbData.contentRating || "";
+  rated = rated && rated !== "N/A" ? rated : "";
+  console.log(
+    `[aiMatchingService] Raw content rating from OMDB: ${omdbData.Rated}, Processed: ${rated}`,
+  );
 
   // Extract genre information, ensuring we handle all possible formats
   let genreStrings: string[] = [];
@@ -229,7 +237,7 @@ function convertOmdbToContentItem(
   console.log(`[aiMatchingService] Plot: ${plot?.substring(0, 50)}...`);
   console.log(`[aiMatchingService] Genres: ${genreStrings.join(", ")}`);
   console.log(`[aiMatchingService] Rating: ${rating}`);
-  console.log(`[aiMatchingService] Content Rating: ${rated}`);
+  console.log(`[aiMatchingService] Processed Content Rating: ${rated}`);
 
   return {
     id: imdbId,
@@ -246,8 +254,8 @@ function convertOmdbToContentItem(
     genre_strings: genreStrings,
     overview: plot !== "N/A" ? plot : "",
     plot: plot !== "N/A" ? plot : "", // Add plot explicitly
-    content_rating: rated !== "N/A" ? rated : "",
-    contentRating: rated !== "N/A" ? rated : "", // Ensure both fields are set
+    content_rating: rated,
+    contentRating: rated, // Ensure both fields are set
     year:
       omdbData.Year ||
       (omdbData.release_date
