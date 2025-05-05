@@ -201,43 +201,38 @@ function convertOmdbToContentItem(
   const imdbId = omdbData.imdbID || omdbData.imdb_id;
   const poster = omdbData.Poster || omdbData.poster_path || omdbData.poster;
   const plot = omdbData.Plot || omdbData.overview || omdbData.plot || "";
-  const type = omdbData.Type || omdbData.media_type || "movie";
+  // Determine media type with better detection for TV series
+  let type = omdbData.Type || omdbData.media_type || "movie";
+
+  // Check for TV series indicators in the year field (e.g., "2014–2015")
+  const yearStr = omdbData.Year || "";
+  if (
+    yearStr.includes("–") ||
+    yearStr.includes("-") ||
+    yearStr.endsWith("–") ||
+    yearStr.includes("present")
+  ) {
+    type = "tv";
+    console.log(
+      `[aiMatchingService] Detected TV series from year format: ${yearStr}`,
+    );
+  }
+
+  // Normalize type values
+  if (type.toLowerCase() === "series") {
+    type = "tv";
+  }
 
   // Log the raw OMDB data to see what fields are available
   console.log(
     `[aiMatchingService] OMDB data keys: ${Object.keys(omdbData).join(", ")}`,
   );
 
-  // Ensure we properly extract the content rating
-  // OMDB returns this as 'Rated' (e.g., "TV-14", "PG-13")
-  // Handle cases where rating might be null, undefined, or "N/A"
-  let rated = null;
-
-  // Try to get the content rating from various possible fields
-  if (omdbData.Rated && omdbData.Rated !== "N/A") {
-    rated = omdbData.Rated;
-  } else if (omdbData.content_rating && omdbData.content_rating !== "N/A") {
-    rated = omdbData.content_rating;
-  } else if (omdbData.contentRating && omdbData.contentRating !== "N/A") {
-    rated = omdbData.contentRating;
-  } else if (omdbData.rated && omdbData.rated !== "N/A") {
-    rated = omdbData.rated;
-  }
-
-  // If no rating was found, check if this is a TV show and assign a default rating
-  if (!rated && (type === "tv" || type === "series")) {
-    // For Korean dramas, which are often TV shows, default to TV-14 if no rating is provided
-    rated = "TV-14";
-    console.log(
-      `[aiMatchingService] No content rating found, defaulting to ${rated} for TV content`,
-    );
-  }
-
-  // Final fallback to empty string if still null
-  rated = rated || "";
+  // Simply capture the 'Rated' field from OMDB response as is
+  const rated = omdbData.Rated || "";
 
   console.log(
-    `[aiMatchingService] Raw content rating from OMDB: ${omdbData.Rated}, Processed: ${rated}`,
+    `[aiMatchingService] Raw content rating from OMDB: ${omdbData.Rated}`,
   );
 
   // Extract genre information, ensuring we handle all possible formats
@@ -283,6 +278,7 @@ function convertOmdbToContentItem(
     plot: plot !== "N/A" ? plot : "", // Add plot explicitly
     content_rating: rated,
     contentRating: rated, // Ensure both fields are set
+    Rated: rated, // Also set the original OMDB field name
     year:
       omdbData.Year ||
       (omdbData.release_date
