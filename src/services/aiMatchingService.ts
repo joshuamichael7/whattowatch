@@ -203,12 +203,39 @@ function convertOmdbToContentItem(
   const plot = omdbData.Plot || omdbData.overview || omdbData.plot || "";
   const type = omdbData.Type || omdbData.media_type || "movie";
 
+  // Log the raw OMDB data to see what fields are available
+  console.log(
+    `[aiMatchingService] OMDB data keys: ${Object.keys(omdbData).join(", ")}`,
+  );
+
   // Ensure we properly extract the content rating
   // OMDB returns this as 'Rated' (e.g., "TV-14", "PG-13")
   // Handle cases where rating might be null, undefined, or "N/A"
-  let rated =
-    omdbData.Rated || omdbData.content_rating || omdbData.contentRating || "";
-  rated = rated && rated !== "N/A" ? rated : "";
+  let rated = null;
+
+  // Try to get the content rating from various possible fields
+  if (omdbData.Rated && omdbData.Rated !== "N/A") {
+    rated = omdbData.Rated;
+  } else if (omdbData.content_rating && omdbData.content_rating !== "N/A") {
+    rated = omdbData.content_rating;
+  } else if (omdbData.contentRating && omdbData.contentRating !== "N/A") {
+    rated = omdbData.contentRating;
+  } else if (omdbData.rated && omdbData.rated !== "N/A") {
+    rated = omdbData.rated;
+  }
+
+  // If no rating was found, check if this is a TV show and assign a default rating
+  if (!rated && (type === "tv" || type === "series")) {
+    // For Korean dramas, which are often TV shows, default to TV-14 if no rating is provided
+    rated = "TV-14";
+    console.log(
+      `[aiMatchingService] No content rating found, defaulting to ${rated} for TV content`,
+    );
+  }
+
+  // Final fallback to empty string if still null
+  rated = rated || "";
+
   console.log(
     `[aiMatchingService] Raw content rating from OMDB: ${omdbData.Rated}, Processed: ${rated}`,
   );
