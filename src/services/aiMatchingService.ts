@@ -228,6 +228,9 @@ function convertOmdbToContentItem(
     `[aiMatchingService] OMDB data keys: ${Object.keys(omdbData).join(", ")}`,
   );
 
+  // Log the entire OMDB data object to see all fields and values
+  console.log("[aiMatchingService] Full OMDB data:", JSON.stringify(omdbData));
+
   // Get the 'Rated' field from OMDB response exactly as is
   // Do not default to anything - show exactly what OMDB returns
   const rated = omdbData.Rated || "Not Rated";
