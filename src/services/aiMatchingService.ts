@@ -228,12 +228,16 @@ function convertOmdbToContentItem(
     `[aiMatchingService] OMDB data keys: ${Object.keys(omdbData).join(", ")}`,
   );
 
-  // Simply capture the 'Rated' field from OMDB response as is
-  const rated = omdbData.Rated || "";
+  // Get the 'Rated' field from OMDB response exactly as is
+  // Do not default to anything - show exactly what OMDB returns
+  const rated = omdbData.Rated || "Not Rated";
 
+  // Log the raw Rated field to debug
   console.log(
-    `[aiMatchingService] Raw content rating from OMDB: ${omdbData.Rated}`,
+    `[aiMatchingService] Raw Rated field from OMDB: ${JSON.stringify(omdbData.Rated)}`,
   );
+
+  console.log(`[aiMatchingService] Content rating being used: ${rated}`);
 
   // Extract genre information, ensuring we handle all possible formats
   let genreStrings: string[] = [];
@@ -259,7 +263,7 @@ function convertOmdbToContentItem(
   console.log(`[aiMatchingService] Plot: ${plot?.substring(0, 50)}...`);
   console.log(`[aiMatchingService] Genres: ${genreStrings.join(", ")}`);
   console.log(`[aiMatchingService] Rating: ${rating}`);
-  console.log(`[aiMatchingService] Processed Content Rating: ${rated}`);
+  console.log(`[aiMatchingService] Content Rating: ${rated}`);
 
   return {
     id: imdbId,
