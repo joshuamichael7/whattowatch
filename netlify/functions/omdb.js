@@ -6,6 +6,7 @@ exports.handler = async function (event, context) {
     const API_KEY = process.env.OMDB_API_KEY;
 
     if (!API_KEY) {
+      console.error("Missing OMDB API key in server environment variables.");
       return {
         statusCode: 500,
         body: JSON.stringify({
@@ -16,6 +17,12 @@ exports.handler = async function (event, context) {
 
     // Get query parameters from the request
     const params = event.queryStringParameters || {};
+
+    // Log the incoming request parameters
+    console.log(
+      "OMDB function received request with params:",
+      JSON.stringify(params),
+    );
 
     // Check if this is a trending request
     if (params.trending === "true") {
@@ -62,11 +69,44 @@ exports.handler = async function (event, context) {
     const searchParams = new URLSearchParams(params);
     searchParams.set("apikey", API_KEY);
 
+    // Always ensure we're requesting full plot for complete data including Rated field
+    if (!searchParams.has("plot")) {
+      searchParams.set("plot", "full");
+      console.log("Added plot=full parameter to ensure complete data");
+    }
+
+    // Log the full request URL (without API key for security)
+    const logParams = new URLSearchParams(searchParams);
+    logParams.delete("apikey");
+    console.log(
+      `OMDB API request: https://www.omdbapi.com/?${logParams.toString()}`,
+    );
+
     // Make the request to OMDB API
     const response = await fetch(
       `https://www.omdbapi.com/?${searchParams.toString()}`,
     );
     const data = await response.json();
+
+    // Log the response data for debugging
+    console.log("OMDB API response status:", response.status);
+    console.log("OMDB API response keys:", Object.keys(data));
+
+    // Log specific fields we're interested in
+    if (data.Title) {
+      console.log("OMDB API Title:", data.Title);
+      console.log("OMDB API Year:", data.Year);
+      console.log("OMDB API Rated field (raw):", JSON.stringify(data.Rated));
+      console.log(
+        "OMDB API Plot (first 50 chars):",
+        (data.Plot || "").substring(0, 50) + "...",
+      );
+      console.log("OMDB API Type:", data.Type);
+      console.log("OMDB API Country:", data.Country);
+    }
+
+    // Log the entire response for thorough debugging
+    console.log("COMPLETE OMDB API RESPONSE:", JSON.stringify(data));
 
     return {
       statusCode: 200,
