@@ -31,6 +31,7 @@ import GenreUpdater from "./GenreUpdater";
 import AutomatedImporter from "./admin/AutomatedImporter";
 import OmdbDebugTester from "./admin/OmdbDebugTester";
 import ContentRatingDebugger from "./ContentRatingDebugger";
+import DataIntegrityTester from "./admin/DataIntegrityTester";
 
 const AdminDashboard: React.FC = () => {
   const { user, profile, isLoading, isAdmin, isAdminVerified, refreshProfile } =
@@ -124,7 +125,7 @@ const AdminDashboard: React.FC = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="data" className="w-full">
-            <TabsList className="grid w-full grid-cols-7 mb-8">
+            <TabsList className="grid w-full grid-cols-8 mb-8">
               <TabsTrigger value="data" className="flex items-center gap-2">
                 <Database className="h-4 w-4" />
                 Data Management
@@ -155,6 +156,13 @@ const AdminDashboard: React.FC = () => {
               <TabsTrigger value="debug" className="flex items-center gap-2">
                 <Bug className="h-4 w-4" />
                 Debug
+              </TabsTrigger>
+              <TabsTrigger
+                value="integrity"
+                className="flex items-center gap-2"
+              >
+                <Check className="h-4 w-4" />
+                Data Integrity
               </TabsTrigger>
               <TabsTrigger value="genres" className="flex items-center gap-2">
                 <Tag className="h-4 w-4" />
@@ -333,6 +341,17 @@ const AdminDashboard: React.FC = () => {
               </p>
               <div className="mt-6">
                 <GenreUpdater />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="integrity" className="space-y-4">
+              <h3 className="text-lg font-medium">Data Integrity Testing</h3>
+              <p className="text-muted-foreground">
+                Test the full recommendation flow to ensure all data fields are
+                properly saved.
+              </p>
+              <div className="mt-6">
+                <DataIntegrityTester />
               </div>
             </TabsContent>
           </Tabs>
