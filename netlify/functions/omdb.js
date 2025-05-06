@@ -62,9 +62,9 @@ exports.handler = async function (event, context) {
     const searchParams = new URLSearchParams(params);
     searchParams.set("apikey", API_KEY);
 
-    // Log the full request URL (without API key for security)
+    // Log the request URL (with API key redacted)
     console.log(
-      `OMDB API Request: https://www.omdbapi.com/?${searchParams.toString().replace(API_KEY, "API_KEY")}`,
+      `OMDB API Request: ${searchParams.toString().replace(API_KEY, "[REDACTED]")}`,
     );
 
     // Make the request to OMDB API
@@ -73,16 +73,10 @@ exports.handler = async function (event, context) {
     );
     const data = await response.json();
 
-    // Log the complete response data
-    console.log("OMDB API COMPLETE RESPONSE:", JSON.stringify(data));
-
-    // Log specific fields we're interested in
-    console.log("OMDB Response Keys:", Object.keys(data));
-    if (data.Title) console.log("Title:", data.Title);
-    if (data.Year) console.log("Year:", data.Year);
-    if (data.Rated) console.log("Rated field:", data.Rated);
-    if (data.Plot)
-      console.log("Plot (first 50 chars):", data.Plot.substring(0, 50) + "...");
+    // Log the response data
+    console.log(`OMDB API Response Keys: ${Object.keys(data).join(", ")}`);
+    if (data.Rated) console.log(`OMDB API Rated field: ${data.Rated}`);
+    if (data.Title) console.log(`OMDB API Title: ${data.Title}`);
 
     return {
       statusCode: 200,
