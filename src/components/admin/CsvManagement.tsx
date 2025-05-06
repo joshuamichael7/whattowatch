@@ -51,7 +51,7 @@ const CsvManagement: React.FC = () => {
 
       // Note: This component now only shows the UI for CSV management
       // The actual upload is handled directly in Supabase
-      // This is a placeholder for the progress simulation
+      // This is a placeholder for the progress simulation and here is some more comment that means nothing
 
       // Simulate progress for better UX
       const progressInterval = setInterval(() => {
