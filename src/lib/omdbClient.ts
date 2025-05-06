@@ -23,19 +23,6 @@ async function fetchFromOmdb(params: URLSearchParams) {
       console.log(`[omdbClient] Title query: ${params.get("t")}`);
     }
 
-    // Always ensure we're requesting full plot to get all data including Rated field
-    if (!params.has("plot")) {
-      params.append("plot", "full");
-      console.log(
-        `[omdbClient] Added plot=full parameter to ensure complete data`,
-      );
-    }
-
-    // Log the full request URL for debugging
-    console.log(
-      `[omdbClient] Full request URL: ${API_ENDPOINT}?${params.toString()}`,
-    );
-
     const response = await fetch(`${API_ENDPOINT}?${params.toString()}`);
     if (!response.ok) {
       console.error(
@@ -45,20 +32,6 @@ async function fetchFromOmdb(params: URLSearchParams) {
     }
 
     const data = await response.json();
-
-    // Log the response data for debugging
-    if (data && data.Title) {
-      console.log(`[omdbClient] Response for "${data.Title}" received:`);
-      console.log(`[omdbClient] - Year: ${data.Year || "N/A"}`);
-      console.log(`[omdbClient] - Type: ${data.Type || "N/A"}`);
-      console.log(
-        `[omdbClient] - Rated field (raw): ${JSON.stringify(data.Rated)}`,
-      );
-      console.log(`[omdbClient] - Country: ${data.Country || "N/A"}`);
-      console.log(
-        `[omdbClient] - Available fields: ${Object.keys(data).join(", ")}`,
-      );
-    }
 
     if (data.Response === "False") {
       console.error("OMDB API error:", data.Error);
@@ -360,23 +333,12 @@ async function searchFromOmdb(
       exactParams.append("y", searchYear);
     }
 
-    // Always ensure we're requesting full plot
-    exactParams.append("plot", "full");
-
     const exactData = await fetchFromOmdb(exactParams);
 
     // If we found an exact match, use it and then supplement with regular search results
     if (exactData && exactData.Response === "True" && exactData.Title) {
       console.log(
         `[omdbClient] Found exact match for "${query}": ${exactData.Title} (${exactData.Year})`,
-      );
-
-      // Log the Rated field specifically
-      console.log(
-        `[omdbClient] Exact match Rated field: ${JSON.stringify(exactData.Rated)}`,
-      );
-      console.log(
-        `[omdbClient] Exact match Country: ${exactData.Country || "N/A"}`,
       );
 
       // Now do a regular search to get additional results
@@ -534,16 +496,6 @@ function formatOMDBData(data: any): ContentItem {
   const ratings =
     data.Ratings && Array.isArray(data.Ratings) ? data.Ratings : [];
 
-  // Log the raw data for debugging
-  console.log(`[formatOMDBData] Processing OMDB data for: ${data.Title}`);
-  console.log(
-    `[formatOMDBData] Raw Rated field: ${JSON.stringify(data.Rated)}`,
-  );
-  console.log(`[formatOMDBData] Country: ${data.Country || "N/A"}`);
-  console.log(
-    `[formatOMDBData] Available fields: ${Object.keys(data).join(", ")}`,
-  );
-
   return {
     id: generateUUID(),
     imdb_id: data.imdbID,
@@ -629,37 +581,14 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
       params.append("t", id);
     }
 
-    // Make sure we're requesting the full plot to get all data including Rated field
     params.append("plot", "full");
 
-    // Log the params to verify what we're sending
-    console.log(
-      `[omdbClient] Requesting OMDB with params: ${params.toString()}`,
-    );
-
-    // Log the full URL being requested for debugging
-    console.log(
-      `[omdbClient] Full request URL: ${API_ENDPOINT}?${params.toString()}`,
-    );
-
+    console.log(`Fetching from OMDB with params: ${params.toString()}`);
     const data = await fetchFromOmdb(params);
     if (!data) {
       console.error(`No data returned from OMDB for ID: ${id}`);
       return null;
     }
-
-    // Log the raw data for debugging
-    console.log(`[omdbClient] Raw OMDB response for ID ${id}:`);
-    console.log(`[omdbClient] - Title: ${data.Title || "N/A"}`);
-    console.log(`[omdbClient] - Year: ${data.Year || "N/A"}`);
-    console.log(`[omdbClient] - Type: ${data.Type || "N/A"}`);
-    console.log(
-      `[omdbClient] - Rated field (raw): ${JSON.stringify(data.Rated)}`,
-    );
-    console.log(`[omdbClient] - Country: ${data.Country || "N/A"}`);
-    console.log(
-      `[omdbClient] - Available fields: ${Object.keys(data).join(", ")}`,
-    );
 
     // Use the helper function to format OMDB data
     const contentItem = formatOMDBData(data);

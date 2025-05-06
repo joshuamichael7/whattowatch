@@ -209,7 +209,7 @@ function convertOmdbToContentItem(
   if (
     yearStr.includes("–") ||
     yearStr.includes("-") ||
-    yearStr.endsWith("��") ||
+    yearStr.endsWith("–") ||
     yearStr.includes("present")
   ) {
     type = "tv";
@@ -231,24 +231,6 @@ function convertOmdbToContentItem(
   // Log the entire OMDB data object to see all fields and values
   console.log("[aiMatchingService] Full OMDB data:", JSON.stringify(omdbData));
 
-  // Check if we're getting the raw OMDB data directly
-  if (omdbData.Response === "True") {
-    console.log("[aiMatchingService] Direct OMDB API response detected");
-  }
-
-  // Explicitly log all fields that should be in the OMDB response
-  console.log("[aiMatchingService] CRITICAL FIELDS CHECK:");
-  console.log("- Title:", omdbData.Title || omdbData.title);
-  console.log("- Year:", omdbData.Year || omdbData.year);
-  console.log("- Rated:", omdbData.Rated);
-  console.log("- Released:", omdbData.Released);
-  console.log("- Runtime:", omdbData.Runtime);
-  console.log("- Genre:", omdbData.Genre);
-  console.log("- Director:", omdbData.Director);
-  console.log("- Plot:", (omdbData.Plot || "").substring(0, 50) + "...");
-  console.log("- Country:", omdbData.Country);
-  console.log("- Language:", omdbData.Language);
-
   // Get the 'Rated' field from OMDB response exactly as is
   // Do not default to anything - show exactly what OMDB returns
   const rated = omdbData.Rated || "Not Rated";
@@ -259,8 +241,6 @@ function convertOmdbToContentItem(
   );
 
   console.log(`[aiMatchingService] Content rating being used: ${rated}`);
-  console.log(`[aiMatchingService] Country: ${omdbData.Country || "N/A"}`);
-  console.log(`[aiMatchingService] Language: ${omdbData.Language || "N/A"}`);
 
   // Extract genre information, ensuring we handle all possible formats
   let genreStrings: string[] = [];
@@ -272,100 +252,171 @@ function convertOmdbToContentItem(
     genreStrings = omdbData.genres.map((g: any) => g.name || g);
   }
 
-  // Create a ContentItem object with all the extracted data
-  const contentItem: ContentItem = {
+  // Extract rating information
+  const rating = omdbData.imdbRating || omdbData.vote_average || "0";
+  const voteCount = omdbData.imdbVotes || omdbData.vote_count || "0";
+
+  // Extract ratings array if available
+  const ratings =
+    omdbData.Ratings && Array.isArray(omdbData.Ratings) ? omdbData.Ratings : [];
+
+  console.log(
+    `[aiMatchingService] Converting OMDB data to ContentItem: ${title} (${imdbId})`,
+  );
+  console.log(`[aiMatchingService] Plot: ${plot?.substring(0, 50)}...`);
+  console.log(`[aiMatchingService] Genres: ${genreStrings.join(", ")}`);
+  console.log(`[aiMatchingService] Rating: ${rating}`);
+  console.log(`[aiMatchingService] Content Rating: ${rated}`);
+
+  return {
     id: imdbId,
-    title,
+    imdb_id: imdbId,
+    title: title,
+    poster_path: poster !== "N/A" ? poster : "",
+    media_type: type === "movie" ? "movie" : "tv",
+    vote_average: rating !== "N/A" ? parseFloat(rating.toString()) : 0,
+    vote_count:
+      voteCount && voteCount !== "N/A"
+        ? parseInt(voteCount.toString().replace(/,/g, ""))
+        : 0,
+    genre_ids: omdbData.genre_ids || [],
+    genre_strings: genreStrings,
+    overview: plot !== "N/A" ? plot : "",
+    plot: plot !== "N/A" ? plot : "", // Add plot explicitly
+    content_rating: rated,
+    contentRating: rated, // Ensure both fields are set
+    Rated: rated, // Also set the original OMDB field name
     year:
       omdbData.Year ||
-      omdbData.year ||
-      omdbData.release_date?.substring(0, 4) ||
-      "",
-    poster,
-    plot,
-    type,
-    imdbID: imdbId,
-    rated,
-    runtime: omdbData.Runtime || omdbData.runtime || "",
-    genre: omdbData.Genre || genreStrings.join(", ") || "",
-    genre_strings: genreStrings,
-    director: omdbData.Director || omdbData.director || "",
-    actors: omdbData.Actors || omdbData.actors || "",
-    language: omdbData.Language || omdbData.language || "",
-    country: omdbData.Country || omdbData.country || "",
-    awards: omdbData.Awards || omdbData.awards || "",
-    writer: omdbData.Writer || omdbData.writer || "",
-    // Include the original recommendation reason if available
-    reason: originalRecommendation?.reason || "",
-    // Include the original synopsis if available and if the plot is empty
-    synopsis: plot || originalRecommendation?.synopsis || "",
+      (omdbData.release_date
+        ? new Date(omdbData.release_date).getFullYear().toString()
+        : ""),
+    release_date:
+      omdbData.Released !== "N/A"
+        ? omdbData.Released
+        : omdbData.release_date || omdbData.Year,
+    runtime:
+      omdbData.Runtime !== "N/A" ? omdbData.Runtime : omdbData.runtime || "",
+    director:
+      omdbData.Director !== "N/A" ? omdbData.Director : omdbData.director || "",
+    actors: omdbData.Actors !== "N/A" ? omdbData.Actors : omdbData.actors || "",
+    writer: omdbData.Writer !== "N/A" ? omdbData.Writer : omdbData.writer || "",
+    language:
+      omdbData.Language !== "N/A" ? omdbData.Language : omdbData.language || "",
+    country:
+      omdbData.Country !== "N/A" ? omdbData.Country : omdbData.country || "",
+    awards: omdbData.Awards !== "N/A" ? omdbData.Awards : omdbData.awards || "",
+    metascore:
+      omdbData.Metascore !== "N/A"
+        ? omdbData.Metascore
+        : omdbData.metascore || "",
+    production:
+      omdbData.Production !== "N/A"
+        ? omdbData.Production
+        : omdbData.production || "",
+    website:
+      omdbData.Website !== "N/A" ? omdbData.Website : omdbData.website || "",
+    boxOffice:
+      omdbData.BoxOffice !== "N/A"
+        ? omdbData.BoxOffice
+        : omdbData.boxOffice || "",
+    imdb_rating: rating !== "N/A" ? rating.toString() : "",
+    imdbRating: rating !== "N/A" ? rating.toString() : "", // Add imdbRating for consistency
+    imdbVotes: voteCount !== "N/A" ? voteCount.toString() : "",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    poster: poster !== "N/A" ? poster : "",
+    // Original OMDB fields
+    Title: title,
+    Year: omdbData.Year || "",
+    Rated: rated,
+    Released: omdbData.Released !== "N/A" ? omdbData.Released : "",
+    Runtime: omdbData.Runtime !== "N/A" ? omdbData.Runtime : "",
+    Genre: omdbData.Genre !== "N/A" ? omdbData.Genre : "",
+    Director: omdbData.Director !== "N/A" ? omdbData.Director : "",
+    Writer: omdbData.Writer !== "N/A" ? omdbData.Writer : "",
+    Actors: omdbData.Actors !== "N/A" ? omdbData.Actors : "",
+    Plot: plot,
+    Language: omdbData.Language !== "N/A" ? omdbData.Language : "",
+    Country: omdbData.Country !== "N/A" ? omdbData.Country : "",
+    Awards: omdbData.Awards !== "N/A" ? omdbData.Awards : "",
+    Poster: poster,
+    Ratings: ratings,
+    Metascore: omdbData.Metascore !== "N/A" ? omdbData.Metascore : "",
+    Type: type,
+    totalSeasons: omdbData.totalSeasons !== "N/A" ? omdbData.totalSeasons : "",
+    // Add recommendation data from original recommendation
+    recommendationReason: originalRecommendation.reason,
+    reason: originalRecommendation.reason, // Ensure both fields are set
+    synopsis: originalRecommendation.synopsis || plot,
+    aiRecommended: true,
+    aiVerified: true,
+    similarityScore: 0.9, // Add a default high similarity score
+    verified: true,
   };
-
-  return contentItem;
 }
 
 /**
  * Calculate similarity between two titles
- * @param title1 First title
- * @param title2 Second title
- * @returns Similarity score (0-1)
  */
 function calculateTitleSimilarity(title1: string, title2: string): number {
-  // Convert to lowercase for case-insensitive comparison
-  const t1 = title1.toLowerCase();
-  const t2 = title2.toLowerCase();
+  if (!title1 || !title2) return 0;
 
-  // Exact match
-  if (t1 === t2) return 1;
+  const normalize = (title: string): string => {
+    return title
+      .toLowerCase()
+      .replace(/[^\w\s]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
 
-  // Check if one contains the other
-  if (t1.includes(t2) || t2.includes(t1)) {
-    // Calculate the ratio of the shorter string to the longer one
-    const shorterLength = Math.min(t1.length, t2.length);
-    const longerLength = Math.max(t1.length, t2.length);
-    return (shorterLength / longerLength) * 0.9; // 0.9 as it's not an exact match
+  const normalizedTitle1 = normalize(title1);
+  const normalizedTitle2 = normalize(title2);
+
+  if (normalizedTitle1 === normalizedTitle2) return 1.0;
+
+  // Check if one title contains the other
+  if (
+    normalizedTitle1.includes(normalizedTitle2) ||
+    normalizedTitle2.includes(normalizedTitle1)
+  ) {
+    const lengthRatio =
+      Math.min(normalizedTitle1.length, normalizedTitle2.length) /
+      Math.max(normalizedTitle1.length, normalizedTitle2.length);
+    return 0.7 + 0.3 * lengthRatio;
   }
 
   // Calculate Levenshtein distance
-  const distance = levenshteinDistance(t1, t2);
-  const maxLength = Math.max(t1.length, t2.length);
+  const distance = levenshteinDistance(normalizedTitle1, normalizedTitle2);
+  const maxLength = Math.max(normalizedTitle1.length, normalizedTitle2.length);
 
-  // Convert distance to similarity score (1 - normalized distance)
-  return Math.max(0, 1 - distance / maxLength);
+  return maxLength > 0 ? 1 - distance / maxLength : 0;
 }
 
 /**
  * Calculate Levenshtein distance between two strings
- * @param a First string
- * @param b Second string
- * @returns Levenshtein distance
  */
-function levenshteinDistance(a: string, b: string): number {
-  const matrix = [];
+function levenshteinDistance(str1: string, str2: string): number {
+  const m = str1.length;
+  const n = str2.length;
 
-  // Initialize matrix
-  for (let i = 0; i <= b.length; i++) {
-    matrix[i] = [i];
-  }
+  const dp: number[][] = Array(m + 1)
+    .fill(null)
+    .map(() => Array(n + 1).fill(0));
 
-  for (let j = 0; j <= a.length; j++) {
-    matrix[0][j] = j;
-  }
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
 
-  // Fill matrix
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      if (b.charAt(i - 1) === a.charAt(j - 1)) {
-        matrix[i][j] = matrix[i - 1][j - 1];
-      } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j - 1] + 1, // substitution
-          matrix[i][j - 1] + 1, // insertion
-          matrix[i - 1][j] + 1, // deletion
-        );
-      }
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost,
+      );
     }
   }
 
-  return matrix[b.length][a.length];
+  return dp[m][n];
 }
