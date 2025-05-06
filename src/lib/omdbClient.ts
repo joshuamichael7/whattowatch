@@ -526,9 +526,9 @@ function formatOMDBData(data: any): ContentItem {
     genre_strings: genreStrings,
     overview: data.Plot !== "N/A" ? data.Plot : "",
     runtime: data.Runtime !== "N/A" ? data.Runtime : "0",
-    content_rating: data.Rated !== "N/A" ? data.Rated : null,
-    contentRating: data.Rated !== "N/A" ? data.Rated : null, // Add contentRating for consistency
-    Rated: data.Rated, // Preserve original OMDB field
+    content_rating: data.Rated, // Preserve original Rated value without transformation
+    contentRating: data.Rated, // Add contentRating for consistency
+    Rated: data.Rated, // Preserve original OMDB field exactly as it comes
     streaming_providers: null,
     popularity: 0,
     year: data.Year,
@@ -547,7 +547,7 @@ function formatOMDBData(data: any): ContentItem {
     imdb_rating: data.imdbRating !== "N/A" ? data.imdbRating : "",
     imdbRating: data.imdbRating !== "N/A" ? data.imdbRating : "", // Add imdbRating for consistency
     imdbVotes: data.imdbVotes !== "N/A" ? data.imdbVotes : "",
-    Rated: data.Rated !== "N/A" ? data.Rated : "", // Original OMDB field
+    // Preserve the original Rated field exactly as it comes from OMDB without any transformation
     Released: data.Released !== "N/A" ? data.Released : "", // Original OMDB field
     Runtime: data.Runtime !== "N/A" ? data.Runtime : "", // Original OMDB field
     Genre: data.Genre !== "N/A" ? data.Genre : "", // Original OMDB field
