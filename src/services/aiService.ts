@@ -1282,10 +1282,17 @@ function levenshteinDistance(str1: string, str2: string): number {
  * Convert OMDB data to ContentItem format
  */
 function convertOmdbToContentItem(omdbData: any): ContentItem {
+  // DETAILED LOGGING: Log the raw OMDB data with focus on Rated field
   console.log("[convertOmdbToContentItem] Raw OMDB Rated field:", {
     rated: omdbData.Rated,
     hasRatedField: "Rated" in omdbData,
     ratedType: typeof omdbData.Rated,
+    ratedIsNull: omdbData.Rated === null,
+    ratedIsUndefined: omdbData.Rated === undefined,
+    ratedIsEmptyString: omdbData.Rated === "",
+    ratedIsNA: omdbData.Rated === "N/A",
+    allOmdbDataKeys: Object.keys(omdbData),
+    fullRatedField: JSON.stringify(omdbData.Rated),
   });
 
   const contentItem = {
@@ -1315,6 +1322,7 @@ function convertOmdbToContentItem(omdbData: any): ContentItem {
     Rated: omdbData.Rated, // Preserve original OMDB field
   };
 
+  // DETAILED LOGGING: Log the created content item with more details about rating fields
   console.log(
     "[convertOmdbToContentItem] Created content item with rating fields:",
     {
@@ -1322,6 +1330,11 @@ function convertOmdbToContentItem(omdbData: any): ContentItem {
       content_rating: contentItem.content_rating,
       contentRating: contentItem.contentRating,
       Rated: contentItem.Rated,
+      originalRated: omdbData.Rated,
+      content_rating_type: typeof contentItem.content_rating,
+      contentRating_type: typeof contentItem.contentRating,
+      Rated_type: typeof contentItem.Rated,
+      originalRated_type: typeof omdbData.Rated,
     },
   );
 

@@ -236,16 +236,7 @@ function convertOmdbToContentItem(
   // Log the entire OMDB data object to see all fields and values
   console.log("[aiMatchingService] Full OMDB data:", JSON.stringify(omdbData));
 
-  // Get the 'Rated' field from OMDB response exactly as is
-  // Do not default to anything - show exactly what OMDB returns
-  const rated =
-    omdbData.Rated ||
-    omdbData.rated ||
-    omdbData.content_rating ||
-    omdbData.contentRating ||
-    "Not Rated";
-
-  // Log the raw Rated field to debug
+  // DETAILED LOGGING: Log the raw Rated field from OMDB with more details
   console.log(`[aiMatchingService] Raw Rated field from OMDB:`, {
     rated: omdbData.Rated,
     ratedLowercase: omdbData.rated,
@@ -258,7 +249,10 @@ function convertOmdbToContentItem(
     ratedIsNull: omdbData.Rated === null,
     ratedIsUndefined: omdbData.Rated === undefined,
     ratedIsNA: omdbData.Rated === "N/A",
+    ratedIsEmptyString: omdbData.Rated === "",
     finalRatedValue: rated,
+    allOmdbDataKeys: Object.keys(omdbData),
+    fullOmdbData: JSON.stringify(omdbData).substring(0, 200) + "...",
   });
 
   console.log(`[aiMatchingService] Content rating being used: ${rated}`);

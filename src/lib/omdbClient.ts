@@ -496,16 +496,22 @@ function formatOMDBData(data: any): ContentItem {
   const ratings =
     data.Ratings && Array.isArray(data.Ratings) ? data.Ratings : [];
 
-  // Log the raw Rated field from OMDB
+  // DETAILED LOGGING: Log the raw Rated field from OMDB with more details
   console.log("[formatOMDBData] Raw OMDB Rated field:", {
     rated: data.Rated,
     hasRatedField: "Rated" in data,
     ratedType: typeof data.Rated,
     ratedIsNA: data.Rated === "N/A",
     ratedValue: JSON.stringify(data.Rated),
+    ratedIsUndefined: data.Rated === undefined,
+    ratedIsNull: data.Rated === null,
+    ratedIsEmptyString: data.Rated === "",
+    allDataKeys: Object.keys(data),
+    dataRatedStringified: JSON.stringify(data.Rated),
   });
 
-  return {
+  // Create the content item object
+  const contentItem = {
     id: generateUUID(),
     imdb_id: data.imdbID,
     title: data.Title,
@@ -566,6 +572,24 @@ function formatOMDBData(data: any): ContentItem {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
+
+  // DETAILED LOGGING: Log the complete content item before returning
+  console.log("[formatOMDBData] Final content item with rating fields:", {
+    content_rating: contentItem.content_rating,
+    contentRating: contentItem.contentRating,
+    Rated: contentItem.Rated,
+    originalRated: data.Rated,
+  });
+
+  // DETAILED LOGGING: Log the rating fields right after creation
+  console.log("[formatOMDBData] Rating fields after initial creation:", {
+    content_rating: contentItem.content_rating,
+    contentRating: contentItem.contentRating,
+    Rated: contentItem.Rated,
+    originalRated: data.Rated,
+  });
+
+  return contentItem;
 }
 
 // Helper function to get content details by ID
@@ -600,8 +624,25 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
       return null;
     }
 
+    // DETAILED LOGGING: Log the raw response from OMDB API
+    console.log(`[omdbClient] OMDB API raw response for ID ${id}:`, {
+      hasRatedField: "Rated" in data,
+      ratedValue: data.Rated,
+      ratedType: typeof data.Rated,
+      allFields: Object.keys(data),
+      fullRatedField: JSON.stringify(data.Rated),
+    });
+
     // Use the helper function to format OMDB data
     const contentItem = formatOMDBData(data);
+
+    // DETAILED LOGGING: Log the formatted content item to see what happened to the Rated field
+    console.log(`[omdbClient] After formatOMDBData, content_rating fields:`, {
+      content_rating: contentItem.content_rating,
+      contentRating: contentItem.contentRating,
+      Rated: contentItem.Rated,
+      originalRated: data.Rated,
+    });
 
     // Store the original IMDB ID for reference
     const imdbId = data.imdbID;
@@ -615,6 +656,14 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     contentItem.poster_path = data.Poster !== "N/A" ? data.Poster : "";
     contentItem.content_rating = data.Rated !== "N/A" ? data.Rated : undefined;
 
+    // DETAILED LOGGING: Log after setting content_rating
+    console.log(`[omdbClient] After setting content_rating:`, {
+      content_rating: contentItem.content_rating,
+      contentRating: contentItem.contentRating,
+      Rated: contentItem.Rated,
+      originalRated: data.Rated,
+    });
+
     // Skip adding to Supabase when called from VectorDatabaseDemo
     if (!window.location.pathname.includes("vector-database")) {
       try {
@@ -623,19 +672,32 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
           const { addContentToSupabase } = await import(
             "../lib/supabaseClient"
           );
-          // Log the content item for debugging
+          // DETAILED LOGGING: Log the content item before adding to Supabase
           console.log(
             `[omdbClient] Attempting to add to Supabase: ${contentItem.title}`,
             {
               id: contentItem.id,
               imdb_id: contentItem.imdb_id,
               media_type: contentItem.media_type,
+              content_rating: contentItem.content_rating,
+              contentRating: contentItem.contentRating,
+              Rated: contentItem.Rated,
+              originalRated: data.Rated,
             },
           );
           const result = await addContentToSupabase(contentItem);
           console.log(
             `[omdbClient] Added content to Supabase: ${contentItem.title}, result: ${result}`,
           );
+
+          // DETAILED LOGGING: Log the final content item after Supabase storage
+          console.log(`[omdbClient] Final content item being returned:`, {
+            title: contentItem.title,
+            content_rating: contentItem.content_rating,
+            contentRating: contentItem.contentRating,
+            Rated: contentItem.Rated,
+            originalRated: data.Rated,
+          });
         } else {
           console.error(
             "[omdbClient] Cannot add incomplete content to Supabase:",
