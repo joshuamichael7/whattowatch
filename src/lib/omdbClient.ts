@@ -23,6 +23,10 @@ async function fetchFromOmdb(params: URLSearchParams) {
       console.log(`[omdbClient] Title query: ${params.get("t")}`);
     }
 
+    console.log(
+      `[omdbClient] Full request URL: ${API_ENDPOINT}?${params.toString()}`,
+    );
+
     const response = await fetch(`${API_ENDPOINT}?${params.toString()}`);
     if (!response.ok) {
       console.error(
@@ -32,6 +36,12 @@ async function fetchFromOmdb(params: URLSearchParams) {
     }
 
     const data = await response.json();
+
+    // Log the full raw response
+    console.log(
+      `[omdbClient] Full raw OMDB API response:`,
+      JSON.stringify(data),
+    );
 
     if (data.Response === "False") {
       console.error("OMDB API error:", data.Error);
@@ -486,6 +496,9 @@ import { mapGenreStringsToIds } from "./utils";
 
 // Convert OMDB data to our format
 function formatOMDBData(data: any): ContentItem {
+  // Log the full raw response for debugging
+  console.log("[formatOMDBData] Full OMDB API response:", JSON.stringify(data));
+
   // Extract genres as an array
   const genreStrings = data.Genre ? data.Genre.split(", ") : [];
 
@@ -508,6 +521,7 @@ function formatOMDBData(data: any): ContentItem {
     ratedIsEmptyString: data.Rated === "",
     allDataKeys: Object.keys(data),
     dataRatedStringified: JSON.stringify(data.Rated),
+    fullData: JSON.stringify(data),
   });
 
   // Create the content item object
@@ -532,8 +546,8 @@ function formatOMDBData(data: any): ContentItem {
     genre_strings: genreStrings,
     overview: data.Plot !== "N/A" ? data.Plot : "",
     runtime: data.Runtime !== "N/A" ? data.Runtime : "0",
-    content_rating: data.Rated, // Preserve original Rated value without transformation
-    contentRating: data.Rated, // Add contentRating for consistency
+    content_rating: data.Rated || "Not Rated", // Use default value if missing
+    contentRating: data.Rated || "Not Rated", // Add contentRating for consistency
     Rated: data.Rated, // Preserve original OMDB field exactly as it comes
     streaming_providers: null,
     popularity: 0,
@@ -631,6 +645,7 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
       ratedType: typeof data.Rated,
       allFields: Object.keys(data),
       fullRatedField: JSON.stringify(data.Rated),
+      fullResponse: JSON.stringify(data),
     });
 
     // Use the helper function to format OMDB data
@@ -654,7 +669,19 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     // Map fields for UI compatibility
     // Ensure we're using the correct column names for the database
     contentItem.poster_path = data.Poster !== "N/A" ? data.Poster : "";
-    contentItem.content_rating = data.Rated !== "N/A" ? data.Rated : undefined;
+
+    // Improved handling of the Rated field
+    if (!data.Rated) {
+      console.warn(
+        `[omdbClient] Rated field is missing in OMDB response for ID ${id}:`,
+        data,
+      );
+      contentItem.content_rating = "Not Rated";
+    } else if (data.Rated === "N/A") {
+      contentItem.content_rating = "Not Rated";
+    } else {
+      contentItem.content_rating = data.Rated;
+    }
 
     // DETAILED LOGGING: Log after setting content_rating
     console.log(`[omdbClient] After setting content_rating:`, {
