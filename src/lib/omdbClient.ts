@@ -511,7 +511,7 @@ function formatOMDBData(data: any): ContentItem {
 
   // DETAILED LOGGING: Log the raw Rated field from OMDB with more details
   console.log("[formatOMDBData] Raw OMDB Rated field:", {
-    rated: data.Rated,
+    Rated: data.Rated,
     hasRatedField: "Rated" in data,
     ratedType: typeof data.Rated,
     ratedIsNA: data.Rated === "N/A",
@@ -641,7 +641,7 @@ export async function getContentById(id: string): Promise<ContentItem | null> {
     // DETAILED LOGGING: Log the raw response from OMDB API
     console.log(`[omdbClient] OMDB API raw response for ID ${id}:`, {
       hasRatedField: "Rated" in data,
-      ratedValue: data.Rated,
+      Rated: data.Rated,
       ratedType: typeof data.Rated,
       allFields: Object.keys(data),
       fullRatedField: JSON.stringify(data.Rated),

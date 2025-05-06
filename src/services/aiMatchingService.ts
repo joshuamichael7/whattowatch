@@ -238,7 +238,7 @@ function convertOmdbToContentItem(
 
   // DETAILED LOGGING: Log the raw Rated field from OMDB with more details
   console.log(`[aiMatchingService] Raw Rated field from OMDB:`, {
-    rated: omdbData.Rated,
+    Rated: omdbData.Rated,
     ratedLowercase: omdbData.rated,
     contentRating: omdbData.content_rating,
     contentRatingCamelCase: omdbData.contentRating,
@@ -250,12 +250,14 @@ function convertOmdbToContentItem(
     ratedIsUndefined: omdbData.Rated === undefined,
     ratedIsNA: omdbData.Rated === "N/A",
     ratedIsEmptyString: omdbData.Rated === "",
-    finalRatedValue: rated,
+    finalRatedValue: omdbData.Rated,
     allOmdbDataKeys: Object.keys(omdbData),
     fullOmdbData: JSON.stringify(omdbData).substring(0, 200) + "...",
   });
 
-  console.log(`[aiMatchingService] Content rating being used: ${rated}`);
+  console.log(
+    `[aiMatchingService] Content rating being used: ${omdbData.Rated}`,
+  );
 
   // Extract genre information, ensuring we handle all possible formats
   let genreStrings: string[] = [];
@@ -281,7 +283,7 @@ function convertOmdbToContentItem(
   console.log(`[aiMatchingService] Plot: ${plot?.substring(0, 50)}...`);
   console.log(`[aiMatchingService] Genres: ${genreStrings.join(", ")}`);
   console.log(`[aiMatchingService] Rating: ${rating}`);
-  console.log(`[aiMatchingService] Content Rating: ${rated}`);
+  console.log(`[aiMatchingService] Content Rating: ${omdbData.Rated}`);
 
   return {
     id: imdbId,
@@ -298,9 +300,9 @@ function convertOmdbToContentItem(
     genre_strings: genreStrings,
     overview: plot !== "N/A" ? plot : "",
     plot: plot !== "N/A" ? plot : "", // Add plot explicitly
-    content_rating: rated,
-    contentRating: rated, // Ensure both fields are set
-    Rated: rated, // Also set the original OMDB field name
+    content_rating: omdbData.Rated,
+    contentRating: omdbData.Rated, // Ensure both fields are set
+    Rated: omdbData.Rated, // Also set the original OMDB field name
     year:
       omdbData.Year ||
       (omdbData.release_date
@@ -344,7 +346,7 @@ function convertOmdbToContentItem(
     // Original OMDB fields
     Title: title,
     Year: omdbData.Year || "",
-    Rated: rated,
+    Rated: omdbData.Rated,
     Released: omdbData.Released !== "N/A" ? omdbData.Released : "",
     Runtime: omdbData.Runtime !== "N/A" ? omdbData.Runtime : "",
     Genre: omdbData.Genre !== "N/A" ? omdbData.Genre : "",
