@@ -57,6 +57,7 @@ export async function matchRecommendationWithOmdbResults(
         plot: result.Plot || result.overview || result.plot,
         actors: result.Actors || result.actors,
         director: result.Director || result.director,
+        rated: result.Rated || result.content_rating || result.contentRating,
         genre:
           result.Genre ||
           (result.genre_strings ? result.genre_strings.join(", ") : ""),
@@ -233,17 +234,27 @@ function convertOmdbToContentItem(
 
   // Get the 'Rated' field from OMDB response exactly as is
   // Do not default to anything - show exactly what OMDB returns
-  const rated = omdbData.Rated || "Not Rated";
+  const rated =
+    omdbData.Rated ||
+    omdbData.rated ||
+    omdbData.content_rating ||
+    omdbData.contentRating ||
+    "Not Rated";
 
   // Log the raw Rated field to debug
   console.log(`[aiMatchingService] Raw Rated field from OMDB:`, {
     rated: omdbData.Rated,
+    ratedLowercase: omdbData.rated,
+    contentRating: omdbData.content_rating,
+    contentRatingCamelCase: omdbData.contentRating,
     ratedValue: JSON.stringify(omdbData.Rated),
     hasRatedField: "Rated" in omdbData,
+    hasRatedLowercaseField: "rated" in omdbData,
     ratedType: typeof omdbData.Rated,
     ratedIsNull: omdbData.Rated === null,
     ratedIsUndefined: omdbData.Rated === undefined,
     ratedIsNA: omdbData.Rated === "N/A",
+    finalRatedValue: rated,
   });
 
   console.log(`[aiMatchingService] Content rating being used: ${rated}`);

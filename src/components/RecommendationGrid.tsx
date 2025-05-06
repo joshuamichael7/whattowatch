@@ -30,42 +30,43 @@ export const RecommendationGrid: React.FC<RecommendationGridProps> = ({
     <div className="font-body">
       {/* Grid of recommendations */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {recommendations.map((item) => (
-          <motion.div
-            key={item.id || item.imdbID}
-            className="cursor-pointer rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => handleItemClick(item)}
-          >
-            <div className="relative pb-[150%] bg-gray-200 dark:bg-gray-800">
-              {item.poster_path ? (
-                <img
-                  src={item.poster_path}
-                  alt={item.title}
-                  className="absolute inset-0 w-full h-full object-cover"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-300 dark:bg-gray-700">
-                  <span className="text-gray-500 dark:text-gray-400 text-sm text-center px-2">
-                    No image available
-                  </span>
-                </div>
-              )}
-            </div>
-            <div className="p-3 bg-white dark:bg-gray-900">
-              <h3 className="text-sm font-medium line-clamp-2 h-10">
-                {item.title}
-              </h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {item.release_date
-                  ? new Date(item.release_date).getFullYear()
-                  : item.Year || "Unknown year"}
-              </p>
-            </div>
-          </motion.div>
-        ))}
+        {recommendations &&
+          recommendations.map((item) => (
+            <motion.div
+              key={item.id || item.imdbID}
+              className="cursor-pointer rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => handleItemClick(item)}
+            >
+              <div className="relative pb-[150%] bg-gray-200 dark:bg-gray-800">
+                {item.poster_path ? (
+                  <img
+                    src={item.poster_path}
+                    alt={item.title}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-300 dark:bg-gray-700">
+                    <span className="text-gray-500 dark:text-gray-400 text-sm text-center px-2">
+                      No image available
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="p-3 bg-white dark:bg-gray-900">
+                <h3 className="text-sm font-medium line-clamp-2 h-10">
+                  {item.title}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {item.release_date
+                    ? new Date(item.release_date).getFullYear()
+                    : item.Year || "Unknown year"}
+                </p>
+              </div>
+            </motion.div>
+          ))}
       </div>
 
       {/* Detail view */}
