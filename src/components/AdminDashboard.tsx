@@ -30,6 +30,7 @@ import HomepageContentManager from "./admin/HomepageContentManager";
 import GenreUpdater from "./GenreUpdater";
 import AutomatedImporter from "./admin/AutomatedImporter";
 import OmdbDebugTester from "./admin/OmdbDebugTester";
+import ContentRatingDebugger from "./ContentRatingDebugger";
 
 const AdminDashboard: React.FC = () => {
   const { user, profile, isLoading, isAdmin, isAdminVerified, refreshProfile } =
@@ -310,8 +311,18 @@ const AdminDashboard: React.FC = () => {
               <p className="text-muted-foreground">
                 Test and debug OMDB API responses.
               </p>
-              <div className="mt-6">
+              <div className="mt-6 space-y-6">
                 <OmdbDebugTester />
+                <div>
+                  <h3 className="text-lg font-medium">
+                    Content Rating Debugger
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    Debug the content rating field through the verification
+                    process.
+                  </p>
+                  <ContentRatingDebugger />
+                </div>
               </div>
             </TabsContent>
 

@@ -236,9 +236,15 @@ function convertOmdbToContentItem(
   const rated = omdbData.Rated || "Not Rated";
 
   // Log the raw Rated field to debug
-  console.log(
-    `[aiMatchingService] Raw Rated field from OMDB: ${JSON.stringify(omdbData.Rated)}`,
-  );
+  console.log(`[aiMatchingService] Raw Rated field from OMDB:`, {
+    rated: omdbData.Rated,
+    ratedValue: JSON.stringify(omdbData.Rated),
+    hasRatedField: "Rated" in omdbData,
+    ratedType: typeof omdbData.Rated,
+    ratedIsNull: omdbData.Rated === null,
+    ratedIsUndefined: omdbData.Rated === undefined,
+    ratedIsNA: omdbData.Rated === "N/A",
+  });
 
   console.log(`[aiMatchingService] Content rating being used: ${rated}`);
 

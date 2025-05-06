@@ -1282,7 +1282,13 @@ function levenshteinDistance(str1: string, str2: string): number {
  * Convert OMDB data to ContentItem format
  */
 function convertOmdbToContentItem(omdbData: any): ContentItem {
-  return {
+  console.log("[convertOmdbToContentItem] Raw OMDB Rated field:", {
+    rated: omdbData.Rated,
+    hasRatedField: "Rated" in omdbData,
+    ratedType: typeof omdbData.Rated,
+  });
+
+  const contentItem = {
     id: omdbData.imdbID,
     imdb_id: omdbData.imdbID,
     title: omdbData.Title,
@@ -1306,7 +1312,20 @@ function convertOmdbToContentItem(omdbData: any): ContentItem {
     actors: omdbData.Actors !== "N/A" ? omdbData.Actors : "",
     poster: omdbData.Poster !== "N/A" ? omdbData.Poster : "",
     contentRating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
+    Rated: omdbData.Rated, // Preserve original OMDB field
   };
+
+  console.log(
+    "[convertOmdbToContentItem] Created content item with rating fields:",
+    {
+      title: contentItem.title,
+      content_rating: contentItem.content_rating,
+      contentRating: contentItem.contentRating,
+      Rated: contentItem.Rated,
+    },
+  );
+
+  return contentItem;
 }
 
 /**

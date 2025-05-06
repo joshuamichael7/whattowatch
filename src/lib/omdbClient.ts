@@ -496,6 +496,15 @@ function formatOMDBData(data: any): ContentItem {
   const ratings =
     data.Ratings && Array.isArray(data.Ratings) ? data.Ratings : [];
 
+  // Log the raw Rated field from OMDB
+  console.log("[formatOMDBData] Raw OMDB Rated field:", {
+    rated: data.Rated,
+    hasRatedField: "Rated" in data,
+    ratedType: typeof data.Rated,
+    ratedIsNA: data.Rated === "N/A",
+    ratedValue: JSON.stringify(data.Rated),
+  });
+
   return {
     id: generateUUID(),
     imdb_id: data.imdbID,
@@ -519,6 +528,7 @@ function formatOMDBData(data: any): ContentItem {
     runtime: data.Runtime !== "N/A" ? data.Runtime : "0",
     content_rating: data.Rated !== "N/A" ? data.Rated : null,
     contentRating: data.Rated !== "N/A" ? data.Rated : null, // Add contentRating for consistency
+    Rated: data.Rated, // Preserve original OMDB field
     streaming_providers: null,
     popularity: 0,
     year: data.Year,
