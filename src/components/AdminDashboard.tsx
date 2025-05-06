@@ -21,6 +21,7 @@ import {
   Layout,
   Tag,
   Server,
+  Bug,
 } from "lucide-react";
 import CsvManagement from "./admin/CsvManagement";
 import AdminPasswordReset from "./admin/AdminPasswordReset";
@@ -122,7 +123,7 @@ const AdminDashboard: React.FC = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="data" className="w-full">
-            <TabsList className="grid w-full grid-cols-6 mb-8">
+            <TabsList className="grid w-full grid-cols-7 mb-8">
               <TabsTrigger value="data" className="flex items-center gap-2">
                 <Database className="h-4 w-4" />
                 Data Management
@@ -149,6 +150,10 @@ const AdminDashboard: React.FC = () => {
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4" />
                 Security
+              </TabsTrigger>
+              <TabsTrigger value="debug" className="flex items-center gap-2">
+                <Bug className="h-4 w-4" />
+                Debug
               </TabsTrigger>
               <TabsTrigger value="genres" className="flex items-center gap-2">
                 <Tag className="h-4 w-4" />
@@ -300,16 +305,6 @@ const AdminDashboard: React.FC = () => {
               </div>
             </TabsContent>
 
-            <TabsContent value="genres" className="space-y-4">
-              <h3 className="text-lg font-medium">Genre Management</h3>
-              <p className="text-muted-foreground">
-                Update missing genres for content items using OMDB data.
-              </p>
-              <div className="mt-6">
-                <GenreUpdater />
-              </div>
-            </TabsContent>
-
             <TabsContent value="debug" className="space-y-4">
               <h3 className="text-lg font-medium">OMDB API Debug Tools</h3>
               <p className="text-muted-foreground">
@@ -317,6 +312,16 @@ const AdminDashboard: React.FC = () => {
               </p>
               <div className="mt-6">
                 <OmdbDebugTester />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="genres" className="space-y-4">
+              <h3 className="text-lg font-medium">Genre Management</h3>
+              <p className="text-muted-foreground">
+                Update missing genres for content items using OMDB data.
+              </p>
+              <div className="mt-6">
+                <GenreUpdater />
               </div>
             </TabsContent>
           </Tabs>
