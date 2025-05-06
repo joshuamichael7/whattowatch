@@ -62,21 +62,11 @@ exports.handler = async function (event, context) {
     const searchParams = new URLSearchParams(params);
     searchParams.set("apikey", API_KEY);
 
-    // Log the request URL (with API key redacted)
-    console.log(
-      `OMDB API Request: ${searchParams.toString().replace(API_KEY, "[REDACTED]")}`,
-    );
-
     // Make the request to OMDB API
     const response = await fetch(
       `https://www.omdbapi.com/?${searchParams.toString()}`,
     );
     const data = await response.json();
-
-    // Log the response data
-    console.log(`OMDB API Response Keys: ${Object.keys(data).join(", ")}`);
-    if (data.Rated) console.log(`OMDB API Rated field: ${data.Rated}`);
-    if (data.Title) console.log(`OMDB API Title: ${data.Title}`);
 
     return {
       statusCode: 200,

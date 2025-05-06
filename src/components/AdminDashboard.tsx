@@ -28,6 +28,7 @@ import AdminPasswordForm from "./AdminPasswordForm";
 import HomepageContentManager from "./admin/HomepageContentManager";
 import GenreUpdater from "./GenreUpdater";
 import AutomatedImporter from "./admin/AutomatedImporter";
+import OmdbDebugTester from "./admin/OmdbDebugTester";
 
 const AdminDashboard: React.FC = () => {
   const { user, profile, isLoading, isAdmin, isAdminVerified, refreshProfile } =
@@ -306,6 +307,16 @@ const AdminDashboard: React.FC = () => {
               </p>
               <div className="mt-6">
                 <GenreUpdater />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="debug" className="space-y-4">
+              <h3 className="text-lg font-medium">OMDB API Debug Tools</h3>
+              <p className="text-muted-foreground">
+                Test and debug OMDB API responses.
+              </p>
+              <div className="mt-6">
+                <OmdbDebugTester />
               </div>
             </TabsContent>
           </Tabs>
