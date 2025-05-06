@@ -57,7 +57,11 @@ export async function matchRecommendationWithOmdbResults(
         plot: result.Plot || result.overview || result.plot,
         actors: result.Actors || result.actors,
         director: result.Director || result.director,
-        rated: result.Rated || result.content_rating || result.contentRating,
+        rated:
+          result.Rated ||
+          result.rated ||
+          result.content_rating ||
+          result.contentRating,
         genre:
           result.Genre ||
           (result.genre_strings ? result.genre_strings.join(", ") : ""),
