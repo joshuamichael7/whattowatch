@@ -300,9 +300,10 @@ function convertOmdbToContentItem(
     genre_strings: genreStrings,
     overview: plot !== "N/A" ? plot : "",
     plot: plot !== "N/A" ? plot : "", // Add plot explicitly
-    content_rating: omdbData.Rated,
-    contentRating: omdbData.Rated, // Ensure both fields are set
-    Rated: omdbData.Rated, // Also set the original OMDB field name
+    content_rating:
+      omdbData.Rated !== "N/A" ? omdbData.Rated : "Rating Unknown",
+    contentRating: omdbData.Rated !== "N/A" ? omdbData.Rated : "Rating Unknown", // Ensure both fields are set
+    Rated: omdbData.Rated, // Preserve original OMDB field without transformation
     year:
       omdbData.Year ||
       (omdbData.release_date
