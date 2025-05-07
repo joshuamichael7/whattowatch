@@ -57,11 +57,7 @@ export async function matchRecommendationWithOmdbResults(
         plot: result.Plot || result.overview || result.plot,
         actors: result.Actors || result.actors,
         director: result.Director || result.director,
-        rated:
-          result.Rated ||
-          result.rated ||
-          result.content_rating ||
-          result.contentRating,
+        rated: result.Rated,
         genre:
           result.Genre ||
           (result.genre_strings ? result.genre_strings.join(", ") : ""),
@@ -236,28 +232,12 @@ function convertOmdbToContentItem(
   // Log the entire OMDB data object to see all fields and values
   console.log("[aiMatchingService] Full OMDB data:", JSON.stringify(omdbData));
 
-  // DETAILED LOGGING: Log the raw Rated field from OMDB with more details
-  console.log(`[aiMatchingService] Raw Rated field from OMDB:`, {
+  // Log the content rating fields
+  console.log("Content rating fields in ContentItem:", {
+    content_rating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
+    contentRating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
     Rated: omdbData.Rated,
-    ratedLowercase: omdbData.rated,
-    contentRating: omdbData.content_rating,
-    contentRatingCamelCase: omdbData.contentRating,
-    ratedValue: JSON.stringify(omdbData.Rated),
-    hasRatedField: "Rated" in omdbData,
-    hasRatedLowercaseField: "rated" in omdbData,
-    ratedType: typeof omdbData.Rated,
-    ratedIsNull: omdbData.Rated === null,
-    ratedIsUndefined: omdbData.Rated === undefined,
-    ratedIsNA: omdbData.Rated === "N/A",
-    ratedIsEmptyString: omdbData.Rated === "",
-    finalRatedValue: omdbData.Rated,
-    allOmdbDataKeys: Object.keys(omdbData),
-    fullOmdbData: JSON.stringify(omdbData).substring(0, 200) + "...",
   });
-
-  console.log(
-    `[aiMatchingService] Content rating being used: ${omdbData.Rated}`,
-  );
 
   // Extract genre information, ensuring we handle all possible formats
   let genreStrings: string[] = [];
@@ -300,10 +280,9 @@ function convertOmdbToContentItem(
     genre_strings: genreStrings,
     overview: plot !== "N/A" ? plot : "",
     plot: plot !== "N/A" ? plot : "", // Add plot explicitly
-    content_rating:
-      omdbData.Rated !== "N/A" ? omdbData.Rated : "Rating Unknown",
-    contentRating: omdbData.Rated !== "N/A" ? omdbData.Rated : "Rating Unknown", // Ensure both fields are set
-    Rated: omdbData.Rated, // Preserve original OMDB field without transformation
+    content_rating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
+    contentRating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
+    Rated: omdbData.Rated, // Preserve original OMDB field
     year:
       omdbData.Year ||
       (omdbData.release_date
