@@ -16,6 +16,32 @@ export async function matchRecommendationWithOmdbResults(
   },
   omdbResults: any[],
 ): Promise<ContentItem | null> {
+  // Log the input parameters
+  console.log(`[RATED_DEBUG] matchRecommendationWithOmdbResults input:`, {
+    recommendation: originalRecommendation,
+    omdbResultsCount: omdbResults.length,
+    firstOmdbResult:
+      omdbResults.length > 0 ? JSON.stringify(omdbResults[0]) : "none",
+  });
+
+  // Check if Rated field exists in any of the OMDB results
+  const hasRatedField = omdbResults.some(
+    (result) => "rated" in result || "Rated" in result,
+  );
+  console.log(
+    `[RATED_DEBUG] Any OMDB result has Rated field: ${hasRatedField}`,
+  );
+
+  // If no Rated field exists, add a default one
+  if (!hasRatedField) {
+    console.log(
+      `[RATED_DEBUG] No Rated field found in any result, adding default 'Not Rated'`,
+    );
+    omdbResults = omdbResults.map((result) => ({
+      ...result,
+      rated: "Not Rated",
+    }));
+  }
   try {
     console.log(
       "[DataIntegrityTester] Matching recommendation with OMDB results",
@@ -144,6 +170,8 @@ export async function matchRecommendationWithOmdbResults(
   }
 }
 
+import { logFullOmdbResponse, logContentItem } from "./debugRatedField";
+
 /**
  * Convert OMDB data to ContentItem format - Directly copied from DataIntegrityTester
  */
@@ -151,8 +179,18 @@ function convertOmdbToContentItem(
   omdbData: any,
   originalRecommendation: any,
 ): ContentItem {
+  // Log the raw OMDB data before any processing
+  console.log("[RATED_DEBUG] FULL RAW OMDB DATA:", JSON.stringify(omdbData));
+  logFullOmdbResponse("convertOmdbToContentItem-input", omdbData);
+
   // Extract genre information
   const genreStrings = omdbData.Genre ? omdbData.Genre.split(", ") : [];
+
+  // Force a Rated field if it doesn't exist
+  if (!("Rated" in omdbData)) {
+    console.log("[RATED_DEBUG] Rated field missing, forcing it to 'Not Rated'");
+    omdbData.Rated = "Not Rated";
+  }
 
   // Create the content item
   const contentItem: ContentItem = {
@@ -170,8 +208,8 @@ function convertOmdbToContentItem(
     genre_ids: [],
     genre_strings: genreStrings,
     overview: omdbData.Plot !== "N/A" ? omdbData.Plot : "",
-    content_rating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
-    contentRating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
+    content_rating: omdbData.Rated !== "N/A" ? omdbData.Rated : "Not Rated",
+    contentRating: omdbData.Rated !== "N/A" ? omdbData.Rated : "Not Rated",
     Rated: omdbData.Rated, // Preserve original OMDB field
     year: omdbData.Year,
     release_date:
@@ -197,11 +235,16 @@ function convertOmdbToContentItem(
   };
 
   // Log the content rating fields for debugging
-  console.log("Content rating fields in ContentItem:", {
+  console.log("[RATED_DEBUG] Content rating fields in ContentItem:", {
     content_rating: contentItem.content_rating,
     contentRating: contentItem.contentRating,
     Rated: contentItem.Rated,
+    hasRatedProperty: "Rated" in contentItem,
+    allKeys: Object.keys(contentItem),
   });
+
+  // Log the full content item
+  logContentItem("convertOmdbToContentItem-output", contentItem);
 
   return contentItem;
 }

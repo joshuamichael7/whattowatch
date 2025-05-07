@@ -517,6 +517,8 @@ export async function getPersonalizedRecommendations(
   }
 }
 
+import { logFullOmdbResponse, logContentItem } from "./debugRatedField";
+
 /**
  * Verify all recommendations upfront before displaying them
  * @param recommendations Raw recommendations from AI
@@ -563,7 +565,7 @@ async function verifyAllRecommendations(
           );
 
           const searchResponse = await fetch(
-            `/.netlify/functions/omdb?s=${encodeURIComponent(searchQuery)}`,
+            `/.netlify/functions/omdb?i=${recommendation.imdb_id || ""}&s=${encodeURIComponent(searchQuery)}&plot=full`,
           );
 
           if (!searchResponse.ok) {
@@ -573,8 +575,80 @@ async function verifyAllRecommendations(
             return { success: false, recommendation };
           }
 
-          const searchData = await searchResponse.json();
+          // Log the raw response
+          const responseText = await searchResponse.text();
+          console.log(`[RATED_DEBUG] Raw OMDB response: ${responseText}`);
+
+          // Parse the response
+          const searchData = JSON.parse(responseText);
           let searchResults = [];
+
+          // If we got a direct hit by IMDB ID
+          if (searchData.Response === "True" && searchData.Title) {
+            console.log(
+              `[RATED_DEBUG] Direct hit by IMDB ID: ${searchData.Title}`,
+            );
+            logFullOmdbResponse("direct-hit", searchData);
+
+            // Create a ContentItem directly
+            const contentItem = {
+              id: searchData.imdbID,
+              imdb_id: searchData.imdbID,
+              title: searchData.Title,
+              poster_path: searchData.Poster !== "N/A" ? searchData.Poster : "",
+              media_type: searchData.Type === "movie" ? "movie" : "tv",
+              vote_average:
+                searchData.imdbRating !== "N/A"
+                  ? parseFloat(searchData.imdbRating)
+                  : 0,
+              vote_count:
+                searchData.imdbVotes !== "N/A"
+                  ? parseInt(searchData.imdbVotes.replace(/,/g, ""))
+                  : 0,
+              genre_ids: [],
+              genre_strings: searchData.Genre
+                ? searchData.Genre.split(", ")
+                : [],
+              overview: searchData.Plot !== "N/A" ? searchData.Plot : "",
+              content_rating:
+                searchData.Rated !== "N/A" ? searchData.Rated : "Not Rated",
+              contentRating:
+                searchData.Rated !== "N/A" ? searchData.Rated : "Not Rated",
+              Rated: searchData.Rated, // Preserve original OMDB field
+              year: searchData.Year,
+              release_date:
+                searchData.Released !== "N/A"
+                  ? searchData.Released
+                  : searchData.Year,
+              runtime: searchData.Runtime !== "N/A" ? searchData.Runtime : "",
+              director:
+                searchData.Director !== "N/A" ? searchData.Director : "",
+              actors: searchData.Actors !== "N/A" ? searchData.Actors : "",
+              writer: searchData.Writer !== "N/A" ? searchData.Writer : "",
+              language:
+                searchData.Language !== "N/A" ? searchData.Language : "",
+              country: searchData.Country !== "N/A" ? searchData.Country : "",
+              awards: searchData.Awards !== "N/A" ? searchData.Awards : "",
+              metascore:
+                searchData.Metascore !== "N/A" ? searchData.Metascore : "",
+              imdb_rating:
+                searchData.imdbRating !== "N/A" ? searchData.imdbRating : "",
+              imdbRating:
+                searchData.imdbRating !== "N/A" ? searchData.imdbRating : "",
+              imdbVotes:
+                searchData.imdbVotes !== "N/A" ? searchData.imdbVotes : "",
+              poster: searchData.Poster !== "N/A" ? searchData.Poster : "",
+              plot: searchData.Plot !== "N/A" ? searchData.Plot : "",
+              recommendationReason: recommendation.reason || "AI recommended",
+              reason: recommendation.reason || "AI recommended",
+              synopsis: recommendation.synopsis || searchData.Plot,
+              aiRecommended: true,
+              verified: true,
+            };
+
+            logContentItem("direct-hit-contentItem", contentItem);
+            return { success: true, item: contentItem };
+          }
 
           if (
             searchData.Response !== "True" ||
@@ -598,7 +672,11 @@ async function verifyAllRecommendations(
                 return { success: false, recommendation };
               }
 
-              const fallbackData = await fallbackResponse.json();
+              const fallbackText = await fallbackResponse.text();
+              console.log(
+                `[RATED_DEBUG] Fallback OMDB response: ${fallbackText}`,
+              );
+              const fallbackData = JSON.parse(fallbackText);
 
               if (
                 fallbackData.Response !== "True" ||
@@ -639,8 +717,14 @@ async function verifyAllRecommendations(
 
               if (!detailResponse.ok) continue;
 
-              const detailData = await detailResponse.json();
+              const detailText = await detailResponse.text();
+              console.log(
+                `[RATED_DEBUG] Detail OMDB response for ${match.imdbID}: ${detailText}`,
+              );
+              const detailData = JSON.parse(detailText);
+
               if (detailData.Response === "True") {
+                logFullOmdbResponse(`detail-${i}`, detailData);
                 potentialMatches.push({
                   title: detailData.Title,
                   year: detailData.Year,
@@ -650,6 +734,7 @@ async function verifyAllRecommendations(
                   actors: detailData.Actors,
                   director: detailData.Director,
                   genre: detailData.Genre,
+                  rated: detailData.Rated, // Explicitly include Rated field
                   poster: detailData.Poster !== "N/A" ? detailData.Poster : "",
                 });
               }
@@ -680,6 +765,11 @@ async function verifyAllRecommendations(
 
             // Create a ContentItem from the single match
             const singleMatch = potentialMatches[0];
+            console.log(
+              `[RATED_DEBUG] Single match data:`,
+              JSON.stringify(singleMatch),
+            );
+
             const contentItem = {
               id: singleMatch.imdbID,
               imdb_id: singleMatch.imdbID,
@@ -694,6 +784,9 @@ async function verifyAllRecommendations(
                 ? singleMatch.genre.split(", ")
                 : [],
               overview: singleMatch.plot || "",
+              content_rating: singleMatch.rated || "Not Rated",
+              contentRating: singleMatch.rated || "Not Rated",
+              Rated: singleMatch.rated, // Explicitly set Rated field
               synopsis: recommendation.synopsis || singleMatch.plot || "",
               recommendationReason: recommendation.recommendationReason,
               reason: recommendation.reason,
@@ -701,6 +794,7 @@ async function verifyAllRecommendations(
               verified: true,
             };
 
+            logContentItem("single-match-contentItem", contentItem);
             return { success: true, item: contentItem };
           }
 
@@ -743,6 +837,7 @@ async function verifyAllRecommendations(
           aiMatchResponse.aiRecommended = true;
           aiMatchResponse.verified = true;
 
+          logContentItem("ai-matched-contentItem", aiMatchResponse);
           return { success: true, item: aiMatchResponse };
         } catch (error) {
           console.error(
@@ -758,6 +853,7 @@ async function verifyAllRecommendations(
     for (const result of batchResults) {
       if (result.success) {
         verifiedItems.push(result.item);
+        logContentItem("final-verified-item", result.item);
       } else {
         failedItems.push(result.recommendation);
       }
@@ -775,6 +871,17 @@ async function verifyAllRecommendations(
   console.log(
     `[verifyAllRecommendations] Failed to verify ${failedItems.length} items`,
   );
+
+  // Final check of all verified items
+  verifiedItems.forEach((item, index) => {
+    console.log(`[RATED_DEBUG] Final verified item #${index + 1}:`, {
+      title: item.title,
+      hasRatedProperty: "Rated" in item,
+      ratedValue: item.Rated,
+      content_rating: item.content_rating,
+      contentRating: item.contentRating,
+    });
+  });
 
   return verifiedItems;
 }
