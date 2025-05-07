@@ -12,32 +12,32 @@ export async function matchRecommendationWithOmdbResults(
     title: string;
     year?: string;
     reason?: string;
-    synopsis?: string; // Ensure synopsis is included
+    synopsis?: string;
   },
   omdbResults: any[],
 ): Promise<ContentItem | null> {
   try {
     console.log(
-      "[aiMatchingService] Matching recommendation with OMDB results",
+      "[DataIntegrityTester] Matching recommendation with OMDB results",
     );
     console.log(
-      `[aiMatchingService] Original recommendation: ${originalRecommendation.title} (${originalRecommendation.year || "unknown year"})`,
+      `[DataIntegrityTester] Original recommendation: ${originalRecommendation.title} (${originalRecommendation.year || "unknown year"})`,
     );
     console.log(
-      `[aiMatchingService] Found ${omdbResults.length} potential OMDB matches`,
+      `[DataIntegrityTester] Found ${omdbResults.length} potential OMDB matches`,
     );
 
     // If there's only one result, use it directly without AI verification
     if (omdbResults.length === 1) {
       console.log(
-        "[aiMatchingService] Only one result found, using it directly without AI verification",
+        "[DataIntegrityTester] Only one result found, using it directly",
       );
       return convertOmdbToContentItem(omdbResults[0], originalRecommendation);
     }
 
     // If there are no results, return null
     if (omdbResults.length === 0) {
-      console.log("[aiMatchingService] No results found");
+      console.log("[DataIntegrityTester] No results found");
       return null;
     }
 
@@ -47,7 +47,7 @@ export async function matchRecommendationWithOmdbResults(
         title: originalRecommendation.title,
         year: originalRecommendation.year,
         reason: originalRecommendation.reason,
-        synopsis: originalRecommendation.synopsis || "", // Ensure synopsis is included even if empty
+        synopsis: originalRecommendation.synopsis || "",
       },
       omdbResults: omdbResults.map((result) => ({
         title: result.Title || result.title,
@@ -57,7 +57,6 @@ export async function matchRecommendationWithOmdbResults(
         plot: result.Plot || result.overview || result.plot,
         actors: result.Actors || result.actors,
         director: result.Director || result.director,
-        rated: result.Rated,
         genre:
           result.Genre ||
           (result.genre_strings ? result.genre_strings.join(", ") : ""),
@@ -66,20 +65,17 @@ export async function matchRecommendationWithOmdbResults(
 
     // Log the synopsis to ensure it's being sent
     console.log(
-      `[matchRecommendationWithOmdbResults] Synopsis for "${originalRecommendation.title}": ${originalRecommendation.synopsis?.substring(0, 100)}${originalRecommendation.synopsis?.length > 100 ? "..." : ""}`,
+      `[DataIntegrityTester] Synopsis for "${originalRecommendation.title}": ${originalRecommendation.synopsis?.substring(0, 100)}${originalRecommendation.synopsis?.length > 100 ? "..." : ""}`,
     );
 
     // Call the AI matching function
-    console.log(
-      "[aiMatchingService] Sending request to AI content matcher with prompt:",
-      JSON.stringify(prompt, null, 2),
-    );
+    console.log("[DataIntegrityTester] Sending request to AI content matcher");
     const response = await axios.post(
       "/.netlify/functions/ai-content-matcher",
       prompt,
     );
     console.log(
-      "[aiMatchingService] Received response from AI content matcher:",
+      "[DataIntegrityTester] Received response from AI content matcher:",
       response.data,
     );
 
@@ -88,11 +84,10 @@ export async function matchRecommendationWithOmdbResults(
       const confidence = response.data.matchedResult.confidence;
       const reason = response.data.matchedResult.reasonForMatch;
       console.log(
-        `[aiMatchingService] AI matched with IMDB ID: ${matchedImdbId}, confidence: ${confidence}, reason: ${reason}`,
+        `[DataIntegrityTester] AI matched with IMDB ID: ${matchedImdbId}, confidence: ${confidence}, reason: ${reason}`,
       );
 
       // Find the full OMDB result that matches the AI's choice
-      // Check both imdbID and imdb_id fields since data might be in either format
       const matchedOmdbResult = omdbResults.find(
         (result) =>
           result.imdbID === matchedImdbId || result.imdb_id === matchedImdbId,
@@ -100,88 +95,47 @@ export async function matchRecommendationWithOmdbResults(
 
       if (matchedOmdbResult) {
         console.log(
-          `[aiMatchingService] Found matching OMDB result: ${matchedOmdbResult.Title || matchedOmdbResult.title} (${matchedOmdbResult.Year || matchedOmdbResult.year})`,
+          `[DataIntegrityTester] Found matching OMDB result: ${matchedOmdbResult.Title || matchedOmdbResult.title}`,
         );
-        const contentItem = convertOmdbToContentItem(
+        return convertOmdbToContentItem(
           matchedOmdbResult,
           originalRecommendation,
         );
-        console.log("[aiMatchingService] Converted content item:", contentItem);
-        return contentItem;
       } else {
         console.error(
-          "[aiMatchingService] AI returned an IMDB ID that doesn't match any of the provided results",
-        );
-        console.log("[aiMatchingService] AI returned IMDB ID:", matchedImdbId);
-        console.log(
-          "[aiMatchingService] Available OMDB results:",
-          omdbResults.map((r) => ({
-            imdbID: r.imdbID || r.imdb_id,
-            title: r.Title || r.title,
-            year: r.Year || r.year,
-          })),
+          "[DataIntegrityTester] AI returned an IMDB ID that doesn't match any of the provided results",
         );
 
-        // Even if we can't find a direct match, try to find a close match by title
-        // This helps in cases where the AI returned a correct ID but in a different format
-        const sortedResults = [...omdbResults].sort((a, b) => {
-          const aSimilarity = calculateTitleSimilarity(
-            originalRecommendation.title,
-            a.Title || a.title || "",
-          );
-          const bSimilarity = calculateTitleSimilarity(
-            originalRecommendation.title,
-            b.Title || b.title || "",
-          );
-          return bSimilarity - aSimilarity;
-        });
-
-        if (sortedResults.length > 0) {
-          console.log("[aiMatchingService] Using best title match as fallback");
+        // Fallback to the first result
+        if (omdbResults.length > 0) {
+          console.log("[DataIntegrityTester] Falling back to first result");
           return convertOmdbToContentItem(
-            sortedResults[0],
+            omdbResults[0],
             originalRecommendation,
           );
         }
       }
     }
 
-    // Fallback: If AI matching fails, use the first result with highest title similarity
-    console.log(
-      "[aiMatchingService] Falling back to title similarity matching",
-    );
-    const sortedResults = [...omdbResults].sort((a, b) => {
-      const aSimilarity = calculateTitleSimilarity(
-        originalRecommendation.title,
-        a.Title || a.title || "",
-      );
-      const bSimilarity = calculateTitleSimilarity(
-        originalRecommendation.title,
-        b.Title || b.title || "",
-      );
-      return bSimilarity - aSimilarity;
-    });
-
-    // Make sure we have a valid result before converting
-    if (sortedResults.length > 0) {
-      const bestMatch = sortedResults[0];
+    // Fallback to the first result if AI matching fails
+    if (omdbResults.length > 0) {
       console.log(
-        `[aiMatchingService] Best match by title similarity: ${bestMatch.Title || bestMatch.title}`,
+        "[DataIntegrityTester] AI matching failed, using first result",
       );
-      return convertOmdbToContentItem(bestMatch, originalRecommendation);
+      return convertOmdbToContentItem(omdbResults[0], originalRecommendation);
     }
 
     return null;
   } catch (error) {
     console.error(
-      "[aiMatchingService] Error matching recommendation with OMDB results:",
+      "[DataIntegrityTester] Error matching recommendation with OMDB results:",
       error,
     );
 
     // Fallback to the first result if there's an error
     if (omdbResults.length > 0) {
       console.log(
-        "[aiMatchingService] Error occurred, falling back to first OMDB result",
+        "[DataIntegrityTester] Error occurred, falling back to first OMDB result",
       );
       return convertOmdbToContentItem(omdbResults[0], originalRecommendation);
     }
@@ -191,170 +145,69 @@ export async function matchRecommendationWithOmdbResults(
 }
 
 /**
- * Convert OMDB data to ContentItem format
+ * Convert OMDB data to ContentItem format - Directly copied from DataIntegrityTester
  */
 function convertOmdbToContentItem(
   omdbData: any,
   originalRecommendation: any,
 ): ContentItem {
-  // Handle different property casing (OMDB returns Title, but our app might use title)
-  const title = omdbData.Title || omdbData.title || "Unknown Title";
-  const imdbId = omdbData.imdbID || omdbData.imdb_id;
-  const poster = omdbData.Poster || omdbData.poster_path || omdbData.poster;
-  const plot = omdbData.Plot || omdbData.overview || omdbData.plot || "";
-  // Determine media type with better detection for TV series
-  let type = omdbData.Type || omdbData.media_type || "movie";
+  // Extract genre information
+  const genreStrings = omdbData.Genre ? omdbData.Genre.split(", ") : [];
 
-  // Check for TV series indicators in the year field (e.g., "2014–2015")
-  const yearStr = omdbData.Year || "";
-  if (
-    yearStr.includes("–") ||
-    yearStr.includes("-") ||
-    yearStr.endsWith("–") ||
-    yearStr.includes("present")
-  ) {
-    type = "tv";
-    console.log(
-      `[aiMatchingService] Detected TV series from year format: ${yearStr}`,
-    );
-  }
-
-  // Normalize type values
-  if (type.toLowerCase() === "series") {
-    type = "tv";
-  }
-
-  // Log the raw OMDB data to see what fields are available
-  console.log(
-    `[aiMatchingService] OMDB data keys: ${Object.keys(omdbData).join(", ")}`,
-  );
-
-  // Log the entire OMDB data object to see all fields and values
-  console.log("[aiMatchingService] Full OMDB data:", JSON.stringify(omdbData));
-
-  // Log the content rating fields
-  console.log("Content rating fields in ContentItem:", {
-    content_rating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
-    contentRating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
-    Rated: omdbData.Rated,
-  });
-
-  // Extract genre information, ensuring we handle all possible formats
-  let genreStrings: string[] = [];
-  if (omdbData.Genre && typeof omdbData.Genre === "string") {
-    genreStrings = omdbData.Genre.split(", ");
-  } else if (omdbData.genre_strings && Array.isArray(omdbData.genre_strings)) {
-    genreStrings = omdbData.genre_strings;
-  } else if (omdbData.genres && Array.isArray(omdbData.genres)) {
-    genreStrings = omdbData.genres.map((g: any) => g.name || g);
-  }
-
-  // Extract rating information
-  const rating = omdbData.imdbRating || omdbData.vote_average || "0";
-  const voteCount = omdbData.imdbVotes || omdbData.vote_count || "0";
-
-  // Extract ratings array if available
-  const ratings =
-    omdbData.Ratings && Array.isArray(omdbData.Ratings) ? omdbData.Ratings : [];
-
-  console.log(
-    `[aiMatchingService] Converting OMDB data to ContentItem: ${title} (${imdbId})`,
-  );
-  console.log(`[aiMatchingService] Plot: ${plot?.substring(0, 50)}...`);
-  console.log(`[aiMatchingService] Genres: ${genreStrings.join(", ")}`);
-  console.log(`[aiMatchingService] Rating: ${rating}`);
-  console.log(`[aiMatchingService] Content Rating: ${omdbData.Rated}`);
-
-  return {
-    id: imdbId,
-    imdb_id: imdbId,
-    title: title,
-    poster_path: poster !== "N/A" ? poster : "",
-    media_type: type === "movie" ? "movie" : "tv",
-    vote_average: rating !== "N/A" ? parseFloat(rating.toString()) : 0,
+  // Create the content item
+  const contentItem: ContentItem = {
+    id: omdbData.imdbID,
+    imdb_id: omdbData.imdbID,
+    title: omdbData.Title,
+    poster_path: omdbData.Poster !== "N/A" ? omdbData.Poster : "",
+    media_type: omdbData.Type === "movie" ? "movie" : "tv",
+    vote_average:
+      omdbData.imdbRating !== "N/A" ? parseFloat(omdbData.imdbRating) : 0,
     vote_count:
-      voteCount && voteCount !== "N/A"
-        ? parseInt(voteCount.toString().replace(/,/g, ""))
+      omdbData.imdbVotes !== "N/A"
+        ? parseInt(omdbData.imdbVotes.replace(/,/g, ""))
         : 0,
-    genre_ids: omdbData.genre_ids || [],
+    genre_ids: [],
     genre_strings: genreStrings,
-    overview: plot !== "N/A" ? plot : "",
-    plot: plot !== "N/A" ? plot : "", // Add plot explicitly
+    overview: omdbData.Plot !== "N/A" ? omdbData.Plot : "",
     content_rating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
     contentRating: omdbData.Rated !== "N/A" ? omdbData.Rated : "",
     Rated: omdbData.Rated, // Preserve original OMDB field
-    year:
-      omdbData.Year ||
-      (omdbData.release_date
-        ? new Date(omdbData.release_date).getFullYear().toString()
-        : ""),
+    year: omdbData.Year,
     release_date:
-      omdbData.Released !== "N/A"
-        ? omdbData.Released
-        : omdbData.release_date || omdbData.Year,
-    runtime:
-      omdbData.Runtime !== "N/A" ? omdbData.Runtime : omdbData.runtime || "",
-    director:
-      omdbData.Director !== "N/A" ? omdbData.Director : omdbData.director || "",
-    actors: omdbData.Actors !== "N/A" ? omdbData.Actors : omdbData.actors || "",
-    writer: omdbData.Writer !== "N/A" ? omdbData.Writer : omdbData.writer || "",
-    language:
-      omdbData.Language !== "N/A" ? omdbData.Language : omdbData.language || "",
-    country:
-      omdbData.Country !== "N/A" ? omdbData.Country : omdbData.country || "",
-    awards: omdbData.Awards !== "N/A" ? omdbData.Awards : omdbData.awards || "",
-    metascore:
-      omdbData.Metascore !== "N/A"
-        ? omdbData.Metascore
-        : omdbData.metascore || "",
-    production:
-      omdbData.Production !== "N/A"
-        ? omdbData.Production
-        : omdbData.production || "",
-    website:
-      omdbData.Website !== "N/A" ? omdbData.Website : omdbData.website || "",
-    boxOffice:
-      omdbData.BoxOffice !== "N/A"
-        ? omdbData.BoxOffice
-        : omdbData.boxOffice || "",
-    imdb_rating: rating !== "N/A" ? rating.toString() : "",
-    imdbRating: rating !== "N/A" ? rating.toString() : "", // Add imdbRating for consistency
-    imdbVotes: voteCount !== "N/A" ? voteCount.toString() : "",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    poster: poster !== "N/A" ? poster : "",
-    // Original OMDB fields
-    Title: title,
-    Year: omdbData.Year || "",
-    Rated: omdbData.Rated,
-    Released: omdbData.Released !== "N/A" ? omdbData.Released : "",
-    Runtime: omdbData.Runtime !== "N/A" ? omdbData.Runtime : "",
-    Genre: omdbData.Genre !== "N/A" ? omdbData.Genre : "",
-    Director: omdbData.Director !== "N/A" ? omdbData.Director : "",
-    Writer: omdbData.Writer !== "N/A" ? omdbData.Writer : "",
-    Actors: omdbData.Actors !== "N/A" ? omdbData.Actors : "",
-    Plot: plot,
-    Language: omdbData.Language !== "N/A" ? omdbData.Language : "",
-    Country: omdbData.Country !== "N/A" ? omdbData.Country : "",
-    Awards: omdbData.Awards !== "N/A" ? omdbData.Awards : "",
-    Poster: poster,
-    Ratings: ratings,
-    Metascore: omdbData.Metascore !== "N/A" ? omdbData.Metascore : "",
-    Type: type,
-    totalSeasons: omdbData.totalSeasons !== "N/A" ? omdbData.totalSeasons : "",
-    // Add recommendation data from original recommendation
-    recommendationReason: originalRecommendation.reason,
-    reason: originalRecommendation.reason, // Ensure both fields are set
-    synopsis: originalRecommendation.synopsis || plot,
+      omdbData.Released !== "N/A" ? omdbData.Released : omdbData.Year,
+    runtime: omdbData.Runtime !== "N/A" ? omdbData.Runtime : "",
+    director: omdbData.Director !== "N/A" ? omdbData.Director : "",
+    actors: omdbData.Actors !== "N/A" ? omdbData.Actors : "",
+    writer: omdbData.Writer !== "N/A" ? omdbData.Writer : "",
+    language: omdbData.Language !== "N/A" ? omdbData.Language : "",
+    country: omdbData.Country !== "N/A" ? omdbData.Country : "",
+    awards: omdbData.Awards !== "N/A" ? omdbData.Awards : "",
+    metascore: omdbData.Metascore !== "N/A" ? omdbData.Metascore : "",
+    imdb_rating: omdbData.imdbRating !== "N/A" ? omdbData.imdbRating : "",
+    imdbRating: omdbData.imdbRating !== "N/A" ? omdbData.imdbRating : "",
+    imdbVotes: omdbData.imdbVotes !== "N/A" ? omdbData.imdbVotes : "",
+    poster: omdbData.Poster !== "N/A" ? omdbData.Poster : "",
+    plot: omdbData.Plot !== "N/A" ? omdbData.Plot : "",
+    recommendationReason: originalRecommendation.reason || "AI recommended",
+    reason: originalRecommendation.reason || "AI recommended",
+    synopsis: originalRecommendation.synopsis || omdbData.Plot,
     aiRecommended: true,
-    aiVerified: true,
-    similarityScore: 0.9, // Add a default high similarity score
     verified: true,
   };
+
+  // Log the content rating fields for debugging
+  console.log("Content rating fields in ContentItem:", {
+    content_rating: contentItem.content_rating,
+    contentRating: contentItem.contentRating,
+    Rated: contentItem.Rated,
+  });
+
+  return contentItem;
 }
 
 /**
- * Calculate similarity between two titles
+ * Calculate similarity between two titles - Simple utility function
  */
 function calculateTitleSimilarity(title1: string, title2: string): number {
   if (!title1 || !title2) return 0;
@@ -371,17 +224,6 @@ function calculateTitleSimilarity(title1: string, title2: string): number {
   const normalizedTitle2 = normalize(title2);
 
   if (normalizedTitle1 === normalizedTitle2) return 1.0;
-
-  // Check if one title contains the other
-  if (
-    normalizedTitle1.includes(normalizedTitle2) ||
-    normalizedTitle2.includes(normalizedTitle1)
-  ) {
-    const lengthRatio =
-      Math.min(normalizedTitle1.length, normalizedTitle2.length) /
-      Math.max(normalizedTitle1.length, normalizedTitle2.length);
-    return 0.7 + 0.3 * lengthRatio;
-  }
 
   // Calculate Levenshtein distance
   const distance = levenshteinDistance(normalizedTitle1, normalizedTitle2);
